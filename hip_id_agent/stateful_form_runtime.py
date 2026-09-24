@@ -1468,6 +1468,25 @@ def _boolean_intent(value: Any) -> Optional[bool]:
     return None
 
 
+def attempt_actual_value(node: Dict[str, Any], control: Optional[Dict[str, Any]]) -> Any:
+    """Committed value as the judge must read it.
+
+    A DDS switch's DOM value is "on" whether or not it is checked, so recording
+    it made Status (Enabled) unprovable to the section judge. Boolean switch
+    nodes record their checked state in the vocabulary of the expected value.
+    """
+    control = control or {}
+    if node.get("action") == "select_multi":
+        return control.get("selected_values")
+    wanted = _boolean_intent(node.get("expected_value"))
+    if str(node.get("action") or "") in {"select_radio", "toggle"} and _is_boolean_switch(control) and wanted is not None:
+        checked = bool(control.get("checked"))
+        if checked == wanted:
+            return node.get("expected_value")
+        return "Enabled" if checked else "Disabled"
+    return control.get("value")
+
+
 def _version_equal(expected: Any, actual: Any) -> bool:
     try:
         return float(str(expected).strip()) == float(str(actual).strip())
@@ -1669,7 +1688,7 @@ async def execute_document_type_state_graph(
             success = _value_equal(node, control)
             attempts.append({
                 "field": node.get("field_key"), "node_id": node.get("node_id"), "input_path": node.get("input_path"),
-                "expected_value": expected, "actual_value": control.get("value"), "success": success, "filled": False,
+                "expected_value": expected, "actual_value": attempt_actual_value(node, control), "success": success, "filled": False,
                 "reason": "portal-generated value verified without mutation" if success else "portal-generated value did not match expected value; mutation is forbidden",
                 "exact_verified": bool(success), "selector": control.get("selector"),
                 "row_index": node.get("row_index"), "row_kind": node.get("row_kind"), "section": node.get("section"), "order": order,
@@ -1689,7 +1708,7 @@ async def execute_document_type_state_graph(
         if (control.get("readonly") or control.get("disabled")) and _value_equal(node, control):
             attempts.append({
                 "field": node.get("field_key"), "node_id": node.get("node_id"), "input_path": node.get("input_path"),
-                "expected_value": expected, "actual_value": control.get("value"), "success": True, "filled": False,
+                "expected_value": expected, "actual_value": attempt_actual_value(node, control), "success": True, "filled": False,
                 "reason": "portal-generated read-only value verified", "exact_verified": True, "selector": control.get("selector"),
                 "row_index": node.get("row_index"), "row_kind": node.get("row_kind"), "section": node.get("section"), "order": order,
                 "executor": "verification-only", "binding_diagnostics": binding_before,
@@ -1881,7 +1900,7 @@ async def execute_document_type_state_graph(
 
         attempts.append(mask_sensitive_data({
             "field": node.get("field_key"), "node_id": node.get("node_id"), "input_path": node.get("input_path"),
-            "expected_value": expected, "value_redacted": expected, "actual_value": actual_control.get("selected_values") if node.get("action") == "select_multi" else actual_control.get("value"),
+            "expected_value": expected, "value_redacted": expected, "actual_value": attempt_actual_value(node, actual_control),
             "success": success, "filled": success, "exact_verified": bool(success), "reason": "exact committed value verified" if success else last_error,
             "selector": actual_control.get("selector"), "semantic_locator": node.get("semantic_locator"),
             "row_index": node.get("row_index"), "row_kind": node.get("row_kind"), "section": node.get("section"), "order": order,
@@ -2967,7 +2986,7 @@ async def execute_phase_state_graph(
                 "input_path": node.get("input_path"), "section": node.get("section"),
                 "row_kind": node.get("row_kind"), "row_index": node.get("row_index"),
                 "expected_value": expected,
-                "actual_value": control.get("selected_values") if node.get("action") == "select_multi" else control.get("value"),
+                "actual_value": attempt_actual_value(node, control),
                 "success": True, "filled": True, "exact_verified": True,
                 "reason": "specialized filler committed exact value" if prior_broker.get("authoritative") else "value already present but no authoritative physical fill provenance",
                 "selector": control.get("selector"),
@@ -3177,7 +3196,7 @@ async def execute_phase_state_graph(
             "node_id": node.get("node_id"), "field": node.get("field_key"), "input_path": node.get("input_path"),
             "section": node.get("section"), "row_kind": node.get("row_kind"), "row_index": node.get("row_index"),
             "expected_value": expected,
-            "actual_value": actual.get("selected_values") if actual and node.get("action") == "select_multi" else (actual or {}).get("value"),
+            "actual_value": attempt_actual_value(node, actual),
             "success": success, "filled": success, "exact_verified": success, "reason": reason,
             "selector": (actual or {}).get("selector"),
             "executor": broker_proof.get("executor") or node.get("executor"),
@@ -3213,7 +3232,7 @@ async def execute_phase_state_graph(
             continue
         prior_broker = _control_broker_proof(page, str(control.get("selector") or ""))
         attempt.update(mask_sensitive_data({
-            "actual_value": control.get("selected_values") if node.get("action") == "select_multi" else control.get("value"),
+            "actual_value": attempt_actual_value(node, control),
             "success": True, "filled": True, "exact_verified": True,
             "reason": "final live-control exact reconciliation",
             "selector": control.get("selector"),

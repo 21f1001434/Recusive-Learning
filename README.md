@@ -11,6 +11,9 @@ Fixes missions stalling at Data Map (`goal not proven ... failed_attempts: []`, 
   - Map identifier / Name / Rule Name / Transport Profile / Business Flow Name;
   - applies in both executors and in the validation gate;
   - a row-level duplicate or a conflicting object still blocks.
+- **The "Looks correct" loop is fixed.**
+  - The judge now reads a Status switch as Enabled/Disabled; it previously saw `on` or nothing.
+  - **Looks correct** on an exact-completed phase commits the phase and hands off, instead of starting another attempt.
 - **Portal-owned disabled fields** (Version, Rule Type, Rule Scope) verify against their displayed value. A mismatch reports `HIP_READONLY_PORTAL_VALUE_MISMATCH`.
 - **Document Type Status switch** is now recognised and operated as a switch. Previously Source/Target Document Type could never be proven.
 - **Failures name the field and the unmet check** for every phase.

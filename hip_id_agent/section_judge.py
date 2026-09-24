@@ -45,6 +45,10 @@ def _value_variants(value: Any) -> set[str]:
     return {v.strip() for v in out if v.strip()}
 
 
+_BOOLEAN_TRUE_WORDS = frozenset({"enable", "enabled", "yes", "true", "on", "checked", "active"})
+_BOOLEAN_FALSE_WORDS = frozenset({"disable", "disabled", "no", "false", "off", "unchecked", "inactive"})
+
+
 def _values_equal(expected: Any, actual: Any) -> bool:
     """Exact committed-value comparison with only portal display equivalences."""
     if isinstance(expected, (list, tuple, set)) or isinstance(actual, (list, tuple, set)):
@@ -57,6 +61,12 @@ def _values_equal(expected: Any, actual: Any) -> bool:
     if ev & av:
         return True
     er, ar = _norm(expected), _norm(actual)
+    # Switch/checkbox display equivalence: a checked DDS switch proves "Enabled".
+    if er and ar and (
+        (er in _BOOLEAN_TRUE_WORDS and ar in _BOOLEAN_TRUE_WORDS)
+        or (er in _BOOLEAN_FALSE_WORDS and ar in _BOOLEAN_FALSE_WORDS)
+    ):
+        return True
     try:
         return float(er) == float(ar)
     except Exception:
@@ -342,12 +352,17 @@ class DualModelSectionJudge:
     return clean([own,near].filter(Boolean).join(' '));
   };
   const root=document.querySelector(rootSelector)||document.body;
-  const controls=Array.from(root.querySelectorAll('input,textarea,select,[role=combobox],[role=radio],[role=checkbox]'))
+  const controls=Array.from(root.querySelectorAll('input,textarea,select,[role=combobox],[role=radio],[role=checkbox],[role=switch]'))
     .filter(visible).map(el=>{
       let value='';
       if(el.tagName==='SELECT') value=clean(el.selectedOptions?.[0]?.textContent||el.value);
       else value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');
-      if((el.type==='radio'||el.type==='checkbox') && el.checked) value=value||'checked';
+      const role=(el.getAttribute('role')||'').toLowerCase();
+      if(el.type==='radio'||el.type==='checkbox'||role==='switch'||role==='checkbox'||role==='radio'){
+        // A checkbox's value attribute is 'on' whether or not it is checked.
+        const isChecked=!!(el.checked||el.getAttribute('aria-checked')==='true');
+        value=isChecked ? ((value && value!=='on') ? value : 'checked') : '';
+      }
       const r=el.getBoundingClientRect();
       return {selector:path(el),label:labelFor(el),value,role:el.getAttribute('role')||'',type:el.type||'',required:!!el.required||el.getAttribute('aria-required')==='true',disabled:!!el.disabled||el.getAttribute('aria-disabled')==='true',x:r.x,y:r.y,w:r.width,h:r.height};
     });

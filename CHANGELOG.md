@@ -1,5 +1,6 @@
 # V243R13 — All-phase completion + learning/RSI unblock (2026-09-24)
 
+- Fixed the endless "Looks correct" loop. Switch evidence records the checked state (`attempt_actual_value`), the judge accepts Enabled/checked equivalence and captures `role=switch`, and **Looks correct** on an exact-completed recovery request commits the phase (`accepted_human_override`).
 - Full HIP missions now run recursive self-improvement (replay + model-champion dreaming, skill review) after the replay episode, via the new `mission_learning.close_mission_learning_loop()`. `skill_library_from_config()` is shared by missions and portal tasks.
 - Added end-to-end learning-loop tests: continuous learning → replay exploitation, mission RSI → model champions, flow-pattern memory run 1 → run 2.
 

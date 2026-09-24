@@ -209,10 +209,12 @@ class HumanPhaseReviewStore:
         exact_safe = bool(row.get("deterministic_pass") or row.get("exact_checkpoint_pass"))
         effective = verdict_norm
         if row.get("request_type") == "incomplete_phase_recovery":
-            # A recovery-button click is only a resume/recheck signal. It cannot
-            # approve an incomplete phase, but it should not be rewritten into a
-            # rejection either: the live browser will be re-proved after resume.
-            effective = "recheck_live_phase"
+            # Without exact proof a recovery click only means "resume and re-prove".
+            # With exact proof (every input-owned value committed and verified) the
+            # only remaining blocker is judge/evidence disagreement, which a human
+            # "Looks correct" is allowed to reconcile. Treating that approval as a
+            # recheck re-ran the same judge and re-asked forever.
+            effective = "pass" if (verdict_norm == "pass" and row.get("exact_checkpoint_pass")) else "recheck_live_phase"
         elif verdict_norm == "pass" and not exact_safe:
             # R9: do not silently turn an explicit human "Looks correct" into a
             # rejection.  The controller must first perform a read-only live reproof

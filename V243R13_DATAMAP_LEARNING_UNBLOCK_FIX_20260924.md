@@ -45,6 +45,21 @@ and Start teaching / Finish & learn did not learn anything.
   The mission now runs the same RSI cycle after its replay episode. The new `mission_learning.close_mission_learning_loop()` writes `recursive_self_improvement.json` in the run folder and updates `data/hip_memory/recursive_self_improvement/`.
 - Every learning store was round-trip verified: learn → write to disk → reload → exploit. The stores are continuous learning, capability graph, Portal Brain, trajectory memory, replay policy (including dreaming), model portfolio champions, RSI state, induced skills, deterministic recipes, flow-pattern fast replay, human phase review, human teaching, interactive teaching and the website world model. After the masking fixes, none of their files contain `***MASKED***`.
 
+### "Looks correct" loop on an exact-completed phase (run `UHAUL-POASN-20260924-181014`)
+
+- **Symptom.** The exact checkpoint was PASS, yet the judge reported Status `{"expected": "Enabled", "actual_candidates": []}`. Clicking **Looks correct** started another attempt, and the same review reappeared each time.
+- **Cause 1: the judge could not read a switch.**
+  - A DDS switch's DOM `value` is `"on"` whether or not it is checked.
+  - The judge's live capture ignored `role="switch"`.
+  - The saved DOM does not serialize the `checked` property.
+- **Fix 1.**
+  - Executors record a switch's checked state as `Enabled` or `Disabled` (`attempt_actual_value`).
+  - The judge treats Enabled/Yes/On/checked as equivalent and captures `role="switch"` by its checked state.
+  - Text and vision claims that contradict this exact evidence are reconciled.
+  - A genuinely disabled switch is still caught.
+- **Cause 2: approval was discarded.** On a recovery request, **Looks correct** was always rewritten to `recheck_live_phase`, even when the exact checkpoint had passed.
+- **Fix 2.** On an exact-completed phase, **Looks correct** now commits the phase (`pass_human_confirmed`, `phase_acceptance_commit.json`) and hands off to the next phase. Without exact proof it still only re-checks, and **Needs correction** still repairs.
+
 ## Fixes
 
 - `security.py`:
@@ -81,6 +96,7 @@ The new tests:
 | `test_v243r13_all_phase_existing_object_replicas.py` | Document Type, Rule, Transport Profile and BizFlow replicas with their golden duplicate messages and disabled fields: goal proven on cycle 1. The validation gate accepts each golden message. |
 | `test_v243r13_universal_task_fill_and_learn.py` | A task-box form fill reaches `100_percent_runtime_input_exact_readback`, and the learned blueprint is value-free. |
 | `test_v243r13_learning_loop_end_to_end.py` | Continuous learning promotes trusted knowledge and replay exploits it after reload. Mission RSI elects model champions and persists its cycles. Flow-pattern memory learned on run 1 drives run 2. |
+| `test_v243r13_judge_switch_and_human_accept.py` | A checked Status switch is proven as Enabled, and a disabled one is still caught. Status and version model claims are reconciled. Live capture reads switches. **Looks correct** on an exact-completed phase is accepted once, and without exact proof it still only re-checks. |
 | `test_v243r13_learning_memory_roundtrip.py` | Finish & learn captures from the saved session. Recipes, induced skills and replay policies still match a re-worded task after reload. |
 
 ## Apply

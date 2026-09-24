@@ -965,7 +965,7 @@ def _artifact_actual_state(run_dir: Path, attempts: Sequence[Dict[str, Any]], fo
                 elif "attribute" in legend.lower():
                     row_counts["attribute_rows"] = len(rows)
 
-            for el in soup.select("input, textarea, select, [role='combobox'], [role='radio'], [role='checkbox']"):
+            for el in soup.select("input, textarea, select, [role='combobox'], [role='radio'], [role='checkbox'], [role='switch']"):
                 eid = str(el.get("id") or "")
                 labelled = str(el.get("aria-labelledby") or "").split()
                 label_parts: List[str] = []
@@ -997,10 +997,10 @@ def _artifact_actual_state(run_dir: Path, attempts: Sequence[Dict[str, Any]], fo
                         opt = el.find("option", selected=True)
                         value = clean(opt.get_text(" ", strip=True) if opt else value)
                 checked = el.has_attr("checked") or str(el.get("aria-checked") or "").lower() == "true"
-                if control_type in {"checkbox", "radio"}:
+                if control_type in {"checkbox", "radio", "switch"}:
                     if not checked:
                         continue
-                    value = value or label or "checked"
+                    value = (value if value and value.lower() != "on" else "") or label or "checked"
                 if value not in (None, "", []):
                     controls.append({
                         "selector": f"{el.name}#{eid}" if eid else el.name,
@@ -2220,6 +2220,22 @@ async def _await_human_phase_review(store: Any, request_id: str, *, wait_seconds
         if row.get("status") == "resolved":
             return row
     return row
+
+
+def accepted_human_override(request: Any, exact_checkpoint: Any) -> Dict[str, Any]:
+    """Return the resolved review when "Looks correct" may commit the phase.
+
+    Only an exact-completed phase qualifies: every input-owned value was
+    committed and verified, so the human reconciles a judge/evidence-only
+    disagreement. Anything else stays a resume-and-re-prove signal.
+    """
+    if not isinstance(request, dict) or request.get("status") != "resolved":
+        return {}
+    if str(request.get("effective_human_verdict") or "") != "pass":
+        return {}
+    if not (isinstance(exact_checkpoint, dict) and exact_checkpoint.get("pass") is True):
+        return {}
+    return dict(request)
 
 
 async def _hold_incomplete_phase_for_human(
@@ -3861,11 +3877,8 @@ class FullDummyFillE2EFlow:
                                 "browser_replay_performed": False,
                             })
                             safe_write_json(phase_dir / "phase_execution_attempts.json", phase_attempts)
-                            await _learning_finish(
-                                phase, attempt_no, success=False, verification=verification,
-                                judge_result=judge_result, error=json.dumps(diagnosis, ensure_ascii=False, default=str)[:8000],
-                                phase_dir=phase_dir,
-                            )
+                            human_accepted_request: Dict[str, Any] = {}
+                            hold: Dict[str, Any] = {}
                             if self.options.hold_browser_on_incomplete_phase:
                                 hold = await _hold_incomplete_phase_for_human(
                                     store=human_phase_reviews, browser=shared_browser, run_id=ctx.run_id,
@@ -3875,15 +3888,57 @@ class FullDummyFillE2EFlow:
                                     exact_checkpoint=completed_phase_checkpoint, automated_judge=judge_result,
                                     verification=verification, config=self.config,
                                 )
+                                held_request = hold.get("request") if isinstance(hold.get("request"), dict) else {}
+                                human_accepted_request = accepted_human_override(held_request, completed_phase_checkpoint)
+                            if not human_accepted_request:
+                                await _learning_finish(
+                                    phase, attempt_no, success=False, verification=verification,
+                                    judge_result=judge_result, error=json.dumps(diagnosis, ensure_ascii=False, default=str)[:8000],
+                                    phase_dir=phase_dir,
+                                )
                                 if hold.get("resume"):
                                     # Read-only rejudge/reproof on the same live form; do
                                     # not close the browser or hand off downstream.
                                     phase_loop_started = time.monotonic()
                                     completed_phase_no_replay = False
                                     continue
-                            blocked_phase = phase
-                            runtime_self_healer.finalize_phase(phase, judge_pass=False)
-                            break
+                                blocked_phase = phase
+                                runtime_self_healer.finalize_phase(phase, judge_pass=False)
+                                break
+                            # V243R13: "Looks correct" on an exact-completed phase is the
+                            # documented reconciliation of a judge/evidence-only
+                            # disagreement. Commit and hand off; re-judging the same
+                            # evidence would block and ask again forever.
+                            judge_result = dict(judge_result)
+                            judge_result["pre_human_review_pass"] = bool(judge_result.get("pass"))
+                            judge_result["pass"] = True
+                            judge_result["status"] = "pass_human_confirmed"
+                            judge_result["human_phase_review"] = human_accepted_request
+                            judge_result["reconciled_diagnosis"] = mask_sensitive_data(diagnosis)
+                            diagnosis = {}
+                            completed_phase_no_replay = False
+                            safe_write_json(phase_dir / "section_judge_gate.json", judge_result)
+                            safe_write_json(phase_dir / "phase_acceptance_commit.json", {
+                                "schema_version": "hip.phase-acceptance-commit.v1",
+                                "phase": phase,
+                                "attempt": attempt_no,
+                                "status": "accepted",
+                                "judge_pass": True,
+                                "human_final_review_pass": True,
+                                "exact_completion_pass": True,
+                                "acceptance_source": "human_recovery_review_on_exact_completed_phase",
+                                "browser_replay_allowed": False,
+                                "next_policy": "commit phase complete and hand off; learning enrichment cannot reopen the accepted form",
+                            })
+                            phase_attempts.append({
+                                "attempt": attempt_no,
+                                "status": "accepted_human_confirmed_exact",
+                                "failure_stage": "",
+                                "exact_completion_checkpoint": completed_phase_checkpoint,
+                                "browser_replay_performed": False,
+                            })
+                            safe_write_json(phase_dir / "phase_execution_attempts.json", phase_attempts)
+                    if diagnosis:
                         decision = await runtime_self_healer.handle_failure(
                             phase=phase,
                             target_url=PHASE_URLS[phase],
