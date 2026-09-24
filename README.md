@@ -1,3 +1,24 @@
+## V243R15 — Every phase fills its whole form, and the task box uses the learned phase knowledge (2026-09-24)
+
+- **All phases are proven on full-length golden replicas**, both directly and through the real browser-session broker. Every one completes on the first cycle:
+  - Data Map;
+  - Source Document Type;
+  - Rule;
+  - Source and Target Transport Profile;
+  - BizFlow Flow Details, Configure Source, Configure Target(s) and Configure Routing.
+- **Transport Profile fixes:**
+  - System Name was filled into System Type;
+  - the Yes/No radios of Existing Account and Use Existing Folder could land in the wrong group;
+  - one failure skipped the whole form.
+- **BizFlow fixes:**
+  - no tab could pass its final check;
+  - the displayed flow version and step numbers had to bind to controls;
+  - the collapsed Step 2 was never opened;
+  - a Date And Time value that is a dropdown on screen was only typed, and lost on blur.
+- **The task box now uses the learned phase knowledge.** A task such as "create the target transport profile from input.json" or "create biz flow", or any task on an open HIP create form, runs through the same engine as a mission, including self-repair. On the Transport Profile replica, the old generic binder stopped with 5 unresolved fields and asked for help; the new path fills all 15 exactly.
+
+See `V243R15_ALL_PHASE_FULL_FORM_AND_TASK_BOX_20260924.md`. Apply with `APPLY_V243R15_IN_PLACE.ps1`; it includes R13 and R14.
+
 ## V243R14 — Document Type fills the whole form and repairs itself (2026-09-24)
 
 Fixes Source/Target Document Type filling only the *Document Type Details* section and then asking for human feedback.

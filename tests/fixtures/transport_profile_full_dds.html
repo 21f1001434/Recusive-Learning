@@ -1,0 +1,82 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HIP Create Transport Profile replica</title></head>
+<body>
+<!--HIP_DDS_KIT-->
+<script>
+/* Golden: golden_screenshots/UHAUL-POASN/Source Transport Profile.png (+ Target). */
+(function () {
+  const H = window.HIP;
+  const SYSTEMS = { 'Dell Application': ['AIC - DCE', 'AIC - EMEA'], Partner: ['dce-test-partner', 'u-haul-partner'] };
+  const GROUPS = {
+    Sender: ['dce-default-sender', 'da-sender-sftphaft-dce-shared'],
+    Receiver: ['dce-default-receiver', 'pt-receiver-sftphaft-dce-shared'],
+  };
+  const ACCOUNTS = ['haftatap10251108', 'haftattp10251114', 'haftatap10250001'];
+  const DOC_TYPES = ['XML_DellAutoASN_10_U-HAUL_ANS_IB (1.0)', 'XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB (1.0)', 'XML_DellAutoASN_10_U-HAUL_ANS_IB (2.0)'];
+  const state = { systemType: '', usage: '' };
+
+  const systemNameHost = document.createElement('div');
+  const groupHost = document.createElement('div');
+  const interfaceHost = document.createElement('div');
+  const accountHost = document.createElement('div');
+  const folderHost = document.createElement('div');
+
+  function renderInterface() {
+    H.when(interfaceHost, () => [
+      H.row(
+        H.dropdown({ label: 'Interface Environment *', name: 'interfaceEnvironment', options: ['UAT', 'PROD'] }),
+        H.radios({
+          label: 'Existing Account *', name: 'existingAccount', options: [['Yes', 'true'], ['No', 'false']],
+          onChange: (v) => setTimeout(() => H.when(accountHost, () => v === 'Yes'
+            ? H.dropdown({ label: 'Existing Account Name *', name: 'existingAccountName', options: ACCOUNTS })
+            : H.text({ label: 'Account Name *', name: 'accountName' })), 120),
+        }),
+        accountHost,
+      ),
+      H.row(
+        H.radios({
+          label: 'Use Existing Folder *', name: 'useExistingFolder', options: [['Yes', 'true'], ['No', 'false']],
+          onChange: (v) => setTimeout(() => H.when(folderHost, () => v === 'No'
+            ? H.text({ label: 'Subscription Folder *', name: 'subscriptionFolder', placeholder: 'Subscription Folder' })
+            : H.dropdown({ label: 'Existing Folder *', name: 'existingFolder', options: ['/Inbound', '/Outbound'] })), 120),
+        }),
+        folderHost,
+        H.text({ label: 'File Filtering Pattern *', name: 'fileFilteringPattern', placeholder: 'File Filtering Pattern' }),
+      ),
+      H.row(
+        H.dropdown({ label: 'Post Transfer Action *', name: 'postTransferAction', options: ['Move To Archive', 'Delete', 'None'] }),
+        H.dropdown({ label: 'Is Compression Required', name: 'isCompressionRequired', options: ['TRUE', 'FALSE'] }),
+      ),
+    ]);
+  }
+
+  const form = H.form(
+    H.row(H.dropdown({
+      label: 'System Type *', name: 'systemType', options: Object.keys(SYSTEMS),
+      onChange: (v) => { state.systemType = v; setTimeout(() => H.when(systemNameHost, () => H.dropdown({ label: 'System Name *', name: 'systemName', options: SYSTEMS[v] })), 150); },
+    })),
+    H.fieldset('Application Details :', systemNameHost, H.checkbox({ label: 'System not onboarded?', name: 'systemNotOnboarded' })),
+    H.fieldset('Transport Profile Details :',
+      H.el('<div class="notice">Notice: Transport Profile Created will be saved into Dev Environment</div>'),
+      H.fieldset('Basic Details :', H.row(
+        H.text({ label: 'Profile Name *', name: 'profileName', placeholder: 'Profile Name', duplicateMessage: 'Transport Profile already exists in DEV environment.' }),
+        H.dropdown({
+          label: 'Profile Usage *', name: 'profileUsage', options: ['Sender', 'Receiver'],
+          onChange: (v) => setTimeout(() => H.when(groupHost, () => H.dropdown({ label: 'Deployment Group *', name: 'deploymentGroup', options: GROUPS[v] })), 150),
+        }),
+        groupHost,
+      )),
+      H.fieldset('Interface Details :', H.fieldset('Primary Interface Detail :',
+        H.row(H.dropdown({ label: 'Interface Type *', name: 'interfaceType', options: ['SFTP HAFT', 'AS2', 'HTTPS'], onChange: () => setTimeout(renderInterface, 150) })),
+        interfaceHost,
+      )),
+    ),
+    H.fieldset('Tags:', H.row(H.text({ label: 'Key', name: 'key' }), H.text({ label: 'Value', name: 'tagValue', placeholder: 'Value' }))),
+    H.fieldset('Pre-process Step :', H.checkbox({ label: 'Splitter Required', name: 'splitterRequired' })),
+    H.fieldset('Document(s) Supported:', H.row(H.dropdown({ label: 'Document Type', name: 'documentType', options: DOC_TYPES }))),
+    H.fieldset('Process Steps :', H.el('<div>1 :: Step Type</div>')),
+  );
+  H.page('Create Transport Profile', form);
+})();
+</script>
+</body></html>

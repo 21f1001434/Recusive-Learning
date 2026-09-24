@@ -311,9 +311,58 @@ def _leaf_control_score(leaf: Dict[str, Any], control: Dict[str, Any], phase: st
     return score
 
 
+async def _visible_page_text(page: Any) -> str:
+    try:
+        return str(await page.evaluate("() => (document.body && document.body.innerText) || ''") or "")[:200000]
+    except Exception:
+        return ""
+
+
+_DISPLAY_ONLY_KEY_TOKENS = ("version", "number")
+
+
+def _display_only_evidence(leaf: Dict[str, Any], page_text: str) -> Optional[Dict[str, Any]]:
+    """Prove a portal-owned value that the portal shows as text, not as a control.
+
+    HIP renders some input.json values without an input: BizFlow "Current Flow
+    version : 1.0" and the process-step ordinal in "1 ::: Mapping-1".  Requiring a
+    control for them made those tabs unprovable.  Only version/number keys qualify,
+    and only with positive evidence: the value next to its label on the page, or a
+    row ordinal equal to the row's position.
+    """
+    import re
+
+    key = _norm(leaf.get("field_key"))
+    if not key or not any(token in key for token in _DISPLAY_ONLY_KEY_TOKENS):
+        return None
+    value = str(leaf.get("value") if leaf.get("value") is not None else "").strip()
+    if not value:
+        return None
+    row_idx = _path_row_index(str(leaf.get("input_path") or ""))
+    if key.endswith("number") and row_idx is not None and value == str(row_idx + 1):
+        return {"status": "portal_row_ordinal", "row_index": row_idx}
+    text = re.sub(r"\s+", " ", str(page_text or "")).lower()
+    label = _humanize_input_key(str(leaf.get("field_key") or "")).lower()
+    if not text or not label:
+        return None
+
+    def same(a: str, b: str) -> bool:
+        try:
+            return float(a) == float(b)
+        except ValueError:
+            return a.lower() == b.lower()
+
+    for match in re.finditer(re.escape(label), text):
+        window = text[match.end(): match.end() + 40]
+        for token in re.findall(r"[a-z0-9._-]+", window)[:3]:
+            if same(token.strip("."), value):
+                return {"status": "portal_display_text", "label": label}
+    return None
+
+
 def _supplement_runtime_input_graph(
     graph: Dict[str, Any], controls: Sequence[Dict[str, Any]], input_data: Dict[str, Any],
-    *, phase: str, section: Optional[str],
+    *, phase: str, section: Optional[str], page_text: str = "",
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Add safe semantic nodes for runtime input leaves missing from the static graph.
 
@@ -382,6 +431,10 @@ def _supplement_runtime_input_graph(
         second_score = ranked[1][0] if len(ranked) > 1 else -999
         margin = best_score - second_score
         if best is None or best_score < 75 or margin < 18:
+            display = _display_only_evidence(leaf, page_text)
+            if display:
+                accounted.append({"input_path": path, **display})
+                continue
             unresolved.append({
                 "input_path": path, "field_key": leaf.get("field_key"), "reason": "no unique live semantic control binding",
                 "best_score": best_score, "score_margin": margin,
@@ -763,7 +816,8 @@ async def execute_autonomous_phase_goal(
         # but never scheduled because the handwritten compiler did not know a new
         # field yet.
         working_graph, runtime_input_ledger = _supplement_runtime_input_graph(
-            working_graph, controls_before, input_data, phase=phase, section=section
+            working_graph, controls_before, input_data, phase=phase, section=section,
+            page_text=await _visible_page_text(page),
         )
         goal_values = _graph_goal_values(working_graph, section)
         goal_summary = ", ".join(f"{k}={v}" for k, v in goal_values.items() if "file" not in k)[:1600]
@@ -993,7 +1047,8 @@ async def execute_autonomous_phase_goal(
         # Reconcile once more because parent selections/repeatable-row additions
         # can reveal controls that did not exist at the beginning of the cycle.
         working_graph, runtime_input_ledger_after = _supplement_runtime_input_graph(
-            working_graph, controls_after, input_data, phase=phase, section=section
+            working_graph, controls_after, input_data, phase=phase, section=section,
+            page_text=await _visible_page_text(page),
         )
         cycle_audit["runtime_input_leaf_ledger_after"] = runtime_input_ledger_after
         shape_after = _control_fingerprint(controls_after)

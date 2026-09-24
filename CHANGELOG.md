@@ -1,3 +1,25 @@
+# V243R15 — Every phase fills its whole form; the task box uses the learned phase knowledge (2026-09-24)
+
+- Added full-length replicas of every golden create form built from DDS behaviour (`tests/fixtures/hip_dds_kit.js`): Data Map, Rule, Transport Profile, and the BizFlow wizard with its process-step accordion and routing drawer. They run through the real autonomous goal, both directly and through the `BrowserSession` broker.
+- Transport Profile:
+  - System Name is no longer bound to System Type (generic create-surface sections score alike);
+  - radios are bound and clicked within their own group (`group_label`, `select_radio_option`);
+  - only real parents block a field (`field_sequence_gate`);
+  - `Name (1.0)` equals `Name(1.0)`.
+- BizFlow:
+  - a section run is modelled on its own nodes;
+  - portal-displayed values (`current_flow_version`, step ordinals) are proven from the page;
+  - fields outside a repeatable row do not bind inside one, and unlabelled rows inherit their siblings' kind;
+  - innermost row containers are used;
+  - a collapsed Step 2 is opened (row-aware reveal);
+  - a Value that is a dropdown on screen is selected, not typed (`_effective_action`, `adapted_action`).
+- All phases:
+  - presentation-only changes (lazy `aria-selected`, `aria-invalid`, row-identity upgrade, ambiguous re-resolution) are no longer "unintended mutations";
+  - off-screen controls are not penalised during binding;
+  - reconciled attempts keep `initial_failure_reason`.
+- Task box: `resolve_hip_phase_for_task` sends tasks that name a HIP object (or target its input root or open form) through that phase's compiled graph and autonomous goal. BizFlow tasks walk the wizard tabs. Unknown forms keep the generic binder.
+- New tests: `tests/test_v243r15_*.py`. Added `APPLY_V243R15_IN_PLACE.ps1` / `VERIFY_V243R15_INSTALL.ps1`.
+
 # V243R14 — Document Type fills the whole form and repairs itself (2026-09-24)
 
 - Fixed Document Type filling only its top section. The child-visibility gate after a commit now waits only for children that commit reveals and whose other structural parents are committed (`eligible_child_nodes`). Name and Data Format Type no longer wait for the identifier Value or attribute Expressions, which appear only after their own Derived From is chosen.

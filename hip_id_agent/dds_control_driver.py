@@ -1777,6 +1777,69 @@ async def set_boolean_control(page: Page, root: Locator | None, selector: str, v
     return (await checked()) == desired
 
 
+_RADIO_TRUE = {"yes", "true", "enable", "enabled", "on", "y", "1"}
+_RADIO_FALSE = {"no", "false", "disable", "disabled", "off", "n", "0"}
+
+
+async def select_radio_option(page: Page, selector: str, value: str, *, phase: str = "") -> Optional[bool]:
+    """Choose ``value`` inside the radio group of the resolved control.
+
+    ``select_radio_value`` searches the whole section for the first radio whose
+    text matches, so on a form with two Yes/No groups (Existing Account, Use
+    Existing Folder) "No" could land in the wrong group.  This helper stays in
+    the group of the radio the resolver bound (same ``name`` or the same
+    radiogroup/fieldset) and clicks the option whose label or value means
+    ``value``.  Returns None when ``selector`` is not a radio, so callers can
+    fall back to the section-level search.
+    """
+    target = re.sub(r"\s+", " ", str(value or "").strip())
+    if not selector or not target:
+        return None
+    try:
+        found = await page.evaluate(r"""
+({selector, value, trueWords, falseWords}) => {
+  const clean=v=>String(v||'').replace(/\s+/g,' ').trim().toLowerCase();
+  const el=document.querySelector(selector);
+  if(!el) return {status:'missing'};
+  const isRadio=x=>(x.type||'').toLowerCase()==='radio'||x.getAttribute('role')==='radio';
+  if(!isRadio(el)) return {status:'not_radio'};
+  const name=el.getAttribute('name')||'';
+  let group=[];
+  if(name){const scope=el.form||el.closest('form')||document;group=Array.from(scope.querySelectorAll('input[type=radio],[role=radio]')).filter(x=>(x.getAttribute('name')||'')===name);}
+  if(group.length<2){const holder=el.closest('[role=radiogroup],fieldset')||el.parentElement&&el.parentElement.parentElement;group=holder?Array.from(holder.querySelectorAll('input[type=radio],[role=radio]')):[el];}
+  const want=clean(value);
+  const intent=trueWords.includes(want)?true:falseWords.includes(want)?false:null;
+  function css(n){if(n.id)return `${n.tagName.toLowerCase()}#${CSS.escape(n.id)}`;const p=[];let x=n;while(x&&x.nodeType===1&&p.length<9){let t=x.tagName.toLowerCase();const par=x.parentElement;if(par){const same=Array.from(par.children).filter(y=>y.tagName===x.tagName);if(same.length>1)t+=`:nth-of-type(${same.indexOf(x)+1})`;}p.unshift(t);x=par;}return p.join(' > ');}
+  const options=group.map(r=>{const lab=r.id?document.querySelector(`label[for="${CSS.escape(r.id)}"]`):r.closest('label');return {selector:css(r),label:clean((lab&&(lab.innerText||lab.textContent))||r.getAttribute('aria-label')||''),value:clean(r.value||r.getAttribute('data-value')||'')};});
+  let pick=options.find(o=>o.label===want)||options.find(o=>o.value===want);
+  if(!pick&&intent!==null)pick=options.find(o=>(intent?trueWords:falseWords).includes(o.label))||options.find(o=>(intent?trueWords:falseWords).includes(o.value));
+  return pick?{status:'found',selector:pick.selector,label:pick.label,options:options.map(o=>o.label)}:{status:'no_option',options:options.map(o=>o.label)};
+}
+""", {"selector": selector, "value": target, "trueWords": sorted(_RADIO_TRUE), "falseWords": sorted(_RADIO_FALSE)})
+    except Exception:
+        return None
+    status = str((found or {}).get("status") or "")
+    if status in {"missing", "not_radio", ""}:
+        return None
+    if status != "found":
+        return False
+    option = str(found.get("selector") or "")
+    loc = page.locator(option).first
+    try:
+        already = bool(await loc.evaluate("el => !!el.checked || el.getAttribute('aria-checked')==='true'"))
+    except Exception:
+        already = False
+    if not already:
+        await _autowebglm_primary_gate(page, action="click", selector=option, label=f"HIP Portal radio {target}", value=target)
+        if not await _broker_click(page, option, label=f"HIP Portal radio {target}", phase=phase, mutation_risk=False):
+            return False
+        await page.wait_for_timeout(180)
+    try:
+        return bool(await page.locator(option).first.evaluate("el => !!el.checked || el.getAttribute('aria-checked')==='true'"))
+    except Exception:
+        return False
+
+
 async def select_radio_value(page: Page, root: Locator | None, value: str, *, section: str = "", phase: str = "") -> bool:
     """Click and verify a visible radio by semantic label through BrowserSession."""
     target = re.sub(r"\s+", " ", str(value or "").strip())

@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import json
 import re
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 from pathlib import Path
 
 from playwright.async_api import Page
@@ -18,6 +18,7 @@ from .dds_control_driver import (
     read_last_single_select_audit,
     read_last_multiselect_audit,
     restore_filled_values,
+    select_radio_option,
     select_radio_value,
     set_text_control,
     set_text_controls_batch,
@@ -883,6 +884,13 @@ def compile_transport_profile_state_graph(payload: Dict[str, Any], phase: str) -
     )
     deployment=add("deployment_group","select_single",deployment_value,("Deployment Group",),deps=(usage,))
     interface=add("interface_type","select_single",obj.get("interface_type"),("Interface Type","Interface"),deps=(deployment,))
+    # Deployment Group options come from Profile Usage.  Profile Name, Profile
+    # Usage and Interface Type are only filled top to bottom: one of them failing
+    # must not skip the others (see form_interaction_policy.ORDERING_ONLY_RELATIONS).
+    edge(usage, deployment, obj.get("profile_usage"), "parent_value_enables_child")
+    edge(system, profile, None, "field_sequence_gate")
+    edge(profile, usage, None, "field_sequence_gate")
+    edge(deployment, interface, None, "field_sequence_gate")
 
     env=add("interface_environment","select_single",obj.get("interface_environment"),("Interface Environment","Available Environment","Environment"),deps=(interface,))
     edge(interface, env, obj.get("interface_type"))
@@ -1044,7 +1052,7 @@ async def capture_document_type_controls(page: Page) -> List[Dict[str, Any]]:
     if(low.includes('validation')&&(ph.includes('validation')||lab.includes('validation')))return 'validation_type';return '';}
   function customHost(el){let n=el;while(n&&n!==document.body){const tag=(n.tagName||'').toLowerCase();if(tag.includes('-'))return n;n=n.parentElement;}return null;}
   function semanticPath(el){const parts=[];let n=el;while(n&&n!==document.body&&parts.length<10){const tag=(n.tagName||'').toLowerCase();if(tag){let part=tag;const fc=n.getAttribute&&n.getAttribute('formcontrolname');const role=n.getAttribute&&n.getAttribute('role');if(fc)part+=`[formcontrolname=${fc}]`;else if(role)part+=`[role=${role}]`;parts.unshift(part);}n=n.parentElement;}return parts.join(' > ');}
-  return els.filter(visible).map((el,index)=>{const sec=section(el);const row=rowMeta(el,sec);const dd=el.closest('dds-dropdown');const host=customHost(el);const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const listId=el.getAttribute('aria-controls')||el.getAttribute('aria-owns')||'';const ownedList=(listId&&document.getElementById(listId))||(dd&&dd.querySelector('[role=listbox],.dds__dropdown__list,.dds__menu'));const optionRoot=ownedList||dd;const selected=optionRoot?Array.from(optionRoot.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label],[class*=dropdown__selection]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const r=el.getBoundingClientRect();const st=getComputedStyle(el);const centerX=r.left+r.width/2;const centerY=r.top+r.height/2;const hit=(r.width&&r.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,centerX)),Math.max(0,Math.min(innerHeight-1,centerY))):null;const interactable=!!(r.width&&r.height&&!el.disabled&&el.getAttribute('aria-disabled')!=='true'&&(hit===el||el.contains(hit)||hit&&hit.contains(el)));const frameworkKey=el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')||el.getAttribute('data-control-name')||el.getAttribute('name')||'';return {index,selector:css(el),semantic_path:semanticPath(el),id:el.id||'',tag:(el.tagName||'').toLowerCase(),component_tag:(host&&host.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||'',form_control_name:el.getAttribute('formcontrolname')||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||'',framework_key:frameworkKey,data_testid:el.getAttribute('data-testid')||el.getAttribute('data-test-id')||'',aria_controls:el.getAttribute('aria-controls')||'',aria_labelledby:el.getAttribute('aria-labelledby')||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_kind:row.kind,row_index:row.index,semantic_key:semantic(el,sec),raw_value:value,locked_value:el.getAttribute('data-hip-locked-value')||'',value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',selected_count:Array.from(new Set([...selected,...chips])).length,checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',interactable,pointer_events:st.pointerEvents||'',z_index:st.zIndex||'',bbox:{x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)}};});
+  return els.filter(visible).map((el,index)=>{const sec=section(el);const row=rowMeta(el,sec);const dd=el.closest('dds-dropdown');const host=customHost(el);const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const listId=el.getAttribute('aria-controls')||el.getAttribute('aria-owns')||'';const ownedList=(listId&&document.getElementById(listId))||(dd&&dd.querySelector('[role=listbox],.dds__dropdown__list,.dds__menu'));const optionRoot=ownedList||dd;const selected=optionRoot?Array.from(optionRoot.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label],[class*=dropdown__selection]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const r=el.getBoundingClientRect();const st=getComputedStyle(el);const centerX=r.left+r.width/2;const centerY=r.top+r.height/2;const hit=(r.width&&r.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,centerX)),Math.max(0,Math.min(innerHeight-1,centerY))):null;const inView=centerX>=0&&centerY>=0&&centerX<innerWidth&&centerY<innerHeight;const interactable=!!(r.width&&r.height&&!el.disabled&&el.getAttribute('aria-disabled')!=='true'&&(!inView||hit===el||el.contains(hit)||hit&&hit.contains(el)));const frameworkKey=el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')||el.getAttribute('data-control-name')||el.getAttribute('name')||'';return {index,selector:css(el),semantic_path:semanticPath(el),id:el.id||'',tag:(el.tagName||'').toLowerCase(),component_tag:(host&&host.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||'',form_control_name:el.getAttribute('formcontrolname')||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||'',framework_key:frameworkKey,data_testid:el.getAttribute('data-testid')||el.getAttribute('data-test-id')||'',aria_controls:el.getAttribute('aria-controls')||'',aria_labelledby:el.getAttribute('aria-labelledby')||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_kind:row.kind,row_index:row.index,semantic_key:semantic(el,sec),raw_value:value,locked_value:el.getAttribute('data-hip-locked-value')||'',value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',selected_count:Array.from(new Set([...selected,...chips])).length,checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',interactable,pointer_events:st.pointerEvents||'',z_index:st.zIndex||'',bbox:{x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)}};});
 }
 """
     try:
@@ -1099,6 +1107,15 @@ def _generic_create_section(value: str) -> bool:
 
 def _node_section_score(node: Dict[str, Any], actual: str) -> int:
     expected = str(node.get("section") or "")
+    # A node owned by the whole create surface (Create Map / Create Transport
+    # Profile) says nothing about which fieldset holds it.  Score every live
+    # section alike; otherwise a control placed directly under the page heading
+    # (e.g. System Type) outranks the right control inside a fieldset (System
+    # Name) on section alone.
+    if _generic_create_section(expected) and str(actual or "").strip():
+        loc = node.get("semantic_locator") if isinstance(node.get("semantic_locator"), dict) else {}
+        aliases = [str(v) for v in loc.get("section_aliases", []) if str(v).strip()]
+        return 55 if any(_section_matches(alias, actual) for alias in aliases) else 10
     if _section_matches(expected, actual):
         return 55
     loc = node.get("semantic_locator") if isinstance(node.get("semantic_locator"), dict) else {}
@@ -1346,17 +1363,64 @@ def _snapshot_bound_node_states(
     graph: Dict[str, Any],
     controls: Sequence[Dict[str, Any]],
     node_ids: Sequence[str],
+    *,
+    reference: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Dict[str, Any]]:
+    return _snapshot_node_states(
+        graph, controls, node_ids, resolve_document_type_control_diagnostics, _document_type_control_state, reference
+    )
+
+
+def _snapshot_node_states(
+    graph: Dict[str, Any],
+    controls: Sequence[Dict[str, Any]],
+    node_ids: Sequence[str],
+    resolver: Callable[..., Dict[str, Any]],
+    state_of: Callable[[Dict[str, Any]], Dict[str, Any]],
+    reference: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Snapshot committed nodes; ``reference`` is the before-snapshot.
+
+    New controls can make an already committed node ambiguous to re-resolve
+    (Step 1's disabled "Source Document Type" and Step 2's disabled "Document
+    Type" both show "Default (All/Other)").  That is not a mutation, so the
+    after-snapshot falls back to the same physical control the before-snapshot
+    used.
+    """
     wanted = {str(x) for x in node_ids}
+    by_selector = {str(c.get("selector") or ""): c for c in controls if isinstance(c, dict) and c.get("selector")}
     out: Dict[str, Dict[str, Any]] = {}
     for node in graph.get("nodes", []) if isinstance(graph.get("nodes"), list) else []:
         if not isinstance(node, dict) or str(node.get("node_id")) not in wanted:
             continue
-        diag = resolve_document_type_control_diagnostics(controls, node)
+        node_id = str(node.get("node_id"))
+        diag = resolver(controls, node)
         control = diag.get("control") if isinstance(diag.get("control"), dict) else None
+        if control is None and reference and node_id in reference:
+            control = by_selector.get(str(reference[node_id].get("selector") or ""))
         if control is not None:
-            out[str(node.get("node_id"))] = _document_type_control_state(control)
+            out[node_id] = dict(state_of(control), selector=str(control.get("selector") or ""))
     return out
+
+
+def _committed_semantics(state: Dict[str, Any]) -> Dict[str, Any]:
+    """The part of a control's state that a user would call its value.
+
+    DDS renders option ``aria-selected`` flags lazily (often only while the popup
+    is open) and Angular flips ``aria-invalid`` between "" and "false".  The row
+    binder also upgrades a row's identity from its position to a semantic anchor
+    once the row holds a value.  None of these is a mutation of a committed
+    field; the snapshot is already keyed by graph node.
+    """
+    value = _norm_text(state.get("value")).lower()
+    selected = [str(x).strip().lower() for x in state.get("selected_values") or [] if str(x).strip()]
+    return {
+        "committed": sorted(set(([value] if value else []) + selected)),
+        "checked": bool(state.get("checked")),
+        "disabled": bool(state.get("disabled")),
+        "readonly": bool(state.get("readonly")),
+        "invalid": str(state.get("aria_invalid") or "").lower() == "true",
+    }
 
 
 def _protected_state_changes(before: Dict[str, Dict[str, Any]], after: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1365,7 +1429,7 @@ def _protected_state_changes(before: Dict[str, Dict[str, Any]], after: Dict[str,
         new = after.get(node_id)
         if new is None:
             changes.append({"node_id": node_id, "change": "control_disappeared", "before": old, "after": None})
-        elif old != new:
+        elif _committed_semantics(old) != _committed_semantics(new):
             changes.append({"node_id": node_id, "change": "committed_state_changed", "before": old, "after": new})
     return changes
 
@@ -1471,6 +1535,36 @@ def _boolean_intent(value: Any) -> Optional[bool]:
     return None
 
 
+def _is_dropdown_control(control: Optional[Dict[str, Any]]) -> bool:
+    control = control or {}
+    return bool(
+        _norm(control.get("role")) in {"combobox", "listbox"}
+        or str(control.get("tag") or "").lower() == "select"
+        or _norm(control.get("component_tag")) in {"dds_dropdown", "app_generic_dropdown"}
+    )
+
+
+def _effective_action(node: Dict[str, Any], control: Optional[Dict[str, Any]]) -> str:
+    """Choose the driver from the live control, not only from the compiled graph.
+
+    input.json cannot know that the portal renders a File Name part's Value as a
+    free-text box for "Fixed Text" but as a format dropdown for "Date And Time".
+    Typing into a DDS dropdown only fills its search box (the text vanishes on
+    blur and no option is committed), and a dropdown driver cannot operate a
+    plain text box.  Pick the driver that matches what is on screen.
+    """
+    action = str(node.get("action") or "")
+    control = control or {}
+    if action == "fill_text" and _is_dropdown_control(control):
+        return "select_multi" if str(control.get("selection_mode") or "").lower() == "multiple" else "select_single"
+    if action == "select_single" and not _is_dropdown_control(control):
+        tag = str(control.get("tag") or "").lower()
+        typ = _norm(control.get("type"))
+        if tag == "textarea" or (tag == "input" and typ in {"", "text", "search", "email", "number"}):
+            return "fill_text"
+    return action
+
+
 def attempt_actual_value(node: Dict[str, Any], control: Optional[Dict[str, Any]]) -> Any:
     """Committed value as the judge must read it.
 
@@ -1481,12 +1575,22 @@ def attempt_actual_value(node: Dict[str, Any], control: Optional[Dict[str, Any]]
     control = control or {}
     if node.get("action") == "select_multi":
         return control.get("selected_values")
+    if node.get("action") == "select_single" and not _norm_text(control.get("value")):
+        # A DDS multi-select used for one value keeps an empty search input and
+        # shows the choice as a selected option/chip.
+        selected = _clean_selected_values(control.get("selected_values", []))
+        if selected:
+            return selected[0] if len(selected) == 1 else selected
     wanted = _boolean_intent(node.get("expected_value"))
     if str(node.get("action") or "") in {"select_radio", "toggle"} and _is_boolean_switch(control) and wanted is not None:
         checked = bool(control.get("checked"))
         if checked == wanted:
             return node.get("expected_value")
         return "Enabled" if checked else "Disabled"
+    if str(node.get("action") or "") == "select_radio" and _norm(control.get("type") or control.get("role")) == "radio":
+        # A radio's DOM value is often an internal token ("true"); the user-facing
+        # answer is its option label ("Yes").
+        return (control.get("label") or control.get("value")) if control.get("checked") else ""
     return control.get("value")
 
 
@@ -1756,7 +1860,9 @@ async def execute_document_type_state_graph(
         dom_cursor = await _mark_dom_transition_cursor(page)
         for retry in range(max_retries + 1):
             try:
-                action = str(node.get("action") or "")
+                action = _effective_action(node, actual_control)
+                if action != str(node.get("action") or ""):
+                    transaction_proof["adapted_action"] = {"compiled": node.get("action"), "live": action}
                 selector = str(actual_control.get("selector") or "")
                 if action == "fill_text":
                     ok = await set_text_control(page, root, selector, str(expected), phase=phase)
@@ -1775,7 +1881,9 @@ async def execute_document_type_state_graph(
                     # Dell renders Document Type Status as a DDS switch, not radios.
                     ok = await set_boolean_control(page, root, selector, expected, phase=phase)
                 elif action == "select_radio":
-                    ok = await select_radio_value(page, root, str(expected), section=str(node.get("section") or ""), phase=phase)
+                    ok = await select_radio_option(page, selector, str(expected), phase=phase)
+                    if ok is None:
+                        ok = await select_radio_value(page, root, str(expected), section=str(node.get("section") or ""), phase=phase)
                 else:
                     ok = False
                     last_error = f"unsupported stateful action: {action}"
@@ -1842,7 +1950,7 @@ async def execute_document_type_state_graph(
                     transaction_proof["multi_select_exact_set_proof"] = multi_proof
                     transaction_proof["multi_select_driver_audit"] = multi_audit
                 if current is not None and _value_equal(node, current):
-                    protected_after = _snapshot_bound_node_states(graph, current_controls, completed_node_ids)
+                    protected_after = _snapshot_bound_node_states(graph, current_controls, completed_node_ids, reference=protected_before)
                     unintended = _protected_state_changes(protected_before, protected_after)
                     transaction_proof["protected_state_changes_initial"] = unintended
                     if unintended:
@@ -1863,7 +1971,7 @@ async def execute_document_type_state_graph(
                             rebound_control = rebound.get("control") if isinstance(rebound.get("control"), dict) else None
                             if rebound_control is not None and _value_equal(node, rebound_control):
                                 current = rebound_control
-                            protected_after = _snapshot_bound_node_states(graph, current_controls, completed_node_ids)
+                            protected_after = _snapshot_bound_node_states(graph, current_controls, completed_node_ids, reference=protected_before)
                             unintended = _protected_state_changes(protected_before, protected_after)
                     transaction_proof["protected_state_changes"] = unintended
                     interaction_state = await inspect_interaction_state(page, str(current.get("selector") or ""))
@@ -2060,8 +2168,34 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
   function label(el){if(el.id){const l=document.querySelector(`label[for="${CSS.escape(el.id)}"]`);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const own=el.closest('label');if(own&&clean(own.innerText||own.textContent))return clean(own.innerText||own.textContent);const labelledBy=el.getAttribute('aria-labelledby');if(labelledBy){const l=document.getElementById(labelledBy);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const group=el.closest('.dds__form-group,.dds__input-text__container,app-generic-dropdown,dds-dropdown,dds-radio-button,.dds__radio-button,[class*=form-field],[class*=field-container]');const l=group&&group.querySelector(':scope > label,:scope > .dds__label,label,.dds__label');return clean((l&&(l.innerText||l.textContent))||el.getAttribute('aria-label')||el.getAttribute('placeholder')||el.getAttribute('name')||'');}
   function headingFrom(cur){while(cur&&cur!==document.body){const candidates=Array.from(cur.children||[]).filter(x=>/^(H1|H2|H3|H4)$/.test(x.tagName)||x.getAttribute('role')==='heading'||x.tagName==='LEGEND');for(const h of candidates){const t=clean(h.innerText||h.textContent);if(t)return t;}cur=cur.parentElement;}return '';}
   function section(el){const tab=el.closest('[role=tabpanel]');if(tab){const labelled=tab.getAttribute('aria-labelledby');if(labelled){const l=document.getElementById(labelled);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const h=tab.querySelector('h1,h2,h3,h4,[role=heading],legend');if(h&&clean(h.innerText||h.textContent))return clean(h.innerText||h.textContent);}const fs=el.closest('fieldset');const lg=fs&&fs.querySelector(':scope > legend');if(lg&&clean(lg.innerText||lg.textContent))return clean(lg.innerText||lg.textContent);return headingFrom(el.parentElement);}
-  function row(el){const array=el.closest('[formarrayname=conditions]');if(array){const direct=Array.from(array.children||[]).filter(x=>x.querySelector&&x.querySelector('[formcontrolname=conditionType],dds-dropdown[name=conditionType]'));const rr=direct.find(x=>x===el||x.contains(el));if(rr)return {signature:css(rr),text:clean(rr.innerText||rr.textContent).slice(0,240)};}const selectors=['tr','[role=row]','.dds__table__row','[class*=condition-row]','[class*=action-row]','[class*=attribute-row]','[class*=process-step]','[class*=filename-part]','[class*=file-name-part]','.dds__d-flex.dds__justify-content-start'];for(const s of selectors){const r=el.closest(s);if(r&&r.querySelectorAll('input:not([type=hidden]),textarea,select,[role=combobox],[role=radio]').length>1)return {signature:css(r),text:clean(r.innerText||r.textContent).slice(0,240)};}return {signature:'',text:''};}
-  return els.filter(visible).map((el,index)=>{const sec=section(el);const r=row(el);const dd=el.closest('dds-dropdown');const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const selected=dd?Array.from(dd.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const box=el.getBoundingClientRect();const style=getComputedStyle(el);const cx=box.left+box.width/2;const cy=box.top+box.height/2;const hit=(box.width&&box.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,cx)),Math.max(0,Math.min(innerHeight-1,cy))):null;const component=el.closest('dds-dropdown,app-generic-dropdown,dds-input,dds-textarea,dds-radio-button,dds-checkbox,dds-switch,dds-file-input,[class*=dds__]');const frameworkHost=el.closest('[formcontrolname],[ng-reflect-name],[data-control-name],dds-dropdown[name],dds-input[name],dds-textarea[name],dds-switch[name]');const inheritedFormControl=(frameworkHost&&frameworkHost.getAttribute('formcontrolname'))||'';const inheritedReflect=(frameworkHost&&frameworkHost.getAttribute('ng-reflect-name'))||'';const inheritedName=(frameworkHost&&frameworkHost.getAttribute('name'))||'';const frameworkKey=el.getAttribute('formcontrolname')||inheritedFormControl||el.getAttribute('ng-reflect-name')||inheritedReflect||el.getAttribute('data-control-name')||(frameworkHost&&frameworkHost.getAttribute('data-control-name'))||el.getAttribute('name')||inheritedName||'';const semanticPath=[sec,r.signature,frameworkKey,label(el),el.getAttribute('role')||el.getAttribute('type')||el.tagName].map(clean).filter(Boolean).join(' > ');return {index,selector:css(el),id:el.id||'',tag:(el.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||inheritedName||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_signature:r.signature,row_text:r.text,value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',form_control_name:el.getAttribute('formcontrolname')||inheritedFormControl||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||inheritedReflect||'',framework_key:frameworkKey,component_tag:component?(component.tagName||'').toLowerCase():'',semantic_path:semanticPath,bbox:{x:box.x,y:box.y,width:box.width,height:box.height},pointer_events:style.pointerEvents||'',z_index:style.zIndex||'',hit_test_selector:hit?css(hit):'',hit_test_pass:!!(hit&&(hit===el||el.contains(hit)||hit.contains(el))),interactable:!!(!el.disabled&&!el.readOnly&&style.pointerEvents!=='none'&&box.width&&box.height&&hit&&(hit===el||el.contains(hit)||hit.contains(el)))};});
+  function row(el){const array=el.closest('[formarrayname=conditions]');if(array){const direct=Array.from(array.children||[]).filter(x=>x.querySelector&&x.querySelector('[formcontrolname=conditionType],dds-dropdown[name=conditionType]'));const rr=direct.find(x=>x===el||x.contains(el));if(rr)return {signature:css(rr),text:clean(rr.innerText||rr.textContent).slice(0,240),parent:css(array)};}const selectors=['tr','[role=row]','.dds__table__row','[class*=condition-row]','[class*=action-row]','[class*=attribute-row]','[class*=process-step]','[class*=filename-part]','[class*=file-name-part]','.dds__d-flex.dds__justify-content-start'];const cands=selectors.map(s=>el.closest(s)).filter(r=>r&&r.querySelectorAll('input:not([type=hidden]),textarea,select,[role=combobox],[role=radio]').length>1);/* innermost container wins: a File Name part row inside a Process Step is its own row */const inner=cands.find(c=>cands.every(o=>o===c||!c.contains(o)));if(inner){const hint=inner.matches('[class*=filename-part],[class*=file-name-part]')?'filename_part':inner.matches('[class*=process-step]')?'process_step':inner.matches('[class*=condition-row]')?'condition':inner.matches('[class*=action-row]')?'action':inner.matches('[class*=attribute-row]')?'attribute':'';return {signature:css(inner),text:clean(inner.innerText||inner.textContent).slice(0,240),parent:inner.parentElement?css(inner.parentElement):'',hint};}return {signature:'',text:'',parent:'',hint:''};}
+  function groupInfo(el){
+    // A radio's own label is its option ("Yes"); the question it answers
+    // ("Existing Account") lives on the group.  Find the smallest container
+    // holding only this group's radios and read its label.
+    const isRadio=(el.type||'').toLowerCase()==='radio'||el.getAttribute('role')==='radio';
+    if(!isRadio)return {label:'',name:''};
+    const name=el.getAttribute('name')||'';
+    const radiosIn=n=>Array.from(n.querySelectorAll('input[type=radio],[role=radio]'));
+    let container=el.parentElement||el;let n=el.parentElement;
+    while(n&&n!==document.body){
+      const rs=radiosIn(n);
+      if(name?!rs.every(x=>(x.getAttribute('name')||'')===name):rs.length>radiosIn(container).length&&radiosIn(container).length>=2)break;
+      container=n;
+      if(n.matches('[role=radiogroup],fieldset'))break;
+      n=n.parentElement;
+    }
+    const isOptionLabel=l=>{const f=l.getAttribute&&l.getAttribute('for');if(f){const t=document.getElementById(f);if(t&&((t.type||'').toLowerCase()==='radio'||t.getAttribute('role')==='radio'))return true;}return !!(l.querySelector&&l.querySelector('input[type=radio],[role=radio]'));};
+    let text='';
+    const lb=container.getAttribute('aria-labelledby');
+    if(lb)text=clean(lb.split(/\s+/).map(i=>{const x=document.getElementById(i);return x?(x.innerText||x.textContent):'';}).join(' '));
+    if(!text)text=clean(container.getAttribute('aria-label')||'');
+    if(!text){const lg=container.querySelector(':scope > legend');if(lg)text=clean(lg.innerText||lg.textContent);}
+    if(!text){const c=Array.from(container.querySelectorAll('label,.dds__label,legend')).find(l=>!isOptionLabel(l));if(c)text=clean(c.innerText||c.textContent);}
+    if(!text){let p=container;for(let i=0;i<3&&p&&!text;i++){let sib=p.previousElementSibling;while(sib&&!text){if(!sib.querySelector('input,select,textarea,[role=combobox]')){const t=clean(sib.innerText||sib.textContent);if(t&&t.length<80)text=t;}sib=sib.previousElementSibling;}p=p.parentElement;}}
+    return {label:text,name};
+  }
+  return els.filter(visible).map((el,index)=>{const sec=section(el);const r=row(el);const dd=el.closest('dds-dropdown');const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const selected=dd?Array.from(dd.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const box=el.getBoundingClientRect();const style=getComputedStyle(el);const cx=box.left+box.width/2;const cy=box.top+box.height/2;const hit=(box.width&&box.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,cx)),Math.max(0,Math.min(innerHeight-1,cy))):null;const component=el.closest('dds-dropdown,app-generic-dropdown,dds-input,dds-textarea,dds-radio-button,dds-checkbox,dds-switch,dds-file-input,[class*=dds__]');const frameworkHost=el.closest('[formcontrolname],[ng-reflect-name],[data-control-name],dds-dropdown[name],dds-input[name],dds-textarea[name],dds-switch[name]');const inheritedFormControl=(frameworkHost&&frameworkHost.getAttribute('formcontrolname'))||'';const inheritedReflect=(frameworkHost&&frameworkHost.getAttribute('ng-reflect-name'))||'';const inheritedName=(frameworkHost&&frameworkHost.getAttribute('name'))||'';const frameworkKey=el.getAttribute('formcontrolname')||inheritedFormControl||el.getAttribute('ng-reflect-name')||inheritedReflect||el.getAttribute('data-control-name')||(frameworkHost&&frameworkHost.getAttribute('data-control-name'))||el.getAttribute('name')||inheritedName||'';const semanticPath=[sec,r.signature,frameworkKey,label(el),el.getAttribute('role')||el.getAttribute('type')||el.tagName].map(clean).filter(Boolean).join(' > ');const gi=groupInfo(el);return {index,selector:css(el),group_label:gi.label,group_name:gi.name,id:el.id||'',tag:(el.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||inheritedName||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_signature:r.signature,row_text:r.text,row_parent:r.parent||'',row_kind_hint:r.hint||'',value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',form_control_name:el.getAttribute('formcontrolname')||inheritedFormControl||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||inheritedReflect||'',framework_key:frameworkKey,component_tag:component?(component.tagName||'').toLowerCase():'',semantic_path:semanticPath,bbox:{x:box.x,y:box.y,width:box.width,height:box.height},pointer_events:style.pointerEvents||'',z_index:style.zIndex||'',hit_test_selector:hit?css(hit):'',hit_test_pass:!!(hit&&(hit===el||el.contains(hit)||hit.contains(el))),interactable:!!(!el.disabled&&!el.readOnly&&style.pointerEvents!=='none'&&box.width&&box.height&&(!(cx>=0&&cy>=0&&cx<innerWidth&&cy<innerHeight)||hit&&(hit===el||el.contains(hit)||hit.contains(el))))};});
 }
 """
     selector = "input:not([type=hidden]),textarea,select,[role='combobox'],[role='radio'],[role='checkbox'],[role='switch']"
@@ -2106,7 +2240,14 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
                 row_order[row_key] = sum(1 for (existing_section, _) in row_order if existing_section == sec)
             c["row_index"] = row_order[row_key]
             low = f"{sec} {_norm(c.get('row_text'))}"
-            if "configure_source" in low and any(x in low for x in ("attribute", "operator", "value")):
+            hint = str(c.get("row_kind_hint") or "")
+            # The container's own class is stronger evidence than its text: a
+            # Process Step's text also contains its File Name parts' labels.
+            if hint == "filename_part" and "configure_targets" in sec:
+                c["row_kind"] = "filename_part"
+            elif hint == "process_step" and "configure_targets" in sec:
+                c["row_kind"] = "process_step"
+            elif "configure_source" in low and any(x in low for x in ("attribute", "operator", "value")):
                 c["row_kind"] = "flow_identifier"
             elif "configure_targets" in low and "derived_from" in low:
                 c["row_kind"] = "filename_part"
@@ -2118,6 +2259,22 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
                 c["row_kind"] = "routing_action"
             elif "condition" in low:
                 c["row_kind"] = "condition"
+    # DDS labels only the first row of a repeatable group, so an unlabelled row
+    # has no text to classify it by.  Sibling rows under the same container are
+    # the same kind: inherit it.
+    kinds_by_parent: Dict[Tuple[str, str], Dict[str, int]] = {}
+    for c in controls:
+        parent = str(c.get("row_parent") or "")
+        if parent and c.get("row_kind"):
+            bucket = kinds_by_parent.setdefault((_canonical_section(str(c.get("section") or "")), parent), {})
+            bucket[str(c["row_kind"])] = bucket.get(str(c["row_kind"]), 0) + 1
+    for c in controls:
+        parent = str(c.get("row_parent") or "")
+        if c.get("row_signature") and not c.get("row_kind") and parent:
+            bucket = kinds_by_parent.get((_canonical_section(str(c.get("section") or "")), parent)) or {}
+            if len(bucket) == 1:
+                c["row_kind"] = next(iter(bucket))
+                c["row_kind_inferred_from_siblings"] = True
     return mask_sensitive_data(controls)
 
 
@@ -2184,6 +2341,14 @@ def _stateful_control_score(control: Dict[str, Any], node: Dict[str, Any]) -> in
         score += 65
     elif labels and any(v and cl and (v in cl or cl in v) for v in labels):
         score += 35
+    # A radio's own label is its option ("Yes"); its group label names the
+    # question ("Existing Account") and is what tells two Yes/No groups apart.
+    group_label = _norm(control.get("group_label"))
+    if group_label and labels:
+        if any(v == group_label for v in labels):
+            score += 65
+        elif any(v and (v in group_label or group_label in v) for v in labels):
+            score += 35
     if names and cn in names:
         score += 35
     if placeholders and cp in placeholders:
@@ -2211,6 +2376,10 @@ def _stateful_control_score(control: Dict[str, Any], node: Dict[str, Any]) -> in
             score += 45
         elif actual_row_kind:
             score -= 55
+    elif actual_row_kind and row_index is None:
+        # A section-level field (Source Document Type Name) never lives inside
+        # a repeatable row (a Flow Identifier row's Document Type Name (Version)).
+        score -= 40
     if row_index is not None:
         bound_index = control.get("expected_row_index")
         if bound_index is not None:
@@ -2355,18 +2524,12 @@ def build_phase_form_state_model(graph: Dict[str, Any], controls: Sequence[Dict[
 
 
 def _snapshot_stateful_node_states(
-    graph: Dict[str, Any], controls: Sequence[Dict[str, Any]], node_ids: Sequence[str]
+    graph: Dict[str, Any], controls: Sequence[Dict[str, Any]], node_ids: Sequence[str],
+    *, reference: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Dict[str, Any]]:
-    wanted = {str(x) for x in node_ids}
-    out: Dict[str, Dict[str, Any]] = {}
-    for node in graph.get("nodes", []) if isinstance(graph.get("nodes"), list) else []:
-        if not isinstance(node, dict) or str(node.get("node_id")) not in wanted:
-            continue
-        diag = resolve_stateful_control_diagnostics(controls, node)
-        control = diag.get("control") if isinstance(diag.get("control"), dict) else None
-        if control is not None:
-            out[str(node.get("node_id"))] = _stateful_control_state(control)
-    return out
+    return _snapshot_node_states(
+        graph, controls, node_ids, resolve_stateful_control_diagnostics, _stateful_control_state, reference
+    )
 
 
 async def _wait_for_stateful_transaction_stable(
@@ -2456,7 +2619,14 @@ def _stateful_value_equal(node: Dict[str, Any], control: Dict[str, Any]) -> bool
     # input value becomes blank after the menu closes.  Treat the selected option
     # as authoritative so an already committed dropdown is not clicked repeatedly.
     if action == "select_single":
-        return any(exp.lower() == value.lower() for value in candidate_values)
+        # The DDS driver picks the option by semantic key, so verify the same way:
+        # "Name (1.0)" in the portal is the input's "Name(1.0)", and an enum such
+        # as ELEMENT_IN_PAYLOAD is the label "Element In Payload".
+        expected_key = _semantic_value_key(exp)
+        return any(
+            exp.lower() == value.lower() or (expected_key and _semantic_value_key(value) == expected_key)
+            for value in candidate_values
+        )
     return exp.lower() == actual.lower()
 
 
@@ -2681,7 +2851,9 @@ async def _recommit_structural_parent_if_needed(
             elif action == "select_multi":
                 ok = await select_dds_multiselect(page, root, str(control.get("selector") or ""), split_multi_value(parent.get("expected_value")), phase=phase)
             elif action == "select_radio":
-                ok = await select_radio_value(page, root, str(parent.get("expected_value") or ""), section=str(parent.get("section") or ""), phase=phase)
+                ok = await select_radio_option(page, str(control.get("selector") or ""), str(parent.get("expected_value") or ""), phase=phase)
+                if ok is None:
+                    ok = await select_radio_value(page, root, str(parent.get("expected_value") or ""), section=str(parent.get("section") or ""), phase=phase)
         except Exception as exc:
             audit["parents"].append({"node_id": parent_id, "success": False, "error": mask_sensitive_string(str(exc))})
             continue
@@ -2748,6 +2920,9 @@ async def execute_phase_state_graph(
         if isinstance(n, dict) and (not section or _section_matches(section, str(n.get("section") or "")))
     ]
     selected_ids = {str(n.get("node_id")) for n in selected_nodes}
+    # A section run (BizFlow tabs) is judged on that section's nodes only; the
+    # other tabs' controls are not on screen and cannot be one-to-one bound.
+    model_graph = dict(graph, nodes=selected_nodes) if section else graph
     node_status: Dict[str, bool] = {
         str(dep): True for n in selected_nodes for dep in n.get("depends_on", []) if str(dep) not in selected_ids
     }
@@ -2770,7 +2945,7 @@ async def execute_phase_state_graph(
     agentq_phase_start = await _agentq_begin_phase(
         page, phase=phase, controls=initial_controls, surface_gate=surface_gate, graph=graph
     )
-    initial_form_model = build_phase_form_state_model(graph, initial_controls, phase=phase)
+    initial_form_model = build_phase_form_state_model(model_graph, initial_controls, phase=phase)
     execution_profile = derive_execution_profile(initial_form_model, graph)
     interaction_profile = dict(execution_profile.get("profile") or {})
     node_by_id = {str(n.get("node_id")): n for n in selected_nodes if isinstance(n, dict)}
@@ -3058,7 +3233,9 @@ async def execute_phase_state_graph(
                 root = await get_active_form_root(page, phase)
                 selector = str(control.get("selector") or "")
                 try:
-                    action = str(node.get("action") or "")
+                    action = _effective_action(node, control)
+                    if action != str(node.get("action") or ""):
+                        transaction_proof["adapted_action"] = {"compiled": node.get("action"), "live": action}
                     ok = True
                     if action == "fill_text":
                         ok = await set_text_control(page, root, selector, str(expected), phase=phase)
@@ -3070,7 +3247,9 @@ async def execute_phase_state_graph(
                         if _norm(control.get("role")) in {"switch", "checkbox"} or _norm(control.get("type")) == "checkbox":
                             ok = await set_boolean_control(page, root, selector, expected, phase=phase)
                         else:
-                            ok = await select_radio_value(page, root, str(expected), section=str(node.get("section") or ""), phase=phase)
+                            ok = await select_radio_option(page, selector, str(expected), phase=phase)
+                            if ok is None:
+                                ok = await select_radio_value(page, root, str(expected), section=str(node.get("section") or ""), phase=phase)
                     elif action == "toggle":
                         ok = await set_boolean_control(page, root, selector, expected, phase=phase)
                     elif action == "verify_only":
@@ -3136,7 +3315,7 @@ async def execute_phase_state_graph(
                         )
                         transaction_proof["multi_select_exact_set_proof"] = multi_proof
                         transaction_proof["multi_select_driver_audit"] = multi_audit
-                    protected_after = _snapshot_stateful_node_states(graph, after_now, completed_node_ids)
+                    protected_after = _snapshot_stateful_node_states(graph, after_now, completed_node_ids, reference=protected_before)
                     unintended = _protected_state_changes(protected_before, protected_after)
                     transaction_proof["protected_after"] = protected_after
                     transaction_proof["protected_state_changes"] = unintended
@@ -3264,6 +3443,7 @@ async def execute_phase_state_graph(
             continue
         prior_broker = _control_broker_proof(page, str(control.get("selector") or ""))
         attempt.update(mask_sensitive_data({
+            "initial_failure_reason": attempt.get("reason"),
             "actual_value": attempt_actual_value(node, control),
             "success": True, "filled": True, "exact_verified": True,
             "reason": "final live-control exact reconciliation",
@@ -3277,7 +3457,7 @@ async def execute_phase_state_graph(
         if str(node.get("node_id")) not in completed_node_ids:
             completed_node_ids.append(str(node.get("node_id")))
 
-    final_form_model = build_phase_form_state_model(graph, final_controls, phase=phase)
+    final_form_model = build_phase_form_state_model(model_graph, final_controls, phase=phase)
     if not final_form_model.get("one_to_one_pass", False):
         attempts.append({
             "node_id": f"{phase}.form_state_model", "field": "phase_form_state_model",

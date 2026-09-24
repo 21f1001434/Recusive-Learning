@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HIP Create Rule replica</title></head>
+<body>
+<!--HIP_DDS_KIT-->
+<script>
+/* Golden: golden_screenshots/UHAUL-POASN/Rules.png */
+(function () {
+  const H = window.HIP;
+  const DOC_TYPES = ['XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)', 'XML_DellAutoASN_10_U-HAUL_ANS_IB(2.0)', 'XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB(1.0)'];
+  const ATTRIBUTES = ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier', 'Alternate Business Identifier'];
+  const conditionsHost = document.createElement('div');
+  conditionsHost.setAttribute('formarrayname', 'conditions');
+
+  function conditionRow(index) {
+    const labelled = index === 0; // DDS shows column labels on the first row only
+    const r = H.row(
+      H.dropdown({ label: 'Condition Type', name: 'conditionType', options: ['Attributes', 'Document Type'], showLabel: labelled }),
+      H.dropdown({ label: 'Operator', name: 'operator', options: ['Equals', 'Not Equals', 'Contains', 'Starts With'], showLabel: labelled }),
+      H.text({ label: 'Value', name: 'value', placeholder: 'Value', showLabel: labelled }),
+      // Attribute options arrive only after a Document Type is chosen above.
+      H.dropdown({ label: 'Attribute Name/Unit', name: 'attributeName', options: () => (window.__ruleDocType ? ATTRIBUTES : []), showLabel: labelled }),
+    );
+    r.classList.add('dds__row');
+    r.setAttribute('cdkdrag', '');
+    return r;
+  }
+  const rowCount = window.__conditionRows || 2;
+  for (let i = 0; i < rowCount; i++) conditionsHost.appendChild(conditionRow(i));
+
+  const mappingHost = document.createElement('div');
+  const form = H.form(
+    H.fieldset('Rule :',
+      H.row(
+        H.text({ label: 'Name *', name: 'ruleName', placeholder: 'Name', duplicateMessage: 'Rule Name already exists' }),
+        H.text({ label: 'Version', name: 'version', placeholder: '1', disabled: true }),
+        H.dropdown({ label: 'Document Type Name (Version) *', name: 'documentTypeName', options: DOC_TYPES, onChange: (v) => { window.__ruleDocType = v; } }),
+      ),
+      H.row(
+        H.text({ label: 'Rule Type', name: 'ruleType', placeholder: 'Mapping', disabled: true }),
+        H.text({ label: 'Rule Scope', name: 'ruleScope', placeholder: 'GLOBAL', disabled: true }),
+        H.switchControl({ label: 'Status', name: 'status', checked: true }),
+      ),
+      H.row(
+        H.switchControl({ label: 'Execute Always', name: 'executeAlways', checked: false, onText: 'Yes', offText: 'No' }),
+        H.text({ label: 'Description', name: 'description', placeholder: 'Description', textarea: true }),
+      ),
+    ),
+    H.fieldset('Conditions :',
+      H.row(H.dropdown({ label: 'Execute Action(s) When *', name: 'executeActionsWhen', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] })),
+      conditionsHost,
+    ),
+    H.fieldset('Actions :',
+      H.row(
+        H.text({ label: 'Name *', name: 'name', placeholder: 'Name' }),
+        H.dropdown({
+          label: 'Type *', name: 'type', options: ['Route Document', 'Transform Document'],
+          // The mapping identifier dropdown is rendered only for a chosen Type.
+          onChange: () => setTimeout(() => H.when(mappingHost, () => H.dropdown({
+            label: 'Mapping Identifier Name (Version) *', name: 'target',
+            options: ['DELLCoXMLASNXX08C_U-HAUL(1.0)', 'DELLCoXMLASNXX08C_U-HAUL(2.0)'],
+          })), 150),
+        }),
+        mappingHost,
+      ),
+    ),
+  );
+  H.page('Create Rule', form);
+})();
+</script>
+</body></html>

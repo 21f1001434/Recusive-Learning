@@ -484,6 +484,7 @@ async def reveal_hidden_structural_parent(page: Page, node: Dict[str, Any]) -> D
         "names": [str(x) for x in loc.get("names", []) if str(x).strip()],
         "placeholders": [str(x) for x in loc.get("placeholders", []) if str(x).strip()],
         "fieldKey": str(node.get("field_key") or ""),
+        "rowIndex": node.get("row_index") if isinstance(node.get("row_index"), int) else None,
     }
     try:
         found = await page.evaluate(
@@ -497,7 +498,7 @@ async def reveal_hidden_structural_parent(page: Page, node: Dict[str, Any]) -> D
   const labels=(args.labels||[]).map(norm),names=(args.names||[]).map(norm),ph=(args.placeholders||[]).map(norm),field=norm(args.fieldKey);
   const controls=Array.from(document.querySelectorAll('input,textarea,select,[role=combobox],[role=radio],[role=checkbox],[role=switch]'));
   const ranked=controls.map(el=>{const n=norm(el.getAttribute('name')),fc=norm(el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')),p=norm(el.getAttribute('placeholder')),l=norm(label(el));let score=0;if(field&&(field===n||field===fc))score+=120;if(names.includes(n)||names.includes(fc))score+=100;if(labels.includes(l))score+=70;if(ph.includes(p))score+=60;return {el,score,label:label(el),visible:visible(el)};}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
-  const best=ranked[0];if(!best||best.visible)return {found:!!best,alreadyVisible:!!best,score:best?best.score:0};
+  let best=ranked[0];  /* Repeated rows share labels: row N's control is the N-th top-scoring match in DOM order,     so a collapsed second Process Step is found even though step 1 is visible. */  if(best&&Number.isInteger(args.rowIndex)){const top=ranked.filter(x=>x.score===best.score).map(x=>x.el).sort((a,b)=>(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1);const el=top[args.rowIndex];if(el)best=ranked.find(x=>x.el===el);}  if(!best||best.visible)return {found:!!best,alreadyVisible:!!best,score:best?best.score:0};
   const target=best.el;
   let controller=null,kind='';
   const details=target.closest('details:not([open])');
@@ -568,7 +569,7 @@ def is_parent_node(graph: Dict[str, Any], node_id: str) -> bool:
 # section or repeatable row before the next).  They never mean "the parent value
 # reveals or enables the child", so they must not skip a child when the
 # predecessor fails, and a parent commit must not wait for such a child to appear.
-ORDERING_ONLY_RELATIONS = frozenset({"section_sequence_gate", "repeatable_row_sequence_gate"})
+ORDERING_ONLY_RELATIONS = frozenset({"section_sequence_gate", "repeatable_row_sequence_gate", "field_sequence_gate"})
 
 
 def _dependency_relations(graph: Dict[str, Any]) -> Dict[tuple, str]:

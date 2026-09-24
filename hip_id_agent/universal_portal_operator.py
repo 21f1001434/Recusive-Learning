@@ -436,6 +436,49 @@ def ordered_actions(task: str) -> List[str]:
     return list(dict.fromkeys(action for _, _, action in found))
 
 
+HIP_PHASE_KEYS = (
+    "data_map", "source_document_type", "target_document_type", "rule",
+    "source_transport_profile", "target_transport_profile", "biz_flow",
+)
+_HIP_FAMILY_WORDS = (
+    ("biz_flow", ("biz flow", "bizflow", "business flow")),
+    ("document_type", ("document type", "doc type", "doctype")),
+    ("transport_profile", ("transport profile",)),
+    ("data_map", ("data map", "datamap", "create map")),
+    ("rule", ("create rule", " rule ", " rules ")),
+)
+
+
+def resolve_hip_phase_for_task(
+    *, task: str, input_root: str, payload: Mapping[str, Any], heading: str = "",
+) -> str:
+    """Map a task-box request onto a learned HIP phase, or "" for unknown forms.
+
+    Known HIP object families (Data Map, Document Type, Rule, Transport Profile,
+    BizFlow) have compiled dependency graphs and hardened executors.  Using them
+    from the task box gives ad-hoc tasks the same parent/child ordering, radio
+    groups, repeatable rows, conditional reveals and self-repair as a mission.
+    """
+    from .stateful_form_runtime import phase_object
+
+    payload = dict(payload or {})
+    root_parts = [x for x in re.split(r"[.\[\]]", str(input_root or "")) if x and x != "$"]
+    for part in reversed(root_parts):
+        if part in HIP_PHASE_KEYS and phase_object(payload, part)[0]:
+            return part
+    text = f" {str(task or '').lower()} {str(heading or '').lower()} "
+    for family, words in _HIP_FAMILY_WORDS:
+        if not any(w in text for w in words):
+            continue
+        if family in {"document_type", "transport_profile"}:
+            side = "target" if re.search(r"\btarget\b", text) else "source" if re.search(r"\bsource\b", text) else ""
+            candidates = [f"{side}_{family}"] if side else [f"source_{family}", f"target_{family}"]
+            present = [c for c in candidates if phase_object(payload, c)[0]]
+            return present[0] if len(present) == 1 else ""
+        return family if phase_object(payload, family)[0] else ""
+    return ""
+
+
 class UniversalPortalTaskPlanner:
     """Plan user-directed tasks without restricting the portal to five hardcoded pages."""
 
@@ -961,6 +1004,18 @@ class UniversalPortalTaskExecutor:
             raise RuntimeError("Universal task input JSON must contain an object at the root")
         out_dir = run_dir / "universal_form_fill"
         out_dir.mkdir(parents=True, exist_ok=True)
+        heading = ""
+        try:
+            heading = str(await browser.page.evaluate(
+                "() => { const h = document.querySelector('main h1, main h2, h1, h2, [role=dialog] h3'); return h ? h.innerText : ''; }"
+            ) or "")
+        except Exception:
+            heading = ""
+        hip_phase = resolve_hip_phase_for_task(task=task, input_root=input_root, payload=payload, heading=heading)
+        if hip_phase:
+            return await self._fill_hip_phase_from_input(
+                browser, payload=dict(payload), phase=hip_phase, out_dir=out_dir, max_cycles=max_cycles,
+            )
         cycles: List[Dict[str, Any]] = []
         last_unresolved: List[str] = []
         skill_blueprint: Dict[str, Any] = {}
@@ -1038,6 +1093,80 @@ class UniversalPortalTaskExecutor:
         }
         safe_write_json(out_dir / "universal_form_fill.json", result)
         return result
+
+    async def _fill_hip_phase_from_input(
+        self, browser: BrowserSession, *, payload: Dict[str, Any], phase: str, out_dir: Path, max_cycles: int = 6,
+    ) -> Dict[str, Any]:
+        """Fill a known HIP form with its compiled phase graph and executor."""
+        from .autonomous_form_runtime import autonomous_failure_summary, autonomous_target_execution, execute_autonomous_phase_goal
+        from .stateful_form_runtime import compile_phase_state_graph, execute_document_type_state_graph
+
+        page = browser.page
+        graph = compile_phase_state_graph(payload, phase)
+        phase_dir = out_dir / f"phase_{phase}"
+        kwargs: Dict[str, Any] = {"executor": execute_document_type_state_graph} if "document_type" in phase else {}
+        sections: List[Tuple[Optional[str], List[str]]] = [(None, [])]
+        template: Dict[str, Any] = {}
+        if phase == "biz_flow":
+            from .bizflow_kb import (
+                _click_bizflow_template_link_after_add,
+                _click_configure_routing_add,
+                _is_bizflow_form_surface,
+                _wait_for_bizflow_form_surface,
+            )
+            from .dds_control_driver import click_visible_tab
+
+            # "Create biz flow" lands on the template picker first; the wizard
+            # opens from the B2B-Flow-PubSub-Template link, as in a mission.
+            if not await _is_bizflow_form_surface(page):
+                template = await _click_bizflow_template_link_after_add(page)
+                template["form_visible"] = await _wait_for_bizflow_form_surface(page, timeout_ms=9000)
+
+            wizard = [
+                ("Flow Details", ["Flow Details", "Basic Details"]),
+                ("Configure Source", ["Configure Source", "Source Details"]),
+                ("Configure Target(s)", ["Configure Target(s)", "Configure Target", "Target Details"]),
+                ("Configure Routing", ["Configure Routing"]),
+            ]
+            present = {str(n.get("section") or "") for n in graph.get("nodes") or [] if isinstance(n, Mapping)}
+            sections = [(name, aliases) for name, aliases in wizard if name in present]
+        runs: List[Dict[str, Any]] = []
+        for section, aliases in sections:
+            navigation: Dict[str, Any] = {}
+            if phase == "biz_flow" and section:
+                navigation["tab"] = await click_visible_tab(page, None, aliases, phase="biz_flow")
+                if section == "Configure Routing":
+                    navigation["routing_add"] = await _click_configure_routing_add(page)
+            result = await execute_autonomous_phase_goal(
+                page=page, graph=graph, phase=phase, input_data=payload, config=self.config,
+                output_dir=phase_dir / (re.sub(r"[^a-z0-9]+", "_", str(section or "form").lower()).strip("_") or "form"),
+                max_cycles=max(1, int(max_cycles)), repair=True, strict_live_execution=True,
+                section=section, **kwargs,
+            )
+            final = autonomous_target_execution(result)
+            runs.append(mask_sensitive_data({
+                "section": section or "", "navigation": navigation, "pass": bool(result.get("pass")),
+                "status": result.get("status"), "cycles": [c.get("status") for c in result.get("cycles") or [] if isinstance(c, Mapping)],
+                "attempt_count": len(final.get("attempts") or []),
+                "failure_summary": {} if result.get("pass") else autonomous_failure_summary(result),
+            }))
+            if not result.get("pass"):
+                break
+        passed = bool(runs) and all(r.get("pass") for r in runs)
+        report = {
+            "schema_version": "hip.universal-form-fill.v1", "pass": passed,
+            "status": "complete" if passed else "incomplete",
+            "hip_phase": phase, "execution_engine": "hip_phase_autonomous_goal", "bizflow_template": mask_sensitive_data(template),
+            "input_root": graph.get("object_path"), "input_leaf_count": len(graph.get("nodes") or []),
+            "sections": runs, "skill_blueprint": build_form_blueprint(graph) if passed else {},
+            "values_stored": False,
+        }
+        if passed:
+            report["verification"] = "100_percent_runtime_input_exact_readback"
+        else:
+            report["reason"] = "The HIP phase goal was not proven; see sections[].failure_summary for the field and check"
+        safe_write_json(out_dir / "universal_form_fill.json", report)
+        return report
 
     async def _execute_live_goal(
         self, browser: BrowserSession, *, goal: str, task_id: str, gate: Mapping[str, Any],

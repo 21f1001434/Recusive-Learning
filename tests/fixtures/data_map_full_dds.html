@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HIP Create Map replica</title></head>
+<body>
+<!--HIP_DDS_KIT-->
+<script>
+/* Golden: golden_screenshots/UHAUL-POASN/Data Map.png */
+(function () {
+  const H = window.HIP;
+  const form = H.form(
+    H.fieldset('Map Reference :', H.row(
+      H.text({ label: 'Map Identifier *', name: 'mapIdentifier', placeholder: 'Map Identifier', duplicateMessage: 'Map identifier already exists' }),
+      H.text({ label: 'Map Identifier Version', name: 'mapIdentifierVersion', placeholder: '1', disabled: true }),
+      H.switchControl({ label: 'Status', name: 'status', checked: true }),
+    )),
+    H.fieldset('Mapping Details :',
+      H.row(
+        H.text({ label: 'Map Name *', name: 'mapName', placeholder: 'Map Name' }),
+        H.text({ label: 'Map Class *', name: 'mapClass', placeholder: 'Map Class' }),
+        H.dropdown({ label: 'Contivo version *', name: 'contivoVersion', options: ['6.5', '6.7', '7.0'] }),
+      ),
+      H.row(H.file({ label: 'Map Data *', name: 'mapData', accept: '.jar' })),
+    ),
+    H.fieldset('Cross Reference Table Details :', H.switchControl({ label: 'Cross Reference Table details', name: 'crossReference', checked: false, onText: 'Yes', offText: 'No' })),
+    H.fieldset('Map Validation Details :', H.row(
+      H.file({ label: 'Input Schema Validation', name: 'inputSchema' }),
+      H.file({ label: 'Output Schema Validation', name: 'outputSchema' }),
+    )),
+  );
+  H.page('Create Map', form);
+})();
+</script>
+</body></html>

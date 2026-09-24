@@ -1,0 +1,212 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HIP Create Biz Flow replica</title></head>
+<body>
+<!--HIP_DDS_KIT-->
+<script>
+/* Golden: golden_screenshots/UHAUL-POASN/BizFlow-FD/CS/CT-1/CT-2/CR.png */
+(function () {
+  const H = window.HIP;
+  const SRC_DOC = 'XML_DellAutoASN_10_U-HAUL_ANS_IB (1.0)';
+  const TGT_DOC = 'XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB (1.0)';
+  const DOCS = [SRC_DOC, TGT_DOC, 'XML_DellAutoASN_10_U-HAUL_ANS_IB (2.0)'];
+  const APPS = { 'Dell Application': ['AIC - DCE', 'AIC - EMEA'], Partner: ['dce-test-partner', 'u-haul-partner'] };
+  const ATTRS = ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier'];
+  const OPS = ['Equals', 'Not Equals', 'Contains'];
+
+  function tabs(names) {
+    const list = H.el('<div role="tablist"></div>');
+    const panels = names.map((name, i) => {
+      const tabId = `tab-${i}`; const panelId = `panel-${i}`;
+      const tab = H.el(`<button type="button" role="tab" id="${tabId}" aria-controls="${panelId}" aria-selected="${i === 0}">${name}</button>`);
+      list.appendChild(tab);
+      const panel = H.el(`<div role="tabpanel" id="${panelId}" aria-labelledby="${tabId}"${i === 0 ? '' : ' hidden'}></div>`);
+      tab.addEventListener('click', () => {
+        list.querySelectorAll('[role=tab]').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+        panels.forEach((p) => { p.hidden = p !== panel; });
+      });
+      return panel;
+    });
+    return { list, panels };
+  }
+
+  function repeatRow(children, cls) {
+    const r = H.row(children);
+    r.classList.add(...cls.split(' '));
+    return r;
+  }
+
+  // ---- Flow Details
+  const { list, panels } = tabs(['Flow Details', 'Configure Source', 'Configure Target(s)', 'Configure Routing']);
+  panels[0].append(
+    H.el('<div>Current Flow version : 1.0</div>'),
+    H.row(H.text({ label: 'Business Flow Name *', name: 'businessFlowName', placeholder: 'Business Flow Name', duplicateMessage: 'Business Flow Name already exists' })),
+    H.row(H.text({ label: 'Flow Description *', name: 'flowDescription', placeholder: 'Flow Description', textarea: true })),
+  );
+
+  // ---- Configure Source
+  const srcAppHost = document.createElement('div');
+  const identifierRows = document.createElement('div');
+  for (let i = 0; i < 2; i++) {
+    const labelled = i === 0;
+    identifierRows.appendChild(repeatRow([
+      H.dropdown({ label: 'Document Type Name (Version) *', name: 'documentTypeName', options: DOCS, showLabel: labelled }),
+      H.dropdown({ label: 'Attribute Name *', name: 'attributeName', options: ATTRS, showLabel: labelled }),
+      H.dropdown({ label: 'Operator *', name: 'operator', options: OPS, showLabel: labelled }),
+      H.text({ label: 'Value *', name: 'value', placeholder: 'Value', showLabel: labelled }),
+    ], 'dds__d-flex dds__justify-content-start'));
+  }
+  panels[1].append(
+    H.fieldset('Source System Details :',
+      H.row(
+        H.dropdown({ label: 'Source Type *', name: 'sourceType', options: Object.keys(APPS),
+          onChange: (v) => setTimeout(() => H.when(srcAppHost, () => H.dropdown({ label: 'Source Application *', name: 'sourceApplication', options: APPS[v] })), 150) }),
+        srcAppHost,
+      ),
+      H.row(
+        H.dropdown({ label: 'Source Transport Profile *', name: 'sourceTransportProfile', options: ['SFTP_U-HAUL_ASN_PC_SRC_IB', 'SFTP_U-HAUL_ASN_PC_SRC_IB_OLD'], multiple: true }),
+        H.dropdown({ label: 'Document Type Name *', name: 'sourceDocumentType', options: DOCS, multiple: true }),
+      ),
+    ),
+    H.fieldset('Flow Identifiers :',
+      H.row(H.dropdown({ label: 'Flow Identifier Operator *', name: 'flowIdentifierOperator', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] })),
+      H.fieldset('Attributes:', identifierRows),
+    ),
+    H.fieldset('Process Steps :', H.el('<div>No Process Steps Added</div>')),
+  );
+
+  // ---- Configure Target(s)
+  const tgtAppHost = document.createElement('div');
+  function step(index, open) {
+    const bodyId = `process-step-body-${index}`;
+    const item = H.el(`<div class="process-step"><button type="button" class="process-step__header" aria-expanded="${open}" aria-controls="${bodyId}">${index + 1} ::: Step</button><div id="${bodyId}"${open ? '' : ' hidden'}></div></div>`);
+    const header = item.querySelector('button');
+    const body = item.querySelector(`#${bodyId}`);
+    header.addEventListener('click', () => { const o = header.getAttribute('aria-expanded') === 'true'; header.setAttribute('aria-expanded', String(!o)); body.hidden = o; });
+    const configHost = document.createElement('div');
+    body.append(
+      H.row(
+        H.dropdown({ label: 'Step Type', name: 'stepType', options: ['Mapping Transformer', 'Enricher', 'Splitter'],
+          onChange: (v) => setTimeout(() => H.when(configHost, () => (v === 'Enricher' ? enricher() : mapping())), 150) }),
+        H.text({ label: 'Step Name', name: 'stepName', placeholder: 'Step Name' }),
+      ),
+      configHost,
+    );
+    return item;
+  }
+  function mapping() {
+    return H.fieldset('Mapping Configuration :',
+      H.row(
+        H.text({ label: 'Source Document Type *', name: 'sourceDocumentType', placeholder: 'Default (All/Other)', disabled: true }),
+        H.dropdown({ label: 'Action *', name: 'action', options: ['Mapping', 'Route'] }),
+        H.dropdown({ label: 'Target Document Type (Version) *', name: 'targetDocumentType', options: DOCS, multiple: true }),
+      ),
+      H.checkbox({ label: 'Add Document Type If not Listed Above?', name: 'addDocumentType' }),
+      H.row(H.dropdown({ label: 'Rule (Version) *', name: 'rule', options: ['DELLCoXMLASNXX08C_U-HAUL_RULE (1.0)', 'DELLCoXMLASNXX08C_U-HAUL_RULE (2.0)'] })),
+      H.checkbox({ label: 'Add Rule If not Listed Above?', name: 'addRule' }),
+    );
+  }
+  function enricher() {
+    const fileNameHost = document.createElement('div');
+    function part(i) {
+      const labelled = i === 0;
+      const valueHost = document.createElement('div');
+      valueHost.appendChild(H.text({ label: 'Value *', name: 'value', placeholder: 'Value', showLabel: labelled }));
+      return repeatRow([
+        H.dropdown({ label: 'Part Number *', name: 'partNumber', options: ['1', '2', '3'], showLabel: labelled }),
+        H.dropdown({ label: 'Derived From *', name: 'derivedFrom', options: ['Fixed Text', 'Date And Time', 'Attribute'], showLabel: labelled,
+          // Date And Time turns Value into a format dropdown (golden CT-2).
+          onChange: (v) => setTimeout(() => H.when(valueHost, () => (v === 'Date And Time'
+            ? H.dropdown({ label: 'Value *', name: 'value', options: ['yyyyddMMhhmmss', 'yyyyMMdd', 'MMddyyyy'], showLabel: labelled })
+            : H.text({ label: 'Value *', name: 'value', placeholder: 'Value', showLabel: labelled }))), 150) }),
+        valueHost,
+      ], 'filename-part');
+    }
+    return H.fieldset('Enricher Configuration :', H.fieldset('Configuration - 0 :',
+      H.row(
+        H.text({ label: 'Document Type *', name: 'documentType', placeholder: 'Default (All/Other)', disabled: true }),
+        H.dropdown({ label: 'Action *', name: 'action', options: ['Enrich', 'Replace'] }),
+      ),
+      H.switchControl({ label: 'Target File Name Config', name: 'targetFileNameConfig', checked: false, onText: 'Yes', offText: 'No',
+        onChange: (on) => setTimeout(() => H.when(fileNameHost, () => (on ? [
+          H.row(H.text({ label: 'File Separator *', name: 'fileSeparator', placeholder: 'File Separator' }), H.text({ label: 'File Extension *', name: 'fileExtension', placeholder: 'File Extension' })),
+          H.fieldset('File Name Section :', part(0), part(1)),
+        ] : [])), 150) }),
+      fileNameHost,
+    ));
+  }
+  panels[2].append(
+    H.el('<div class="target-tabs"><button type="button">dce-test-partner</button></div>'),
+    H.fieldset('Target System Details :',
+      H.row(
+        H.dropdown({ label: 'Target Type *', name: 'targetType', options: Object.keys(APPS),
+          onChange: (v) => setTimeout(() => H.when(tgtAppHost, () => H.dropdown({ label: 'Target Application *', name: 'targetApplication', options: APPS[v] })), 150) }),
+        tgtAppHost,
+      ),
+      H.row(
+        H.dropdown({ label: 'Target Transport Profile *', name: 'targetTransportProfile', options: ['SFTP_U-HAUL_ASN_PC_TGT_OB', 'SFTP_U-HAUL_ASN_PC_TGT_OB_OLD'] }),
+        H.dropdown({ label: 'Document Type Name (Version) *', name: 'targetDocumentType', options: DOCS, multiple: true }),
+      ),
+    ),
+    // Two steps as created by Process Steps (+); step 2 starts collapsed (golden CT-1).
+    H.fieldset('Process Steps :', step(0, true), step(1, false)),
+  );
+
+  // ---- Configure Routing: table + Add opens the Create Rule drawer
+  const drawerHost = document.createElement('div');
+  const addButton = H.el('<button type="button" id="routing-add">+ Add</button>');
+  addButton.addEventListener('click', () => H.when(drawerHost, routingDrawer));
+  panels[3].append(
+    H.row(H.text({ label: 'Table search', name: 'tableSearch', placeholder: 'Table search' }), addButton),
+    H.el('<table class="dds__table"><thead><tr><th>Rule Name</th><th>Description</th><th>Rule Type</th><th>Version</th><th>Status</th></tr></thead><tbody></tbody></table>'),
+    drawerHost,
+  );
+  function routingDrawer() {
+    const targetHost = document.createElement('div');
+    const conditions = document.createElement('div');
+    conditions.setAttribute('formarrayname', 'conditions');
+    for (let i = 0; i < 2; i++) {
+      const labelled = i === 0;
+      conditions.appendChild(repeatRow([
+        H.dropdown({ label: 'Condition Type', name: 'conditionType', options: ['Attributes', 'Document Type'], showLabel: labelled }),
+        H.dropdown({ label: 'Operator', name: 'operator', options: OPS, showLabel: labelled }),
+        H.text({ label: 'Value', name: 'value', placeholder: 'Value', showLabel: labelled }),
+        H.dropdown({ label: 'Attribute Name', name: 'attributeName', options: ATTRS, showLabel: labelled }),
+      ], 'dds__row'));
+    }
+    const drawer = H.el('<div class="dds__drawer" role="dialog" style="position:fixed;top:64px;right:0;bottom:0;width:760px;overflow:auto;background:#fff;border-left:1px solid #999;z-index:950;padding:12px"><h3>Create Rule</h3></div>');
+    drawer.append(
+      H.fieldset('Rule :',
+        H.row(
+          H.text({ label: 'Rule Name *', name: 'ruleName', placeholder: 'Rule Name' }),
+          H.text({ label: 'Version', name: 'version', placeholder: 'Version' }),
+        ),
+        H.row(
+          H.dropdown({ label: 'Document Type Name (Version) *', name: 'documentTypeName', options: DOCS }),
+          H.dropdown({ label: 'Rule Type *', name: 'ruleType', options: ['Target Routing', 'Mapping'] }),
+          H.dropdown({ label: 'Rule Scope *', name: 'ruleScope', options: ['LOCAL', 'GLOBAL'] }),
+        ),
+        H.row(
+          H.switchControl({ label: 'Status', name: 'status', checked: true }),
+          H.switchControl({ label: 'Execute Always', name: 'executeAlways', checked: false, onText: 'Yes', offText: 'No' }),
+        ),
+      ),
+      H.fieldset('Conditions :', H.row(H.dropdown({ label: 'Execute Actions When *', name: 'executeActionsWhen', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] })), conditions),
+      H.fieldset('Actions :', H.row(
+        H.text({ label: 'Name *', name: 'name', placeholder: 'Name' }),
+        H.dropdown({ label: 'Type *', name: 'type', options: ['Route Document', 'Transform Document'],
+          onChange: () => setTimeout(() => H.when(targetHost, () => H.dropdown({ label: 'Target *', name: 'target', options: ['SFTP_U-HAUL_ASN_PC_TGT_OB', 'SFTP_U-HAUL_ASN_PC_SRC_IB'] })), 150) }),
+        targetHost,
+      )),
+      H.el('<div class="actions"><button type="button">Cancel</button> <button type="button">Save</button></div>'),
+    );
+    return drawer;
+  }
+
+  const wizard = document.createElement('form');
+  wizard.setAttribute('autocomplete', 'off');
+  wizard.append(list, ...panels, H.el('<div class="actions"><button type="button">Previous</button> <button type="button">Reset</button> <button type="button">Next</button></div>'));
+  H.page('Create Biz Flow', wizard);
+  document.querySelector('main').insertBefore(H.el('<p>Create B2B flow using B2B-Flow-PubSub-Template template tailored for Inbound/Outbound integration.</p>'), wizard);
+})();
+</script>
+</body></html>
