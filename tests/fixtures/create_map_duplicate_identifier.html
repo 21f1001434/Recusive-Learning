@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Create Map</title>
+<style>body{font-family:sans-serif} .dds__drawer{width:1100px;padding:12px} fieldset{margin:8px 0} .dds__error{color:#c00;font-size:11px} label{display:block;font-size:12px} input[type=text]{width:320px}</style></head>
+<body>
+<div class="dds__drawer" role="dialog" aria-label="Create Map">
+ <h2>Create Map</h2>
+ <form>
+  <fieldset><legend>Map Reference :</legend>
+   <div class="dds__form-group" id="mi-group"><label for="mapIdentifier">Map Identifier *</label>
+     <input type="text" id="mapIdentifier" name="mapIdentifier" formcontrolname="mapIdentifier" required aria-required="true">
+     <div id="mi-err" class="dds__invalid-feedback" style="display:none"></div></div>
+   <div class="dds__form-group"><label for="mapIdentifierVersion">Map Identifier Version</label>
+     <input type="text" id="mapIdentifierVersion" name="mapIdentifierVersion" formcontrolname="mapIdentifierVersion" disabled __VERSION_ATTR__></div>
+   <div class="dds__form-group"><label for="status">Status</label>
+     <input type="checkbox" role="switch" id="status" name="status" formcontrolname="status" checked aria-checked="true"> <span>Enabled</span></div>
+  </fieldset>
+  <fieldset><legend>Mapping Details :</legend>
+   <div class="dds__form-group"><label for="mapName">Map Name *</label><input type="text" id="mapName" name="mapName" formcontrolname="mapName" required></div>
+   <div class="dds__form-group"><label for="mapClass">Map Class *</label><input type="text" id="mapClass" name="mapClass" formcontrolname="mapClass" required></div>
+  </fieldset>
+  <fieldset><legend>Map Validation Details :</legend><span>Input Schema Validation</span> <span>Output Schema Validation</span></fieldset>
+  <button type="button">Cancel</button> <button type="button" id="submit">Submit</button>
+ </form>
+</div>
+<script>
+ const EXISTING = ["dellcoxmlasnxx08c_u-haul"];
+ const mi = document.getElementById('mapIdentifier');
+ let t=null;
+ mi.addEventListener('input', () => {
+   clearTimeout(t);
+   t = setTimeout(() => {
+     const dup = EXISTING.includes(mi.value.trim().toLowerCase());
+     const err = document.getElementById('mi-err');
+     mi.setAttribute('aria-invalid', dup ? 'true' : 'false');
+     mi.classList.toggle('ng-invalid', dup); mi.classList.toggle('ng-valid', !dup);
+     document.getElementById('mi-group').classList.toggle('dds__form-group--error', dup);
+     err.textContent = dup ? 'Map identifier already exists' : '';
+     err.className = dup ? 'dds__error dds__invalid-feedback' : 'dds__invalid-feedback';
+     err.style.display = dup ? 'block' : 'none';
+   }, 250);
+ });
+</script>
+</body></html>

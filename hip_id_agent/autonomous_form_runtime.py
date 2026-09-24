@@ -1077,6 +1077,11 @@ async def execute_autonomous_phase_goal(
             and (not strict_live_execution or stage.get("authoritative_execution_verified") is True)
         )
         cycle_audit["status"] = "goal_achieved" if success else "retry_required"
+        if not success:
+            cycle_audit["unmet_success_checks"] = _unmet_success_checks(
+                full_result, file_failures, uncovered_required, runtime_input_ledger_after,
+                synthesized_nodes_verified, stage, strict_live_execution,
+            )
         cycles.append(mask_sensitive_data(cycle_audit))
 
         if output_dir is not None:
@@ -1154,8 +1159,90 @@ async def execute_autonomous_phase_goal(
         "needs_input": needs_input,
         "no_progress_cycle_limit": no_progress_limit,
         "prior_attempts": all_prior,
+        # Deliberately not ``final_execution``: callers treat that key as the
+        # proven goal state. This is diagnostic evidence of the last try only.
+        "last_cycle_execution": (cycles[-1].get("full_goal_execution") or {}) if cycles else {},
     }
+    result["failure_summary"] = autonomous_failure_summary(result)
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
         safe_write_json(output_dir / "autonomous_form_runtime.json", result)
     return mask_sensitive_data(result)
+
+
+def _unmet_success_checks(
+    full_result: Dict[str, Any], file_failures: Sequence[Dict[str, Any]],
+    uncovered_required: Sequence[Dict[str, Any]], ledger_after: Dict[str, Any],
+    synthesized_nodes_verified: bool, stage: Dict[str, Any], strict_live_execution: bool,
+) -> List[str]:
+    """Name every success condition that failed in one autonomous cycle."""
+    unmet: List[str] = []
+    if not full_result.get("pass"):
+        unmet.append("executor_pass")
+    if file_failures:
+        unmet.append("file_uploads")
+    if uncovered_required:
+        unmet.append("required_controls_without_input")
+    if not ledger_after.get("pass"):
+        unmet.append("runtime_input_leaves_bound")
+    if not synthesized_nodes_verified:
+        unmet.append("input_owned_nodes_verified")
+    if strict_live_execution and stage.get("exact_execution_verified") is not True:
+        unmet.append("exact_execution_verified")
+    if strict_live_execution and stage.get("authoritative_execution_verified") is not True:
+        unmet.append("authoritative_execution_verified")
+    return unmet
+
+
+def autonomous_target_execution(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the proven final execution, or a failing stub that explains why.
+
+    Phase modules historically used ``result.get("final_execution") or {}``;
+    on failure that produced ``failed_attempts: []`` in every blocker message.
+    The stub is always ``pass: False`` so it can never be mistaken for proof.
+    """
+    result = result if isinstance(result, dict) else {}
+    final = result.get("final_execution")
+    if result.get("pass") and isinstance(final, dict) and final:
+        return final
+    summary = result.get("failure_summary") or autonomous_failure_summary(result)
+    return {
+        "pass": False,
+        "status": "failed",
+        "failed_attempts": list(summary.get("failed_attempts") or []),
+        "autonomous_failure_summary": summary,
+    }
+
+
+def autonomous_failure_summary(result: Dict[str, Any], *, max_attempts: int = 8) -> Dict[str, Any]:
+    """Compact, value-safe explanation of why an autonomous phase goal failed.
+
+    Phase modules raise with this summary so the Control Center shows the
+    failing fields/checks instead of an empty ``failed_attempts`` list.
+    """
+    cycles = [c for c in (result.get("cycles") or []) if isinstance(c, dict)]
+    last = cycles[-1] if cycles else {}
+    execution = (
+        result.get("last_cycle_execution") or last.get("full_goal_execution")
+        or result.get("final_execution") or {}
+    )
+    failed = [a for a in (execution.get("failed_attempts") or []) if isinstance(a, dict)]
+    file_failures = [
+        a for a in (last.get("file_attempts") or [])
+        if isinstance(a, dict) and not bool(a.get("success", a.get("filled")))
+    ]
+    return mask_sensitive_data({
+        "reason": result.get("reason") or (execution.get("error") if isinstance(execution, dict) else ""),
+        "cycles": [
+            {"cycle": c.get("cycle"), "status": c.get("status"), "unmet": c.get("unmet_success_checks") or []}
+            for c in cycles
+        ],
+        "executor_error": str(execution.get("error") or "")[:600] if isinstance(execution, dict) else "",
+        "failed_attempts": [
+            {"field": a.get("field"), "reason": str(a.get("reason") or "")[:300],
+             "unresolved_node_ids": a.get("unresolved_node_ids") or []}
+            for a in (failed + file_failures)[:max_attempts]
+        ],
+        "uncovered_required_controls": (last.get("uncovered_required_controls") or [])[:max_attempts],
+        "needs_input": (result.get("needs_input") or [])[:max_attempts],
+    })

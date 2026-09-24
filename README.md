@@ -1,3 +1,15 @@
+## V243R13 — Data Map learning phase unblock (2026-09-24)
+
+Fixes the learning mission getting stuck at **Data Map** with `goal not proven before bounded adaptive/no-progress guard ... failed_attempts: []` and *exact checkpoint: not proven*, even when the Create Map form was filled correctly.
+
+- Secret masking no longer hides `authoritative_*` proof flags. It turned `True` into `"***MASKED***"`, so strict completion gates could never pass in any phase, and `Looks correct` could not unblock the phase.
+- A disabled, portal-owned *Map Identifier Version* that shows `1` only as a placeholder is accepted for verify-only nodes. A real read-only mismatch reports `HIP_READONLY_PORTAL_VALUE_MISMATCH`.
+- Autonomous failures now name the failing fields and unmet checks instead of `failed_attempts: []`.
+- A portal-reported `Map identifier already exists` (as in the golden screenshot) is existing-object evidence in no-save runs. A conflicting existing object still blocks.
+- `websockets==15.0.1`, so `pip install -r requirements.txt` resolves with `browser-use==0.13.8`.
+
+See `V243R13_DATAMAP_LEARNING_UNBLOCK_FIX_20260924.md`. Apply with `APPLY_V243R13_IN_PLACE.ps1`.
+
 ## V243R12 — Continuous Portal Learning + Dell On-Prem Model Orchestra
 
 V243R12 makes **real filling, clicking and navigation the training experience** for the HIP operator. Exact-verified interaction sequences are promoted into value-free Capability Graph / Portal Brain / trajectory / replay knowledge so later complex search, edit, fill, Rules, Transport Profile and BizFlow tasks can exploit what earlier runs taught the agent.

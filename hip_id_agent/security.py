@@ -4,8 +4,12 @@ import json
 import re
 from typing import Any, Iterable
 
+# ``auth(?!or)`` keeps ``auth``/``auth_token``/``x-auth``/``oauth`` masked while
+# leaving proof flags such as ``authoritative_execution_verified`` readable.
+# Masking those flags turned ``True`` into ``"***MASKED***"`` and made every
+# strict ``is True`` completion gate fail (Data Map stuck in retry_required).
 SECRET_KEY_RE = re.compile(
-    r"(password|passwd|pwd|secret|token|cookie|authorization|auth|api[_-]?key|apikey|private[_-]?key|session|bearer|sftp[_-]?password|client[_-]?secret|certificate|as2[_-]?private[_-]?key|passphrase|set-cookie)",
+    r"(password|passwd|pwd|secret|token|cookie|authorization|auth(?!or)|api[_-]?key|apikey|private[_-]?key|session|bearer|sftp[_-]?password|client[_-]?secret|certificate|as2[_-]?private[_-]?key|passphrase|set-cookie)",
     re.IGNORECASE,
 )
 SECRET_TARGET_RE = re.compile(
@@ -32,7 +36,9 @@ def mask_sensitive_data(data: Any) -> Any:
     if isinstance(data, dict):
         out = {}
         for k, v in data.items():
-            if SECRET_KEY_RE.search(str(k)):
+            # Booleans/None carry no secret material; keep flags such as
+            # ``session_reused`` or ``token_present`` usable by gates.
+            if SECRET_KEY_RE.search(str(k)) and not (v is None or isinstance(v, bool)):
                 out[k] = "***MASKED***"
             else:
                 out[k] = mask_sensitive_data(v)

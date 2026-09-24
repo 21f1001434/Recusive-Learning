@@ -27,7 +27,7 @@ from .dds_control_driver import active_form_root_info, assert_active_surface, cl
 from .phase_form_entry import ensure_phase_form_entry, find_same_page_top_right_add, same_page_add_candidate
 from .datamap_kb import _evaluate_controls, _evaluate_buttons, _find_add_button, _set_control_value
 from .stateful_form_runtime import compile_phase_state_graph, execute_phase_state_graph, build_target_branch_knowledge, capture_stateful_controls
-from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled
+from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled, autonomous_target_execution
 
 BIZFLOWS_URL = "https://developer.dell.com/hybrid-integrations/bizexchange/bizflows"
 
@@ -3164,7 +3164,7 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
                 max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
                 repair=True, strict_live_execution=True, section=graph_section,
             )
-            result = autonomous.get("final_execution") or {}
+            result = autonomous_target_execution(autonomous)
             result["autonomous_runtime"] = {
                 "pass": bool(autonomous.get("pass")),
                 "cycles": len(autonomous.get("cycles") or []),

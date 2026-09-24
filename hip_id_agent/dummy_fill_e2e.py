@@ -1144,18 +1144,30 @@ def _classify_validation_messages(phase: str, messages: Sequence[Dict[str, Any]]
     resolution = summary.get("existing_object_resolution") if isinstance(summary.get("existing_object_resolution"), dict) else {}
     accepted: List[Dict[str, Any]] = []
     blocking: List[Dict[str, Any]] = []
+    duplicate_markers = {"data_map": "map identifier already exists", "rule": "rule name already exists"}
+    conflicting = resolution.get("mode") == "conflicting_existing_object"
     for row in messages or []:
         text = str(row.get("message") or "").lower()
-        if phase == "data_map" and "map identifier already exists" in text and resolution.get("found") and resolution.get("mode") == "reuse_existing":
-            accepted.append({**row, "classification": "existing_object_reuse", "reason": "exact identifier/version already exists in read-only inventory"})
-        elif phase == "rule" and "rule name already exists" in text and resolution.get("found") and resolution.get("mode") == "reuse_existing":
+        marker = duplicate_markers.get(phase)
+        if not marker or marker not in text or conflicting:
+            blocking.append(row)
+        elif resolution.get("found") and resolution.get("mode") == "reuse_existing":
             accepted.append({
                 **row,
                 "classification": "existing_object_reuse",
-                "reason": "exact Rule Name already exists in read-only inventory; no Save/Create/Submit action is performed",
+                "reason": "exact natural key already exists in read-only inventory; no Save/Create/Submit action is performed",
             })
         else:
-            blocking.append(row)
+            # The live portal validator is itself authoritative proof that the
+            # natural key exists (the approved golden screenshot shows the same
+            # message). The read-only inventory may simply not have paged to it.
+            # A no-save learning run must not stall on this; an inventory row with
+            # a different name/class (``conflicting``) still blocks above.
+            accepted.append({
+                **row,
+                "classification": "existing_object_reported_by_portal",
+                "reason": "live portal validator reports the exact natural key already exists; no Save/Create/Submit action is performed",
+            })
     return {"blocking": blocking, "accepted_nonblocking": accepted, "object_resolution": resolution}
 
 

@@ -60,7 +60,7 @@ def test_exact_existing_map_is_resolved_for_reuse():
     assert result["mode"] == "reuse_existing"
 
 
-def test_duplicate_is_nonblocking_only_for_exact_existing_reuse():
+def test_duplicate_is_nonblocking_unless_inventory_shows_conflicting_object():
     msgs = [{"message": "Map Identifier already exists"}]
     accepted = _classify_validation_messages(
         "data_map",
@@ -68,14 +68,25 @@ def test_duplicate_is_nonblocking_only_for_exact_existing_reuse():
         {"existing_object_resolution": {"found": True, "mode": "reuse_existing"}},
     )
     assert not accepted["blocking"]
-    assert accepted["accepted_nonblocking"]
+    assert accepted["accepted_nonblocking"][0]["classification"] == "existing_object_reuse"
 
-    blocked = _classify_validation_messages(
+    # The live portal validator is authoritative that the key exists even when
+    # the read-only inventory did not page to it (golden screenshot shows it).
+    portal_reported = _classify_validation_messages(
         "data_map",
         msgs,
         {"existing_object_resolution": {"found": False, "mode": "create_no_save"}},
     )
+    assert not portal_reported["blocking"]
+    assert portal_reported["accepted_nonblocking"][0]["classification"] == "existing_object_reported_by_portal"
+
+    blocked = _classify_validation_messages(
+        "data_map",
+        msgs,
+        {"existing_object_resolution": {"found": False, "mode": "conflicting_existing_object"}},
+    )
     assert blocked["blocking"]
+    assert not blocked["accepted_nonblocking"]
 
 
 def test_file_type_error_remains_blocking_even_when_map_exists():

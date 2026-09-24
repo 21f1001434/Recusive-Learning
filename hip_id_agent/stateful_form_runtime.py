@@ -2351,6 +2351,16 @@ def _stateful_value_equal(node: Dict[str, Any], control: Dict[str, Any]) -> bool
     field_key = _norm(node.get("field_key"))
     candidate_values = [actual] + [_norm_text(x) for x in _clean_selected_values(control.get("selected_values", []))]
     candidate_values = [x for x in candidate_values if x]
+    # A verify-only node cannot type into a portal-owned disabled/read-only
+    # control. Dell renders e.g. Map Identifier Version as a disabled input whose
+    # only visible text is the placeholder ("1"); that display is the value.
+    if (
+        action == "verify_only"
+        and not candidate_values
+        and (control.get("disabled") or control.get("readonly"))
+        and _norm_text(control.get("placeholder"))
+    ):
+        candidate_values = [_norm_text(control.get("placeholder"))]
     if field_key in {"version", "map_identifier_version", "document_type_version", "routing_rule_version", "current_flow_version"}:
         return any(_version_equal(exp, value) for value in candidate_values)
     if field_key in {"process_source_document_type", "process_document_type_version"} and any(_default_all_other_equal(exp, value) for value in candidate_values):
@@ -2924,6 +2934,16 @@ async def execute_phase_state_graph(
         actual = control
         if not binding_before.get("resolved"):
             reason = f"HIP_PHASE_AMBIGUOUS_CONTROL_BINDING: {binding_before.get('reason')}"
+        elif (
+            str(node.get("action")) == "verify_only" and control is not None
+            and (control.get("disabled") or control.get("readonly"))
+        ):
+            # Retrying cannot change a portal-owned read-only value; say so
+            # instead of reporting a failed "repair" every adaptive cycle.
+            reason = (
+                "HIP_READONLY_PORTAL_VALUE_MISMATCH: portal-owned read-only control shows a "
+                "different value than input.json; correct input.json or the portal object"
+            )
         elif repair and control is not None and str(node.get("action")) != "upload_file":
             for retry in range(max_retries + 1):
                 root = await get_active_form_root(page, phase)

@@ -102,7 +102,8 @@ def test_runtime_status_reports_import_failure_separately_from_installation(monk
 def test_live_windows_venv_compatibility_pins_are_shipped():
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "websockets==13.1" in requirements
+    # browser-use 0.13.8 requires websockets==15.0.1; 13.1 made pip resolution impossible.
+    assert "websockets==15.0.1" in requirements
     assert "packaging>=23.2,<26" in requirements
-    assert '"websockets==13.1"' in pyproject
+    assert '"websockets==15.0.1"' in pyproject
     assert '"packaging>=23.2,<26"' in pyproject

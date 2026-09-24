@@ -25,7 +25,7 @@ from .repeatable_rows import apply_repeatable_row_adds, build_repeatable_section
 from .portal_form_exploration import run_portal_form_exploration, merge_section_knowledge
 from .deterministic_plan_runtime import sort_controls as deterministic_sort_controls, annotate_attempt as annotate_plan_attempt, plan_summary as deterministic_plan_summary
 from .stateful_form_runtime import compile_phase_state_graph, execute_phase_state_graph, build_target_branch_knowledge, capture_stateful_controls
-from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled
+from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled, autonomous_target_execution
 from .upload_assets import attempt_upload_for_control
 from .dds_control_driver import close_open_dropdown, get_active_form_root, select_dds_combobox, set_text_control as dds_set_text_control, _read_control_value, _lock_filled_value, semantic_runtime_enabled, open_control_for_discovery
 from .phase_form_entry import ensure_phase_form_entry, find_same_page_top_right_add, same_page_add_candidate
@@ -5489,7 +5489,7 @@ class RuleKBFlow:
                         max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
                         repair=True, strict_live_execution=True,
                     )
-                    target_branch_execution = autonomous_execution.get("final_execution") or {}
+                    target_branch_execution = autonomous_target_execution(autonomous_execution)
                     _write_json(kb_dir / "rule_autonomous_form_execution.json", autonomous_execution)
                 else:
                     target_branch_execution = await execute_phase_state_graph(
@@ -5536,7 +5536,7 @@ class RuleKBFlow:
                             max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
                             repair=True, strict_live_execution=True,
                         )
-                        restored_execution = restored_autonomous.get("final_execution") or {}
+                        restored_execution = autonomous_target_execution(restored_autonomous)
                         _write_json(kb_dir / "rule_autonomous_restore_execution.json", restored_autonomous)
                     else:
                         restored_execution = await execute_phase_state_graph(

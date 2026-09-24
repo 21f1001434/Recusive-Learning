@@ -27,7 +27,7 @@ from .stateful_form_runtime import compile_phase_state_graph, execute_phase_stat
 from .upload_assets import attempt_upload_for_control, find_upload_asset, parse_accept_extensions
 from .dds_control_driver import active_form_root_info, assert_active_surface, close_open_dropdown, get_active_form_root, set_text_control as dds_set_text_control, select_dds_combobox, set_boolean_control, upload_file_control, semantic_runtime_enabled, open_control_for_discovery
 from .phase_form_entry import ensure_phase_form_entry
-from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled
+from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled, autonomous_target_execution
 from .hip_surface_ground_truth import DATA_MAP_LISTING_SIGNATURE, DATA_MAP_CREATE_SIGNATURE, SITE_GROUND_TRUTH_VERSION
 
 DATAMAPS_URL = "https://developer.dell.com/hybrid-integrations/securelink/datamaps"
@@ -2013,20 +2013,16 @@ class DataMapKBFlow:
                     dict(a) for a in (autonomous_execution.get("prior_attempts") or [])
                     if isinstance(a, dict)
                 ]
-                target_branch_execution = autonomous_execution.get("final_execution") or {}
+                target_branch_execution = autonomous_target_execution(autonomous_execution)
                 _write_json(kb_dir / "datamap_target_branch_execution.json", target_branch_execution)
                 if not autonomous_execution.get("pass") or not target_branch_execution.get("pass"):
+                    summary = target_branch_execution.get("autonomous_failure_summary") or {
+                        "reason": autonomous_execution.get("reason"),
+                        "failed_attempts": (target_branch_execution.get("failed_attempts") or [])[:8],
+                    }
                     raise RuntimeError(
                         "Data Map autonomous goal was not proven: "
-                        + mask_sensitive_string(json.dumps({
-                            "reason": autonomous_execution.get("reason"),
-                            "cycles": [
-                                {"cycle": c.get("cycle"), "status": c.get("status")}
-                                for c in (autonomous_execution.get("cycles") or [])
-                                if isinstance(c, dict)
-                            ],
-                            "failed_attempts": (target_branch_execution.get("failed_attempts") or [])[:8],
-                        }, ensure_ascii=False, default=str))
+                        + mask_sensitive_string(json.dumps(summary, ensure_ascii=False, default=str))
                     )
                 progress(
                     "autonomous_goal_execution", len(state_graph.get("nodes") or []),

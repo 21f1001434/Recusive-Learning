@@ -22,7 +22,8 @@ fastapi>=0.115.0
 uvicorn>=0.30.0
 
 # Compatibility pins validated against Uvicorn, Browser Use, LangChain and the existing HIP venv.
-websockets==13.1
+# browser-use 0.13.8 -> browser-harness pins websockets==15.0.1 (13.1 was unresolvable).
+websockets==15.0.1
 packaging>=23.2,<26
 
 # Optional physical-screen fallback used only on Windows when DOM/MCP interaction fails.

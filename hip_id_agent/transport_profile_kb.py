@@ -31,7 +31,7 @@ from .phase_form_entry import ensure_phase_form_entry, find_same_page_top_right_
 from .llm_form_planner import LLMFormPlanner
 from .deterministic_plan_runtime import ordered_keys as deterministic_ordered_keys, annotate_attempt as annotate_plan_attempt, plan_summary as deterministic_plan_summary
 from .stateful_form_runtime import compile_phase_state_graph, execute_phase_state_graph, build_target_branch_knowledge, capture_stateful_controls
-from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled
+from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled, autonomous_target_execution
 
 TRANSPORT_PROFILES_URL = "https://developer.dell.com/hybrid-integrations/securelink/transportprofiles"
 
@@ -4685,7 +4685,7 @@ class TransportProfileKBFlow:
                         max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
                         repair=True, strict_live_execution=True,
                     )
-                    target_branch_execution = autonomous_execution.get("final_execution") or {}
+                    target_branch_execution = autonomous_target_execution(autonomous_execution)
                     _write_json(kb_dir / "transport_profile_autonomous_form_execution.json", autonomous_execution)
                 else:
                     target_branch_execution = await execute_phase_state_graph(
@@ -4796,7 +4796,7 @@ class TransportProfileKBFlow:
                             max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
                             repair=True, strict_live_execution=True,
                         )
-                        restored_execution = restored_autonomous.get("final_execution") or {}
+                        restored_execution = autonomous_target_execution(restored_autonomous)
                         _write_json(kb_dir / "transport_profile_autonomous_restore_execution.json", restored_autonomous)
                     else:
                         restored_execution = await execute_phase_state_graph(

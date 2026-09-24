@@ -28,7 +28,7 @@ from .upload_assets import attempt_upload_for_control
 from .active_surface import inspect_doctype_create_surface, get_doctype_create_root
 from .dds_control_driver import select_dds_combobox, close_open_dropdown, set_text_control as dds_set_text_control, semantic_runtime_enabled, open_control_for_discovery
 from .phase_form_entry import ensure_phase_form_entry, find_same_page_top_right_add, same_page_add_candidate
-from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled
+from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled, autonomous_target_execution
 from .stateful_form_runtime import (
     compile_document_type_state_graph,
     execute_document_type_state_graph,
@@ -3384,7 +3384,7 @@ class DocumentTypeKBFlow:
                         repair=True, strict_live_execution=True,
                         executor=execute_document_type_state_graph,
                     )
-                    target_branch_execution = autonomous_execution.get("final_execution") or {}
+                    target_branch_execution = autonomous_target_execution(autonomous_execution)
                     _write_json(kb_dir / "doctype_autonomous_form_execution.json", autonomous_execution)
                 else:
                     target_branch_execution = await execute_document_type_state_graph(
@@ -3411,7 +3411,7 @@ class DocumentTypeKBFlow:
                                     repair=True, strict_live_execution=True,
                                     executor=execute_document_type_state_graph,
                                 )
-                                target_branch_execution = autonomous_execution.get("final_execution") or {}
+                                target_branch_execution = autonomous_target_execution(autonomous_execution)
                                 _write_json(kb_dir / "doctype_autonomous_form_execution_retry.json", autonomous_execution)
                             else:
                                 target_branch_execution = await execute_document_type_state_graph(
