@@ -14,6 +14,8 @@ Fixes missions stalling at Data Map (`goal not proven ... failed_attempts: []`, 
 - **The "Looks correct" loop is fixed.**
   - The judge now reads a Status switch as Enabled/Disabled; it previously saw `on` or nothing.
   - **Looks correct** on an exact-completed phase commits the phase and hands off, instead of starting another attempt.
+  - Only one review per phase stays open, so old attempts' reviews no longer resurface.
+- **Verified:** clean install, 1,305 passing tests from the packaged zip, the 7-phase local mission UAT, and the running Control Center API/UI. See `V243R13_FINAL_VERIFICATION_20260924.md`.
 - **Portal-owned disabled fields** (Version, Rule Type, Rule Scope) verify against their displayed value. A mismatch reports `HIP_READONLY_PORTAL_VALUE_MISMATCH`.
 - **Document Type Status switch** is now recognised and operated as a switch. Previously Source/Target Document Type could never be proven.
 - **Failures name the field and the unmet check** for every phase.

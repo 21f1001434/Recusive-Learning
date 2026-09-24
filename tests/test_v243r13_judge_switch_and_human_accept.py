@@ -194,3 +194,30 @@ def test_executor_records_enabled_for_status_switch_on_replica(tmp_path: Path):
     final = autonomous_target_execution(asyncio.run(run()))
     status = next(a for a in final["attempts"] if a.get("field") == "status")
     assert status["success"] is True and status["actual_value"] == "Enabled"
+
+
+def test_only_one_open_review_per_phase_and_committed_phase_clears_it(tmp_path: Path):
+    store = HumanPhaseReviewStore(tmp_path / "reviews", AppConfig().human_in_the_loop)
+    old_run = store.create_recovery_request(
+        run_id="RUN-OLD", phase="data_map", phase_display="Data Map", recovery_round=1,
+        reason="stale from a stopped run", exact_checkpoint={"pass": True},
+    )
+    first = store.create_recovery_request(
+        run_id="RUN-1", phase="data_map", phase_display="Data Map", recovery_round=2,
+        reason="attempt 2", exact_checkpoint={"pass": True},
+    )
+    second = store.create_recovery_request(
+        run_id="RUN-1", phase="data_map", phase_display="Data Map", recovery_round=3,
+        reason="attempt 3", exact_checkpoint={"pass": True},
+    )
+    other_phase = store.create_recovery_request(
+        run_id="RUN-1", phase="rule", phase_display="Rule", recovery_round=1,
+        reason="rule", exact_checkpoint={"pass": False},
+    )
+    pending_ids = [r["request_id"] for r in store.pending()]
+    assert second["request_id"] in pending_ids and other_phase["request_id"] in pending_ids
+    assert old_run["request_id"] not in pending_ids and first["request_id"] not in pending_ids
+    assert store.get(first["request_id"])["status"] == "superseded"
+
+    store.close_pending_for_phase(phase="data_map")
+    assert [r["phase"] for r in store.pending()] == ["rule"]

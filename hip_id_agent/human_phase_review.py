@@ -112,6 +112,7 @@ class HumanPhaseReviewStore:
             "coordinates_stored": False,
         }
         safe_write_json(path, payload)
+        self._supersede_pending(phase=phase, keep_request_id=request_id, reason="newer review for the same phase")
         return payload
 
 
@@ -180,7 +181,35 @@ class HumanPhaseReviewStore:
             "coordinates_stored": False,
         }
         safe_write_json(path, payload)
+        self._supersede_pending(phase=phase, keep_request_id=request_id, reason="newer recovery request for the same phase")
         return payload
+
+    def _supersede_pending(self, *, phase: str, keep_request_id: str = "", reason: str) -> List[str]:
+        """Keep at most one open review per phase.
+
+        Every attempt used to create a new recovery request while older ones
+        (including those of stopped runs) stayed "needs_review" forever. The
+        Control Center shows the newest pending request, so after resolving one
+        the same message reappeared from a stale request.
+        """
+        closed: List[str] = []
+        for path in self.pending_dir.glob("*.json"):
+            row = _read_json(path)
+            if row.get("status") != "needs_review" or str(row.get("phase") or "") != str(phase or ""):
+                continue
+            if keep_request_id and str(row.get("request_id") or "") == keep_request_id:
+                continue
+            row["status"] = "superseded"
+            row["superseded_at"] = utc_now()
+            row["superseded_by"] = keep_request_id
+            row["superseded_reason"] = reason
+            safe_write_json(path, row)
+            closed.append(str(row.get("request_id") or ""))
+        return closed
+
+    def close_pending_for_phase(self, *, phase: str, reason: str = "phase accepted") -> List[str]:
+        """Close every open review for a phase that has been committed."""
+        return self._supersede_pending(phase=phase, keep_request_id="", reason=reason)
 
     def pending(self, *, run_id: str = "") -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []

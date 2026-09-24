@@ -58,6 +58,8 @@ and Start teaching / Finish & learn did not learn anything.
   - Text and vision claims that contradict this exact evidence are reconciled.
   - A genuinely disabled switch is still caught.
 - **Cause 2: approval was discarded.** On a recovery request, **Looks correct** was always rewritten to `recheck_live_phase`, even when the exact checkpoint had passed.
+- **Cause 3: stale reviews reappeared.** The Control Center showed the newest *pending* review across all runs and attempts. Every attempt created a new recovery request and old ones were never closed, so after one click the same message returned from an older request.
+- **Fix 3.** The store keeps at most one open review per phase: a newer request supersedes older ones, including those from stopped runs. Committing a phase closes its open reviews, and the mission stops waiting on a superseded request.
 - **Fix 2.** On an exact-completed phase, **Looks correct** now commits the phase (`pass_human_confirmed`, `phase_acceptance_commit.json`) and hands off to the next phase. Without exact proof it still only re-checks, and **Needs correction** still repairs.
 
 ## Fixes
@@ -98,6 +100,8 @@ The new tests:
 | `test_v243r13_learning_loop_end_to_end.py` | Continuous learning promotes trusted knowledge and replay exploits it after reload. Mission RSI elects model champions and persists its cycles. Flow-pattern memory learned on run 1 drives run 2. |
 | `test_v243r13_judge_switch_and_human_accept.py` | A checked Status switch is proven as Enabled, and a disabled one is still caught. Status and version model claims are reconciled. Live capture reads switches. **Looks correct** on an exact-completed phase is accepted once, and without exact proof it still only re-checks. |
 | `test_v243r13_learning_memory_roundtrip.py` | Finish & learn captures from the saved session. Recipes, induced skills and replay policies still match a re-worded task after reload. |
+
+See `V243R13_FINAL_VERIFICATION_20260924.md` for the final verification results.
 
 ## Apply
 

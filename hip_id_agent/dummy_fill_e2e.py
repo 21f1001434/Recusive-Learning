@@ -2316,6 +2316,9 @@ async def _hold_incomplete_phase_for_human(
                 "policy": "resume same phase and re-prove exact live state before any handoff",
             })
             return {"held": True, "resume": True, "request": row}
+        if row.get("status") == "superseded":
+            # A newer review for this phase replaced this one; stop waiting on it.
+            return {"held": True, "resume": False, "superseded": True, "request": row}
 
         now = time.monotonic()
         if timeout > 0 and now - started >= timeout:
@@ -4346,6 +4349,12 @@ class FullDummyFillE2EFlow:
                     safe_write_json(phase_dir / PHASE_VERIFICATION_FILENAME, verification)
                     safe_write_json(phase_dir / PHASE_JUDGE_RESULT_FILENAME, judge_result or {"pass": True, "status": "judge_disabled"})
                     mission.mark_phase_complete(phase, attempt=attempt_no, judge_pass=bool(judge_result.get("pass", True)))
+                    try:
+                        # A committed phase must not leave an old review visible in
+                        # the Control Center (it would reappear after every click).
+                        human_phase_reviews.close_pending_for_phase(phase=phase, reason="phase committed and handed off")
+                    except Exception:
+                        pass
                     safe_write_json(phase_dir / "phase_completion_token.json", {
                         "schema_version": "hip.phase-completion-token.v1",
                         "phase": phase,
