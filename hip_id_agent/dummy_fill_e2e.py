@@ -61,6 +61,7 @@ from .phase_transition import MissionTransitionCoordinator
 from .final_mission import FinalMissionConsolidator
 from .mlflow_async import AsyncMLflowTracker
 from .replay_policy import replay_policy_engine_from_config
+from .mission_learning import close_mission_learning_loop
 from .judge_consensus import MultiModelJudgeConsensus
 from .model_portfolio import model_portfolio_from_config
 from .human_phase_review import human_phase_review_from_config
@@ -4726,6 +4727,21 @@ class FullDummyFillE2EFlow:
                 "active_policy_version": replay_policy.manifest().get("active_policy_version"),
             })
             safe_write_json(root_dir / "replay_policy_final.json", aggregate["replay_policy"])
+            # V243R13: missions run the same bounded recursive self-improvement
+            # cycle as portal tasks (replay + model-champion dreaming, skill review).
+            try:
+                aggregate["recursive_self_improvement"] = close_mission_learning_loop(
+                    self.config, replay_policy=replay_policy,
+                    reward=float(replay_episode.get("score") or (1.0 if mission_success else 0.0)),
+                    success=mission_success,
+                )
+                mlflow_tracker.log_event("recursive_self_improvement", {
+                    "cycles": aggregate["recursive_self_improvement"].get("cycle_count"),
+                    "best_reward": (aggregate["recursive_self_improvement"].get("state") or {}).get("best_reward"),
+                })
+            except Exception as rsi_exc:
+                aggregate["recursive_self_improvement"] = {"status": "error_fail_open", "error": mask_sensitive_string(str(rsi_exc))[:500]}
+            safe_write_json(root_dir / "recursive_self_improvement.json", aggregate["recursive_self_improvement"])
         except Exception as exc:
             aggregate["replay_policy"] = {"status": "error_fail_open", "error": mask_sensitive_string(str(exc))}
         _write_csv_report(root_dir / "phase_verification_report.csv", phase_verifications)

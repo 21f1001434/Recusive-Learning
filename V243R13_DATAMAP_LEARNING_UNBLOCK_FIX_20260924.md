@@ -1,4 +1,4 @@
-# V243R13 — All-phase completion + learning unblock (2026-09-24)
+# V243R13 — All-phase completion + learning/RSI unblock (2026-09-24)
 
 ## Symptom (run `UHAUL-POASN-20260924-103934`)
 
@@ -35,6 +35,16 @@ and Start teaching / Finish & learn did not learn anything.
 | Doc Type / Transport Profile / BizFlow | The validation gate only recognised the Data Map and Rule duplicate messages. | `Name already exists` and `Transport Profile already exists in DEV environment.` blocked phase verification. |
 | All | `requirements.txt` pinned `websockets==13.1`, but `browser-use==0.13.8` requires `15.0.1`. | A clean `pip install -r requirements.txt` failed. |
 
+### Learning and recursive self-improvement wiring
+
+- **Start mission never ran RSI.** `recursive_self_improvement` was called only by the task box, production E2E and the persistent operator, so full phase missions never ran:
+  - model-champion dreaming over the judge-panel and AutoWebGLM outcomes they recorded;
+  - bounded RSI cycles;
+  - skill-library review.
+
+  The mission now runs the same RSI cycle after its replay episode. The new `mission_learning.close_mission_learning_loop()` writes `recursive_self_improvement.json` in the run folder and updates `data/hip_memory/recursive_self_improvement/`.
+- Every learning store was round-trip verified: learn → write to disk → reload → exploit. The stores are continuous learning, capability graph, Portal Brain, trajectory memory, replay policy (including dreaming), model portfolio champions, RSI state, induced skills, deterministic recipes, flow-pattern fast replay, human phase review, human teaching, interactive teaching and the website world model. After the masking fixes, none of their files contain `***MASKED***`.
+
 ## Fixes
 
 - `security.py`:
@@ -70,6 +80,7 @@ The new tests:
 | `test_v243r13_datamap_stuck_learning_fix.py` | Data Map Create Map replica: goal proven on cycle 1, with both version renderings. |
 | `test_v243r13_all_phase_existing_object_replicas.py` | Document Type, Rule, Transport Profile and BizFlow replicas with their golden duplicate messages and disabled fields: goal proven on cycle 1. The validation gate accepts each golden message. |
 | `test_v243r13_universal_task_fill_and_learn.py` | A task-box form fill reaches `100_percent_runtime_input_exact_readback`, and the learned blueprint is value-free. |
+| `test_v243r13_learning_loop_end_to_end.py` | Continuous learning promotes trusted knowledge and replay exploits it after reload. Mission RSI elects model champions and persists its cycles. Flow-pattern memory learned on run 1 drives run 2. |
 | `test_v243r13_learning_memory_roundtrip.py` | Finish & learn captures from the saved session. Recipes, induced skills and replay policies still match a re-worded task after reload. |
 
 ## Apply

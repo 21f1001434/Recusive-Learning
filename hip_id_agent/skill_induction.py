@@ -512,3 +512,18 @@ class SkillInductionEngine:
             evidence=evidence,
             skill_id_override=skill_id_override,
         )
+
+
+def skill_library_from_config(config: Any) -> InducedSkillLibrary:
+    """The single induced-skill library shared by missions and portal tasks."""
+    cfg = config.skill_induction
+    root = Path(config.reporting.memory_dir) / str(config.brain.directory or "portal_brain") / str(cfg.memory_subdir or "induced_skills")
+    return InducedSkillLibrary(
+        root,
+        min_verified_successes=int(cfg.min_verified_successes or 1),
+        demote_after_failures=int(cfg.demote_after_failures or 2),
+        min_replay_confidence=float(cfg.min_replay_confidence or 0.66),
+        confidence_half_life_days=float(cfg.confidence_half_life_days or 45.0),
+        stale_after_days=float(cfg.stale_after_days or 120.0),
+        max_skills=int(cfg.max_skills or 500),
+    )

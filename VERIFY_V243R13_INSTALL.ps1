@@ -11,5 +11,7 @@ python -c "from hip_id_agent.security import mask_sensitive_data as m; r=m({'ses
 if ($LASTEXITCODE -ne 0) { throw "R13 learning-memory masking smoke failed" }
 python -c "from hip_id_agent.stateful_form_runtime import existing_object_validation as ex, _value_equal as eq; assert ex({'field_key':'document_type_name'},{'blockingValidation':True,'validationMessage':'Name already exists'}); assert not ex({'field_key':'attribute_name'},{'blockingValidation':True,'validationMessage':'Attribute Name already exists'}); assert eq({'action':'select_radio','expected_value':'Enabled'},{'role':'switch','checked':True}); print('R13_ALL_PHASE_EXISTING_OBJECT_AND_SWITCH_OK')"
 if ($LASTEXITCODE -ne 0) { throw "R13 all-phase smoke failed" }
+python -c "from hip_id_agent.mission_learning import close_mission_learning_loop; from hip_id_agent.dummy_fill_e2e import close_mission_learning_loop as wired; print('R13_MISSION_RSI_WIRED_OK')"
+if ($LASTEXITCODE -ne 0) { throw "R13 mission RSI wiring smoke failed" }
 Write-Host "V243R13 install verification PASS" -ForegroundColor Green
-Write-Host "All-phase completion + learning unblock (proof flags, learning memory, existing objects, read-only fields, diagnostics) is active."
+Write-Host "All-phase completion + learning unblock (proof flags, learning memory, mission RSI, existing objects, read-only fields, diagnostics) is active."

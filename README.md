@@ -1,8 +1,9 @@
-## V243R13 — All-phase completion + learning unblock (2026-09-24)
+## V243R13 — All-phase completion + learning/RSI unblock (2026-09-24)
 
 Fixes missions stalling at Data Map (`goal not proven ... failed_attempts: []`, *exact checkpoint: not proven*). It also fixes the hidden blockers waiting in every later phase and in learning.
 
 - **All 7 phases and the task box:** secret masking no longer hides `authoritative_*` proof flags. They were turned into `"***MASKED***"`, so no strict phase gate, exact checkpoint, `Looks correct` promotion or task-box form fill could ever pass.
+- **Recursive self-improvement now runs after every Start mission**, not just after task-box and production runs: replay dreaming, model-champion dreaming and skill review. Results are in the run's `recursive_self_improvement.json` and in the Control Center RSI panel.
 - **Learning:** agent-owned keys (`session_id`, `task_tokens`, …) are no longer masked when saved.
   - Start teaching → Finish & learn now captures the demonstration.
   - Learned recipes, skills and replay policies match new tasks after reload.

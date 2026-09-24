@@ -22,7 +22,7 @@ from .portal_discovery_flow import _action_label, _page_surface
 from .safe_io import safe_write_json
 from .security import mask_sensitive_data, mask_sensitive_string
 from .semantic_affordance import canonical_intent
-from .skill_induction import InducedSkillLibrary, SkillInductionEngine, build_form_blueprint
+from .skill_induction import InducedSkillLibrary, SkillInductionEngine, build_form_blueprint, skill_library_from_config
 from .replay_policy import replay_policy_engine_from_config
 from .model_portfolio import model_portfolio_from_config
 from .recursive_self_improvement import recursive_improvement_from_config
@@ -53,17 +53,7 @@ async def _browser_context(config: AppConfig, run_dir: Path, browser_override: B
 
 
 def _skill_library(config: AppConfig) -> InducedSkillLibrary:
-    cfg = config.skill_induction
-    root = Path(config.reporting.memory_dir) / str(config.brain.directory or "portal_brain") / str(cfg.memory_subdir or "induced_skills")
-    return InducedSkillLibrary(
-        root,
-        min_verified_successes=int(cfg.min_verified_successes or 1),
-        demote_after_failures=int(cfg.demote_after_failures or 2),
-        min_replay_confidence=float(cfg.min_replay_confidence or 0.66),
-        confidence_half_life_days=float(cfg.confidence_half_life_days or 45.0),
-        stale_after_days=float(cfg.stale_after_days or 120.0),
-        max_skills=int(cfg.max_skills or 500),
-    )
+    return skill_library_from_config(config)
 
 
 def redact_form_graph_for_artifact(graph: Mapping[str, Any]) -> Dict[str, Any]:

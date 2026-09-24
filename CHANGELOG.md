@@ -1,4 +1,7 @@
-# V243R13 — All-phase completion + learning unblock (2026-09-24)
+# V243R13 — All-phase completion + learning/RSI unblock (2026-09-24)
+
+- Full HIP missions now run recursive self-improvement (replay + model-champion dreaming, skill review) after the replay episode, via the new `mission_learning.close_mission_learning_loop()`. `skill_library_from_config()` is shared by missions and portal tasks.
+- Added end-to-end learning-loop tests: continuous learning → replay exploitation, mission RSI → model champions, flow-pattern memory run 1 → run 2.
 
 - Fixed `mask_sensitive_data()` masking `authoritative_*` keys (bare `auth` regex). Strict autonomous gates, exact completion checkpoints and universal task fills received `"***MASKED***"` instead of `True` and could never pass, in any phase.
 - Boolean/`None` values are never masked. New `NON_SECRET_KEYS` (`task_tokens`, `session_id`, `sessions`, …) keeps learning memory usable after `safe_write_json`:
