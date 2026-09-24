@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "open Target Transport Profile",
+  "selector": "role=button name=Target Transport Profile",
+  "point": {
+    "x": 765,
+    "y": 40,
+    "bbox": {
+      "x": 673.84375,
+      "y": 12.0,
+      "width": 162.53125,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

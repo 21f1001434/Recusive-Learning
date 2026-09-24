@@ -1,0 +1,16 @@
+Document Type Usage Multi-Select Fix — Local Verification
+
+Python compileall: PASS
+Targeted regression suite: 39 passed
+Full suite: 295 passed in 12.26s
+
+Validated:
+- Source/Target shared Usage driver
+- unique listbox + aria-posinset option selectors
+- four values selected additively
+- no destructive key calls on empty search input
+- exact set verification
+- aria-checked/data-selected/aria-selected/selected-icon extraction
+- artifact parser exact set extraction
+
+Live authenticated HIP rerun: NOT PERFORMED in this environment.

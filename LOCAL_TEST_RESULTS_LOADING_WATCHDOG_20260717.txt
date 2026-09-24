@@ -1,0 +1,17 @@
+HIP Portal Loading Watchdog Fix - Local Verification
+Date: 2026-07-17
+
+Python compilation: PASS
+Targeted loading watchdog tests: 5 passed
+Session/ReAct/self-heal targeted regression tests: 29 passed
+Complete automated suite: 324 passed
+
+Key verified contracts:
+- Default loading threshold is 120 seconds.
+- One automatic refresh per phase/URL by default.
+- Refresh preserves the persistent authenticated context.
+- Loading that clears after refresh resumes execution.
+- Loading that survives refresh fails closed.
+- Loading timeout is classified as blocking_overlay.
+- Self-heal action begins with refresh_page_and_reopen.
+- Stale loading overlays are not bypassed by pointer-event mutation.

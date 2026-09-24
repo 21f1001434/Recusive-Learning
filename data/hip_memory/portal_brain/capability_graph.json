@@ -1,0 +1,3693 @@
+{
+  "schema_version": "hip.capability-graph.v7",
+  "updated_at": "2026-09-20T06:26:31.219102+00:00",
+  "pages": {
+    "data_maps": {
+      "page_family": "data_maps",
+      "urls": [
+        "/securelink/datamaps"
+      ],
+      "titles": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "fingerprints": [],
+      "capability_ids": [
+        "cap-025c2e70ea8db8f13da1",
+        "cap-27008e8a6237b3a1eb2f",
+        "cap-717ff71e226339c6b8a0",
+        "cap-693244d831cdeb73ede5",
+        "cap-e0397a14a473731478a6",
+        "cap-b31a6f9507130344603e",
+        "cap-aec89210a16c371ebdf9"
+      ],
+      "api_contract_ids": [
+        "api-143824c61597c264c105"
+      ],
+      "last_seen_at": "2026-09-20T06:26:31.218695+00:00",
+      "observations": 9,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map"
+      }
+    },
+    "document_types": {
+      "page_family": "document_types",
+      "urls": [
+        "/securelink/doctypes"
+      ],
+      "titles": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "fingerprints": [],
+      "capability_ids": [
+        "cap-74094cb3edce784cea49",
+        "cap-dd2015314989360f7eca",
+        "cap-03b6354c778084d9bb84",
+        "cap-50aef60a74c2eb78a04b",
+        "cap-cdb07d24c318fd2cd434",
+        "cap-ce17296775dc049f1392",
+        "cap-45cefc1a993a6183f6da",
+        "cap-c2e14cd2a5a00ac09586",
+        "cap-c6a2b8b14779baf1a71b",
+        "cap-1a3112cb8315a554c384",
+        "cap-839569ff7e225d5a99aa",
+        "cap-9f11db2edd8dd0bf0aa9",
+        "cap-27164ec334c203d5a0e1",
+        "cap-8aaf39dfd075d6ea560d",
+        "cap-a238a8df43dee88ff552",
+        "cap-9a8f52b72d393a61ff78",
+        "cap-b2ae9a43545d06b2aae6"
+      ],
+      "api_contract_ids": [
+        "api-1f7a75bd40d4d46501ea"
+      ],
+      "last_seen_at": "2026-09-20T06:26:31.218644+00:00",
+      "observations": 20,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type"
+      }
+    },
+    "rules": {
+      "page_family": "rules",
+      "urls": [
+        "/securelink/rules"
+      ],
+      "titles": [
+        "SecureLink > Rules > + Add"
+      ],
+      "fingerprints": [],
+      "capability_ids": [
+        "cap-0d5a485bd3d45799f9f7",
+        "cap-6cca20890fce4abeb967",
+        "cap-7405a827a349b9129cd7",
+        "cap-9134e6798246f382c508",
+        "cap-f65b58a40e92d7a32742",
+        "cap-db8f36936d2e997f5029",
+        "cap-9475620e3ab834cec099",
+        "cap-5e6f74861d0f0b694322",
+        "cap-515c31f5435d7dd74fa2",
+        "cap-f1e4b092a1f60a091e5b"
+      ],
+      "api_contract_ids": [
+        "api-db70bbe5b0e247b1e813"
+      ],
+      "last_seen_at": "2026-09-20T06:26:31.218670+00:00",
+      "observations": 12,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule"
+      }
+    },
+    "transport_profiles": {
+      "page_family": "transport_profiles",
+      "urls": [
+        "/securelink/transportprofiles"
+      ],
+      "titles": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "fingerprints": [],
+      "capability_ids": [
+        "cap-d2a123e197104a9ef1aa",
+        "cap-53eeca9ba036a2c2d854",
+        "cap-a46571958cdd0fdc35b3",
+        "cap-549d2da976574a7a28f9",
+        "cap-dcc612a7a94ea601b227",
+        "cap-36665bb69ee90c8aa322",
+        "cap-8fadb8ed6f2d111084ab",
+        "cap-66bcf4ee402459793ced",
+        "cap-2d0306030a76c814a072",
+        "cap-24ab2f1854ad5d89dfd9",
+        "cap-f98011d30bb37056ba78",
+        "cap-76cc49027cbcbab33dae",
+        "cap-b21832bd3551ddb5b2d0",
+        "cap-3df2bcf6a520f4ad2930",
+        "cap-80ccfff98d61954391bc",
+        "cap-d85d22ed1116767e5eae",
+        "cap-63077809f171b58a0b9e",
+        "cap-cb549ae172e106fb4f28",
+        "cap-a706ad218375fb4f7add",
+        "cap-ea81247ef2f1168b4b69",
+        "cap-bc84dd85604dd37ef73b",
+        "cap-63190332642173ca71d2",
+        "cap-4e782614515d0ef57ea9",
+        "cap-c45c86b1f024e8f2c6c9",
+        "cap-61ac166dd24e5a1158f3"
+      ],
+      "api_contract_ids": [
+        "api-f86579de27c9ab87d3f5",
+        "api-c054fc55fdec7a4bc024",
+        "api-5605e62f004038f9533c",
+        "api-8445afd47291b3a885a0",
+        "api-0391a6f6b28926e5a64f",
+        "api-c03bc9a94bcf15651f4d"
+      ],
+      "last_seen_at": "2026-09-20T06:26:31.218875+00:00",
+      "observations": 33,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile"
+      }
+    },
+    "bizflows": {
+      "page_family": "bizflows",
+      "urls": [
+        "/bizexchange/bizflows"
+      ],
+      "titles": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "fingerprints": [],
+      "capability_ids": [
+        "cap-b54c2df159c64316c44e",
+        "cap-b438544272fab1a8d7fc",
+        "cap-df9425bd9c48f8a3fdbe",
+        "cap-518ed8390bbd79fae9a6",
+        "cap-635bd0453f8364bf006c",
+        "cap-e7ab1f76fe80abbb63f6",
+        "cap-ae4e2de82044781d399c",
+        "cap-35123909468f498de9a2",
+        "cap-1e7c6dd4fdb3648c4ccf",
+        "cap-7543f0b75cfd03c81e70",
+        "cap-72ce9c0fc170009e86e6",
+        "cap-88fdb4fda117e47eeb22",
+        "cap-5b53e546a809500b5fa2",
+        "cap-ad56cb7304082d6ee845",
+        "cap-af23a258b350fce8dc77",
+        "cap-779f1bf6512c69bdab49",
+        "cap-5723c3da866eab356cf5",
+        "cap-614586fff9cce88801ac",
+        "cap-2ec6c65f7b15cc8f2de0",
+        "cap-e0a03aa81667b9cee113",
+        "cap-97ca0ba95249620cfd56"
+      ],
+      "api_contract_ids": [
+        "api-eaa5e28de324b7e6e3b1",
+        "api-ec1eb52797e6fe748aea",
+        "api-c054fc55fdec7a4bc024",
+        "api-5605e62f004038f9533c",
+        "api-1db46ebc42906558d370",
+        "api-e60361233bf8ca2332e8",
+        "api-42609b13ad1e35c43740",
+        "api-72680f98f94284dd09ae"
+      ],
+      "last_seen_at": "2026-09-20T06:26:31.219009+00:00",
+      "observations": 30,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow"
+      }
+    },
+    "workflow": {
+      "page_family": "workflow",
+      "urls": [],
+      "titles": [],
+      "fingerprints": [],
+      "capability_ids": [],
+      "api_contract_ids": [
+        "api-cdac9e42551b6bc76b33",
+        "api-c88adf1a642e2193855a",
+        "api-e5c54d0b4b6cc909373b"
+      ],
+      "last_seen_at": "2026-09-20T06:26:31.219092+00:00",
+      "observations": 3
+    }
+  },
+  "capabilities": {
+    "cap-025c2e70ea8db8f13da1": {
+      "capability_id": "cap-025c2e70ea8db8f13da1",
+      "page_family": "data_maps",
+      "kind": "form_field",
+      "label": "Map Identifier",
+      "selectors": [
+        "label=Map Identifier"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "data_map.map_identifier"
+      ],
+      "sections": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.213589+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map",
+        "action": "fill",
+        "selector_hints": [
+          "label=Map Identifier",
+          "placeholder=Map Identifier"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "data_map.map_identifier"
+    },
+    "cap-27008e8a6237b3a1eb2f": {
+      "capability_id": "cap-27008e8a6237b3a1eb2f",
+      "page_family": "data_maps",
+      "kind": "form_field",
+      "label": "Map Identifier Version",
+      "selectors": [
+        "label=Map Identifier Version"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "data_map.map_identifier_version"
+      ],
+      "sections": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.213668+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map",
+        "action": "fill",
+        "selector_hints": [
+          "label=Map Identifier Version"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "data_map.map_identifier_version"
+    },
+    "cap-717ff71e226339c6b8a0": {
+      "capability_id": "cap-717ff71e226339c6b8a0",
+      "page_family": "data_maps",
+      "kind": "form_field",
+      "label": "Map Name",
+      "selectors": [
+        "label=Map Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "data_map.map_name"
+      ],
+      "sections": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.213723+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map",
+        "action": "fill",
+        "selector_hints": [
+          "label=Map Name",
+          "placeholder=Map Name"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "data_map.map_name"
+    },
+    "cap-693244d831cdeb73ede5": {
+      "capability_id": "cap-693244d831cdeb73ede5",
+      "page_family": "data_maps",
+      "kind": "form_field",
+      "label": "Map Class",
+      "selectors": [
+        "label=Map Class"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "data_map.map_class"
+      ],
+      "sections": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.213775+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map",
+        "action": "fill",
+        "selector_hints": [
+          "label=Map Class"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "data_map.map_class"
+    },
+    "cap-e0397a14a473731478a6": {
+      "capability_id": "cap-e0397a14a473731478a6",
+      "page_family": "data_maps",
+      "kind": "form_field",
+      "label": "Contivo Version",
+      "selectors": [
+        "label=Contivo Version"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "data_map.contivo_version"
+      ],
+      "sections": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.213826+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map",
+        "action": "fill",
+        "selector_hints": [
+          "label=Contivo Version",
+          "label=Contivo version"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "data_map.contivo_version"
+    },
+    "cap-b31a6f9507130344603e": {
+      "capability_id": "cap-b31a6f9507130344603e",
+      "page_family": "data_maps",
+      "kind": "form_field",
+      "label": "Map Data",
+      "selectors": [
+        "label=Map Data"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "data_map.map_data_file"
+      ],
+      "sections": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.213878+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map",
+        "action": "upload_file",
+        "selector_hints": [
+          "label=Map Data",
+          "css=input[type='file']"
+        ],
+        "values_stored": false
+      },
+      "action": "upload_file",
+      "input_json_key": "data_map.map_data_file"
+    },
+    "cap-aec89210a16c371ebdf9": {
+      "capability_id": "cap-aec89210a16c371ebdf9",
+      "page_family": "data_maps",
+      "kind": "form_field",
+      "label": "Cross Reference Table details",
+      "selectors": [
+        "label=Cross Reference Table details"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "data_map.cross_reference_table_details"
+      ],
+      "sections": [
+        "SecureLink > Data Maps > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.213943+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "data_map",
+        "action": "toggle",
+        "selector_hints": [
+          "label=Cross Reference Table details"
+        ],
+        "values_stored": false
+      },
+      "action": "toggle",
+      "input_json_key": "data_map.cross_reference_table_details"
+    },
+    "cap-74094cb3edce784cea49": {
+      "capability_id": "cap-74094cb3edce784cea49",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Name",
+      "selectors": [
+        "label=Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.name"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214045+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Name",
+          "placeholder=Name"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_document_type.name"
+    },
+    "cap-dd2015314989360f7eca": {
+      "capability_id": "cap-dd2015314989360f7eca",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Transaction Type",
+      "selectors": [
+        "label=Transaction Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.transaction_type"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214109+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Transaction Type",
+          "placeholder=Transaction Type"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_document_type.transaction_type"
+    },
+    "cap-03b6354c778084d9bb84": {
+      "capability_id": "cap-03b6354c778084d9bb84",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Version",
+      "selectors": [
+        "label=Version"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.version"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214170+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Version"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_document_type.version"
+    },
+    "cap-50aef60a74c2eb78a04b": {
+      "capability_id": "cap-50aef60a74c2eb78a04b",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Data Format Type",
+      "selectors": [
+        "label=Data Format Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.data_format_type"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214231+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Data Format Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_document_type.data_format_type"
+    },
+    "cap-cdb07d24c318fd2cd434": {
+      "capability_id": "cap-cdb07d24c318fd2cd434",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Description",
+      "selectors": [
+        "label=Description"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.description"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214289+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Description",
+          "placeholder=Description"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_document_type.description"
+    },
+    "cap-ce17296775dc049f1392": {
+      "capability_id": "cap-ce17296775dc049f1392",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Operation",
+      "selectors": [
+        "label=Operation"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.document_identifier.operation"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214358+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Operation",
+          "dialog>>label=Operation"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_document_type.document_identifier.operation"
+    },
+    "cap-45cefc1a993a6183f6da": {
+      "capability_id": "cap-45cefc1a993a6183f6da",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Document Identifier rows",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.document_identifier.rows"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214427+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "fill_doc_id_rows",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_doc_id_rows",
+      "input_json_key": "source_document_type.document_identifier.rows"
+    },
+    "cap-c2e14cd2a5a00ac09586": {
+      "capability_id": "cap-c2e14cd2a5a00ac09586",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Attributes to Configure",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.attributes_to_configure"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "draft",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214488+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "fill_attributes",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_attributes",
+      "input_json_key": "source_document_type.attributes_to_configure"
+    },
+    "cap-c6a2b8b14779baf1a71b": {
+      "capability_id": "cap-c6a2b8b14779baf1a71b",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Validation Type",
+      "selectors": [
+        "label=Validation Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_document_type.validation_type"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214546+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_document_type",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Validation Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_document_type.validation_type"
+    },
+    "cap-1a3112cb8315a554c384": {
+      "capability_id": "cap-1a3112cb8315a554c384",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Name",
+      "selectors": [
+        "label=Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.name"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214615+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Name"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_document_type.name"
+    },
+    "cap-839569ff7e225d5a99aa": {
+      "capability_id": "cap-839569ff7e225d5a99aa",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Transaction Type",
+      "selectors": [
+        "label=Transaction Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.transaction_type"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214673+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Transaction Type"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_document_type.transaction_type"
+    },
+    "cap-9f11db2edd8dd0bf0aa9": {
+      "capability_id": "cap-9f11db2edd8dd0bf0aa9",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Version",
+      "selectors": [
+        "label=Version"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.version"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214724+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Version"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_document_type.version"
+    },
+    "cap-27164ec334c203d5a0e1": {
+      "capability_id": "cap-27164ec334c203d5a0e1",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Data Format Type",
+      "selectors": [
+        "label=Data Format Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.data_format_type"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214783+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Data Format Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "target_document_type.data_format_type"
+    },
+    "cap-8aaf39dfd075d6ea560d": {
+      "capability_id": "cap-8aaf39dfd075d6ea560d",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Document Identifier rows",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.document_identifier.rows"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214846+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "fill_doc_id_rows",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_doc_id_rows",
+      "input_json_key": "target_document_type.document_identifier.rows"
+    },
+    "cap-a238a8df43dee88ff552": {
+      "capability_id": "cap-a238a8df43dee88ff552",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Segment Separator",
+      "selectors": [
+        "label=Segment Separator"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.segment_separator"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214906+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Segment Separator"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_document_type.segment_separator"
+    },
+    "cap-9a8f52b72d393a61ff78": {
+      "capability_id": "cap-9a8f52b72d393a61ff78",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Data Element Separator",
+      "selectors": [
+        "label=Data Element Separator"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.data_element_separator"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.214968+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "fill",
+        "selector_hints": [
+          "label=Data Element Separator"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_document_type.data_element_separator"
+    },
+    "cap-b2ae9a43545d06b2aae6": {
+      "capability_id": "cap-b2ae9a43545d06b2aae6",
+      "page_family": "document_types",
+      "kind": "form_field",
+      "label": "Attributes to Configure",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_document_type.attributes_to_configure"
+      ],
+      "sections": [
+        "SecureLink > Document Types > + Add"
+      ],
+      "risk": "draft",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215046+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_document_type",
+        "action": "fill_attributes",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_attributes",
+      "input_json_key": "target_document_type.attributes_to_configure"
+    },
+    "cap-0d5a485bd3d45799f9f7": {
+      "capability_id": "cap-0d5a485bd3d45799f9f7",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Name",
+      "selectors": [
+        "label=Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.name"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215110+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "fill",
+        "selector_hints": [
+          "label=Name"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "rule.name"
+    },
+    "cap-6cca20890fce4abeb967": {
+      "capability_id": "cap-6cca20890fce4abeb967",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Document Type Name (Version)",
+      "selectors": [
+        "label=Document Type Name (Version)"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.document_type_name_version"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215162+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Document Type Name (Version)",
+          "label=Document Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "rule.document_type_name_version"
+    },
+    "cap-7405a827a349b9129cd7": {
+      "capability_id": "cap-7405a827a349b9129cd7",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Rule Type",
+      "selectors": [
+        "label=Rule Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.rule_type"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215210+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Rule Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "rule.rule_type"
+    },
+    "cap-9134e6798246f382c508": {
+      "capability_id": "cap-9134e6798246f382c508",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Rule Scope",
+      "selectors": [
+        "label=Rule Scope"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.rule_scope"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215253+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Rule Scope"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "rule.rule_scope"
+    },
+    "cap-f65b58a40e92d7a32742": {
+      "capability_id": "cap-f65b58a40e92d7a32742",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Description",
+      "selectors": [
+        "label=Description"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.description"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215295+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "fill",
+        "selector_hints": [
+          "label=Description"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "rule.description"
+    },
+    "cap-db8f36936d2e997f5029": {
+      "capability_id": "cap-db8f36936d2e997f5029",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Execute Action(s) When",
+      "selectors": [
+        "label=Execute Action(s) When"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.conditions.execute_actions_when"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "mutation",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215345+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Execute Action(s) When",
+          "label=Execute Actions When"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "rule.conditions.execute_actions_when"
+    },
+    "cap-9475620e3ab834cec099": {
+      "capability_id": "cap-9475620e3ab834cec099",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Condition rows",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.conditions.rows"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215393+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "fill_condition_rows",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_condition_rows",
+      "input_json_key": "rule.conditions.rows"
+    },
+    "cap-5e6f74861d0f0b694322": {
+      "capability_id": "cap-5e6f74861d0f0b694322",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Action Name",
+      "selectors": [
+        "label=Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.actions.action_name"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215438+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "fill",
+        "selector_hints": [
+          "label=Name",
+          "label=Action Name"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "rule.actions.action_name"
+    },
+    "cap-515c31f5435d7dd74fa2": {
+      "capability_id": "cap-515c31f5435d7dd74fa2",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Action Type",
+      "selectors": [
+        "label=Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.actions.action_type"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215481+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Type",
+          "label=Action Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "rule.actions.action_type"
+    },
+    "cap-f1e4b092a1f60a091e5b": {
+      "capability_id": "cap-f1e4b092a1f60a091e5b",
+      "page_family": "rules",
+      "kind": "form_field",
+      "label": "Mapping Identifier",
+      "selectors": [
+        "label=Mapping Identifier"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "rule.actions.mapping_identifier_name_version"
+      ],
+      "sections": [
+        "SecureLink > Rules > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215540+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "rule",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Mapping Identifier",
+          "label=Target"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "rule.actions.mapping_identifier_name_version"
+    },
+    "cap-d2a123e197104a9ef1aa": {
+      "capability_id": "cap-d2a123e197104a9ef1aa",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "System Type",
+      "selectors": [
+        "label=System Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.system_type"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215626+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=System Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.system_type"
+    },
+    "cap-53eeca9ba036a2c2d854": {
+      "capability_id": "cap-53eeca9ba036a2c2d854",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "System Name",
+      "selectors": [
+        "label=System Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.system_name"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215712+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=System Name",
+          "label=Application Name"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.system_name"
+    },
+    "cap-a46571958cdd0fdc35b3": {
+      "capability_id": "cap-a46571958cdd0fdc35b3",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Profile Name",
+      "selectors": [
+        "label=Profile Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.profile_name"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215781+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "fill",
+        "selector_hints": [
+          "label=Profile Name",
+          "label=Profile Name *"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_transport_profile_dell.profile_name"
+    },
+    "cap-549d2da976574a7a28f9": {
+      "capability_id": "cap-549d2da976574a7a28f9",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Profile Usage",
+      "selectors": [
+        "label=Profile Usage"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.profile_usage"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215847+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Profile Usage"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.profile_usage"
+    },
+    "cap-dcc612a7a94ea601b227": {
+      "capability_id": "cap-dcc612a7a94ea601b227",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Deployment Group",
+      "selectors": [
+        "label=Deployment Group"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.deployment_group"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "mutation",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215914+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Deployment Group"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.deployment_group"
+    },
+    "cap-36665bb69ee90c8aa322": {
+      "capability_id": "cap-36665bb69ee90c8aa322",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Interface Type",
+      "selectors": [
+        "label=Interface Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.interface_type"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.215983+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Interface Type",
+          "label=Primary Interface Detail"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.interface_type"
+    },
+    "cap-8fadb8ed6f2d111084ab": {
+      "capability_id": "cap-8fadb8ed6f2d111084ab",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Interface Environment",
+      "selectors": [
+        "label=Interface Environment"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.interface_environment"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216075+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Interface Environment"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.interface_environment"
+    },
+    "cap-66bcf4ee402459793ced": {
+      "capability_id": "cap-66bcf4ee402459793ced",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Existing Account",
+      "selectors": [
+        "label=Existing Account"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.existing_account"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216144+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "radio",
+        "selector_hints": [
+          "label=Existing Account"
+        ],
+        "values_stored": false
+      },
+      "action": "radio",
+      "input_json_key": "source_transport_profile_dell.existing_account"
+    },
+    "cap-2d0306030a76c814a072": {
+      "capability_id": "cap-2d0306030a76c814a072",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Existing Account Name",
+      "selectors": [
+        "label=Existing Account Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.existing_account_name"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216214+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "fill",
+        "selector_hints": [
+          "label=Existing Account Name"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_transport_profile_dell.existing_account_name"
+    },
+    "cap-24ab2f1854ad5d89dfd9": {
+      "capability_id": "cap-24ab2f1854ad5d89dfd9",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Use Existing Folder",
+      "selectors": [
+        "label=Use Existing Folder"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.use_existing_folder"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216282+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "radio",
+        "selector_hints": [
+          "label=Use Existing Folder"
+        ],
+        "values_stored": false
+      },
+      "action": "radio",
+      "input_json_key": "source_transport_profile_dell.use_existing_folder"
+    },
+    "cap-f98011d30bb37056ba78": {
+      "capability_id": "cap-f98011d30bb37056ba78",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Subscription Folder",
+      "selectors": [
+        "label=Subscription Folder"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.subscription_folder"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216349+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "fill",
+        "selector_hints": [
+          "label=Subscription Folder"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_transport_profile_dell.subscription_folder"
+    },
+    "cap-76cc49027cbcbab33dae": {
+      "capability_id": "cap-76cc49027cbcbab33dae",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "File Filtering Pattern",
+      "selectors": [
+        "label=File Filtering Pattern"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.file_filtering_pattern"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216420+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "fill",
+        "selector_hints": [
+          "label=File Filtering Pattern"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "source_transport_profile_dell.file_filtering_pattern"
+    },
+    "cap-b21832bd3551ddb5b2d0": {
+      "capability_id": "cap-b21832bd3551ddb5b2d0",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Post Transfer Action",
+      "selectors": [
+        "label=Post Transfer Action"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.post_transfer_action"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216491+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Post Transfer Action"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.post_transfer_action"
+    },
+    "cap-3df2bcf6a520f4ad2930": {
+      "capability_id": "cap-3df2bcf6a520f4ad2930",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Document Type",
+      "selectors": [
+        "label=Document Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "source_transport_profile_dell.document_type"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216555+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "source_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Document Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "source_transport_profile_dell.document_type"
+    },
+    "cap-80ccfff98d61954391bc": {
+      "capability_id": "cap-80ccfff98d61954391bc",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "System Type",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.system_type"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216629+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "target_transport_profile.system_type"
+    },
+    "cap-d85d22ed1116767e5eae": {
+      "capability_id": "cap-d85d22ed1116767e5eae",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Partner Name",
+      "selectors": [
+        "label=Partner Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.partner_name"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216685+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Partner Name"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "target_transport_profile.partner_name"
+    },
+    "cap-63077809f171b58a0b9e": {
+      "capability_id": "cap-63077809f171b58a0b9e",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Profile Name",
+      "selectors": [
+        "label=Profile Name"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.profile_name"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216742+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "fill",
+        "selector_hints": [
+          "label=Profile Name",
+          "label=Profile Name *"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_transport_profile.profile_name"
+    },
+    "cap-cb549ae172e106fb4f28": {
+      "capability_id": "cap-cb549ae172e106fb4f28",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Profile Usage",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.profile_usage"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216799+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "target_transport_profile.profile_usage"
+    },
+    "cap-a706ad218375fb4f7add": {
+      "capability_id": "cap-a706ad218375fb4f7add",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Existing Account",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.existing_account"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216853+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "radio",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "radio",
+      "input_json_key": "target_transport_profile.existing_account"
+    },
+    "cap-ea81247ef2f1168b4b69": {
+      "capability_id": "cap-ea81247ef2f1168b4b69",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Existing Account Name",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.existing_account_name"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216910+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "fill",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_transport_profile.existing_account_name"
+    },
+    "cap-bc84dd85604dd37ef73b": {
+      "capability_id": "cap-bc84dd85604dd37ef73b",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Use Existing Folder",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.use_existing_folder"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.216965+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "radio",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "radio",
+      "input_json_key": "target_transport_profile.use_existing_folder"
+    },
+    "cap-63190332642173ca71d2": {
+      "capability_id": "cap-63190332642173ca71d2",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Existing Folder",
+      "selectors": [
+        "label=Existing Folder"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.existing_folder"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217036+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "fill",
+        "selector_hints": [
+          "label=Existing Folder"
+        ],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_transport_profile.existing_folder"
+    },
+    "cap-4e782614515d0ef57ea9": {
+      "capability_id": "cap-4e782614515d0ef57ea9",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "File Filtering Pattern",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.file_filtering_pattern"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217098+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "fill",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "target_transport_profile.file_filtering_pattern"
+    },
+    "cap-c45c86b1f024e8f2c6c9": {
+      "capability_id": "cap-c45c86b1f024e8f2c6c9",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Post Transfer Action",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.post_transfer_action"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217155+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "target_transport_profile.post_transfer_action"
+    },
+    "cap-61ac166dd24e5a1158f3": {
+      "capability_id": "cap-61ac166dd24e5a1158f3",
+      "page_family": "transport_profiles",
+      "kind": "form_field",
+      "label": "Document Type",
+      "selectors": [
+        "label=Document Type"
+      ],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "target_transport_profile.document_types"
+      ],
+      "sections": [
+        "SecureLink > Transport Profiles > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217213+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "target_transport_profile",
+        "action": "select_option",
+        "selector_hints": [
+          "label=Document Type"
+        ],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "target_transport_profile.document_types"
+    },
+    "cap-b54c2df159c64316c44e": {
+      "capability_id": "cap-b54c2df159c64316c44e",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Business Flow Name",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.flow_details.business_flow_name"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217290+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "fill",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "biz_flow.flow_details.business_flow_name"
+    },
+    "cap-b438544272fab1a8d7fc": {
+      "capability_id": "cap-b438544272fab1a8d7fc",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Flow Description",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.flow_details.flow_description"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217338+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "fill",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "biz_flow.flow_details.flow_description"
+    },
+    "cap-df9425bd9c48f8a3fdbe": {
+      "capability_id": "cap-df9425bd9c48f8a3fdbe",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Source Type",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_source.source_type"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217384+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_source.source_type"
+    },
+    "cap-518ed8390bbd79fae9a6": {
+      "capability_id": "cap-518ed8390bbd79fae9a6",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Source Application",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_source.source_application"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217436+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_source.source_application"
+    },
+    "cap-635bd0453f8364bf006c": {
+      "capability_id": "cap-635bd0453f8364bf006c",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Source Transport Profile",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_source.source_transport_profile"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217492+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_source.source_transport_profile"
+    },
+    "cap-e7ab1f76fe80abbb63f6": {
+      "capability_id": "cap-e7ab1f76fe80abbb63f6",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Document Type Name (Version)",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_source.document_type_name_version"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217551+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_source.document_type_name_version"
+    },
+    "cap-ae4e2de82044781d399c": {
+      "capability_id": "cap-ae4e2de82044781d399c",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Flow Identifier Operator",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_source.flow_identifier_operator"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217609+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_source.flow_identifier_operator"
+    },
+    "cap-35123909468f498de9a2": {
+      "capability_id": "cap-35123909468f498de9a2",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Flow Identifier Attributes",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_source.attributes"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217658+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "fill_flow_attributes",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_flow_attributes",
+      "input_json_key": "biz_flow.configure_source.attributes"
+    },
+    "cap-1e7c6dd4fdb3648c4ccf": {
+      "capability_id": "cap-1e7c6dd4fdb3648c4ccf",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Target Type",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_targets[0].target_type"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217706+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_targets[0].target_type"
+    },
+    "cap-7543f0b75cfd03c81e70": {
+      "capability_id": "cap-7543f0b75cfd03c81e70",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Target Application",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_targets[0].target_application"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217754+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_targets[0].target_application"
+    },
+    "cap-72ce9c0fc170009e86e6": {
+      "capability_id": "cap-72ce9c0fc170009e86e6",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Target Transport Profile",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_targets[0].target_transport_profile"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217804+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_targets[0].target_transport_profile"
+    },
+    "cap-88fdb4fda117e47eeb22": {
+      "capability_id": "cap-88fdb4fda117e47eeb22",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Document Type Name (Version)",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_targets[0].document_type_name_version"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217855+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_targets[0].document_type_name_version"
+    },
+    "cap-5b53e546a809500b5fa2": {
+      "capability_id": "cap-5b53e546a809500b5fa2",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Process Steps",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_targets[0].process_steps"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217900+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "fill_process_steps",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_process_steps",
+      "input_json_key": "biz_flow.configure_targets[0].process_steps"
+    },
+    "cap-ad56cb7304082d6ee845": {
+      "capability_id": "cap-ad56cb7304082d6ee845",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Name",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.rule_name"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.217947+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "fill",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "biz_flow.configure_routing.rule_name"
+    },
+    "cap-af23a258b350fce8dc77": {
+      "capability_id": "cap-af23a258b350fce8dc77",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Rule Type",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.rule_type"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.218006+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_routing.rule_type"
+    },
+    "cap-779f1bf6512c69bdab49": {
+      "capability_id": "cap-779f1bf6512c69bdab49",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Rule Scope",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.rule_scope"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.218054+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_routing.rule_scope"
+    },
+    "cap-5723c3da866eab356cf5": {
+      "capability_id": "cap-5723c3da866eab356cf5",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Execute Action(s) When",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.conditions.execute_actions_when"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "mutation",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.218114+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_routing.conditions.execute_actions_when"
+    },
+    "cap-614586fff9cce88801ac": {
+      "capability_id": "cap-614586fff9cce88801ac",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Condition rows",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.conditions.rows"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.218164+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "fill_condition_rows",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill_condition_rows",
+      "input_json_key": "biz_flow.configure_routing.conditions.rows"
+    },
+    "cap-2ec6c65f7b15cc8f2de0": {
+      "capability_id": "cap-2ec6c65f7b15cc8f2de0",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Action Name",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.actions.action_name"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.218220+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "fill",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "fill",
+      "input_json_key": "biz_flow.configure_routing.actions.action_name"
+    },
+    "cap-e0a03aa81667b9cee113": {
+      "capability_id": "cap-e0a03aa81667b9cee113",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Action Type",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.actions.action_type"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.218272+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_routing.actions.action_type"
+    },
+    "cap-97ca0ba95249620cfd56": {
+      "capability_id": "cap-97ca0ba95249620cfd56",
+      "page_family": "bizflows",
+      "kind": "form_field",
+      "label": "Target",
+      "selectors": [],
+      "roles": [],
+      "placeholders": [],
+      "scopes": [
+        "biz_flow.configure_routing.actions.target"
+      ],
+      "sections": [
+        "BizExchange > Biz Flows > + Add"
+      ],
+      "risk": "read",
+      "revealed_by": [],
+      "parent_capability_ids": [],
+      "api_contract_ids": [],
+      "observations": 1,
+      "success_observations": 0,
+      "last_seen_at": "2026-09-20T06:26:31.218320+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "phase": "biz_flow",
+        "action": "select_option",
+        "selector_hints": [],
+        "values_stored": false
+      },
+      "action": "select_option",
+      "input_json_key": "biz_flow.configure_routing.actions.target"
+    }
+  },
+  "api_contracts": {
+    "api-f86579de27c9ab87d3f5": {
+      "api_contract_id": "api-f86579de27c9ab87d3f5",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/orchestration/api/transport-profiles/orchestration/create",
+      "risk": "mutation",
+      "page_families": [
+        "transport_profiles"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218540+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "tp_create"
+      },
+      "catalog_key": "tp_create"
+    },
+    "api-eaa5e28de324b7e6e3b1": {
+      "api_contract_id": "api-eaa5e28de324b7e6e3b1",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/orchestration/api/flows/orchestration/create",
+      "risk": "mutation",
+      "page_families": [
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218579+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "flow_create"
+      },
+      "catalog_key": "flow_create"
+    },
+    "api-ec1eb52797e6fe748aea": {
+      "api_contract_id": "api-ec1eb52797e6fe748aea",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/orchestration/api/flows/orchestration/deploy",
+      "risk": "mutation",
+      "page_families": [
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218611+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "flow_deploy"
+      },
+      "catalog_key": "flow_deploy"
+    },
+    "api-1f7a75bd40d4d46501ea": {
+      "api_contract_id": "api-1f7a75bd40d4d46501ea",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/document-type/api/document-type",
+      "risk": "mutation",
+      "page_families": [
+        "document_types"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218640+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "document_type"
+      },
+      "catalog_key": "document_type"
+    },
+    "api-db70bbe5b0e247b1e813": {
+      "api_contract_id": "api-db70bbe5b0e247b1e813",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/map-rule/api/rule",
+      "risk": "mutation",
+      "page_families": [
+        "rules"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218667+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "rule"
+      },
+      "catalog_key": "rule"
+    },
+    "api-143824c61597c264c105": {
+      "api_contract_id": "api-143824c61597c264c105",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/map/api/mac-map",
+      "risk": "mutation",
+      "page_families": [
+        "data_maps"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218691+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "map"
+      },
+      "catalog_key": "map"
+    },
+    "api-c054fc55fdec7a4bc024": {
+      "api_contract_id": "api-c054fc55fdec7a4bc024",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip-partners/api/authz/partner",
+      "risk": "mutation",
+      "page_families": [
+        "transport_profiles",
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 2,
+      "last_seen_at": "2026-09-20T06:26:31.218739+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "partner"
+      },
+      "catalog_key": "partner"
+    },
+    "api-5605e62f004038f9533c": {
+      "api_contract_id": "api-5605e62f004038f9533c",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip-partners/api/authz/account",
+      "risk": "mutation",
+      "page_families": [
+        "transport_profiles",
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 2,
+      "last_seen_at": "2026-09-20T06:26:31.218785+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "account"
+      },
+      "catalog_key": "account"
+    },
+    "api-8445afd47291b3a885a0": {
+      "api_contract_id": "api-8445afd47291b3a885a0",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/transport-profile/api/transport-profiles/validate-unique-interface-detail",
+      "risk": "mutation",
+      "page_families": [
+        "transport_profiles"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218813+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "tp_validate"
+      },
+      "catalog_key": "tp_validate"
+    },
+    "api-0391a6f6b28926e5a64f": {
+      "api_contract_id": "api-0391a6f6b28926e5a64f",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/transport-profile/api/transport-profiles",
+      "risk": "mutation",
+      "page_families": [
+        "transport_profiles"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218839+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "tp_save"
+      },
+      "catalog_key": "tp_save"
+    },
+    "api-c03bc9a94bcf15651f4d": {
+      "api_contract_id": "api-c03bc9a94bcf15651f4d",
+      "method": "GET",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/transport-profile/api/transport-profiles/audits",
+      "risk": "read",
+      "page_families": [
+        "transport_profiles"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218871+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "tp_audit"
+      },
+      "catalog_key": "tp_audit"
+    },
+    "api-1db46ebc42906558d370": {
+      "api_contract_id": "api-1db46ebc42906558d370",
+      "method": "GET",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/b2bflow/api/flows/validate-name",
+      "risk": "read",
+      "page_families": [
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218903+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "flow_validate"
+      },
+      "catalog_key": "flow_validate"
+    },
+    "api-e60361233bf8ca2332e8": {
+      "api_contract_id": "api-e60361233bf8ca2332e8",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/b2bflow/api/flows/definition",
+      "risk": "mutation",
+      "page_families": [
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218931+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "flow_definition"
+      },
+      "catalog_key": "flow_definition"
+    },
+    "api-42609b13ad1e35c43740": {
+      "api_contract_id": "api-42609b13ad1e35c43740",
+      "method": "POST",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/b2bflow/api/flows/deployment",
+      "risk": "mutation",
+      "page_families": [
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218956+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "flow_deploy"
+      },
+      "catalog_key": "flow_deploy"
+    },
+    "api-72680f98f94284dd09ae": {
+      "api_contract_id": "api-72680f98f94284dd09ae",
+      "method": "GET",
+      "endpoint": "https://apigtwtst.us.dell.com/hip/b2bflow/api/flows/deployment/history",
+      "risk": "mutation",
+      "page_families": [
+        "bizflows"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.218983+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "flow_history"
+      },
+      "catalog_key": "flow_history"
+    },
+    "api-cdac9e42551b6bc76b33": {
+      "api_contract_id": "api-cdac9e42551b6bc76b33",
+      "method": "POST",
+      "endpoint": "https://workflow-api-oauth.r1.pcf.dell.com/api/workorder/create",
+      "risk": "mutation",
+      "page_families": [
+        "workflow"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.219034+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "wf_create"
+      },
+      "catalog_key": "wf_create"
+    },
+    "api-c88adf1a642e2193855a": {
+      "api_contract_id": "api-c88adf1a642e2193855a",
+      "method": "GET",
+      "endpoint": "https://workflow-api-oauth.r1.pcf.dell.com/api/workorder/{workOrderId}",
+      "risk": "read",
+      "page_families": [
+        "workflow"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.219064+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "wf_get"
+      },
+      "catalog_key": "wf_get"
+    },
+    "api-e5c54d0b4b6cc909373b": {
+      "api_contract_id": "api-e5c54d0b4b6cc909373b",
+      "method": "POST",
+      "endpoint": "https://workflow-api-oauth.r1.pcf.dell.com/api/workorder/close",
+      "risk": "mutation",
+      "page_families": [
+        "workflow"
+      ],
+      "stages": [
+        "canonical_contract"
+      ],
+      "response_statuses": [],
+      "caused_by_capability_ids": [],
+      "observations": 1,
+      "last_seen_at": "2026-09-20T06:26:31.219089+00:00",
+      "knowledge_source": "canonical_kb",
+      "trust": "canonical_contract",
+      "verified": false,
+      "values_stored": false,
+      "latest_evidence": {
+        "knowledge_source": "canonical_kb",
+        "catalog_key": "wf_close"
+      },
+      "catalog_key": "wf_close"
+    }
+  },
+  "replay_profiles": {},
+  "task_replay_profiles": {},
+  "relations": [],
+  "source_runs": [],
+  "bootstrap_sources": {
+    "unified_deep_kb": {
+      "path": "/mnt/data/HIP_PORTAL_V243_FINAL_PRODUCTION_E2E_20260920/knowledge_base/HIP_Unified_Deep_KB.json",
+      "sha256": "ce873b298f89e860f705b1f1452c2340a27155c2fe82496015e030d584ccb237",
+      "seeded_at": "2026-09-20T06:26:31.219095+00:00",
+      "capabilities_seeded": 80,
+      "apis_seeded": 20,
+      "values_stored": false
+    }
+  },
+  "values_stored": false
+}

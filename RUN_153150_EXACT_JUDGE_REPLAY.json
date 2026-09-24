@@ -1,0 +1,483 @@
+{
+  "summary": {
+    "verification_status": "pass_with_warnings",
+    "verification_warnings": [
+      "Many dropdown controls have no captured/enriched options."
+    ],
+    "deterministic_pass": true,
+    "text_pass": true,
+    "text_status": "reconciled",
+    "text_unsupported_count": 2,
+    "vision_pass": true,
+    "vision_status": "reconciled",
+    "vision_unsupported_count": 1,
+    "overall_pass": true,
+    "overall_status": "pass"
+  },
+  "result": {
+    "phase": "source_document_type",
+    "section": "Source Document Type",
+    "pass": true,
+    "status": "pass",
+    "policy": {
+      "enabled": true,
+      "require_text_model": true,
+      "require_vision_model": true,
+      "max_repairs": 2,
+      "fail_closed": true
+    },
+    "deterministic_judge": {
+      "pass": true,
+      "missing_values": [],
+      "row_issues": [],
+      "failed_attempts": [],
+      "matched_values": [
+        {
+          "field": "document_type_name",
+          "expected": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+          "actual": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+          "selector": "input#dds-form-field-754988379",
+          "evidence": "saved_post_fill_dom",
+          "section": "Document Type Details",
+          "row_kind": "",
+          "row_index": null
+        },
+        {
+          "field": "transaction_type",
+          "expected": "856",
+          "actual": "856",
+          "selector": "input#dds-form-field-871513374",
+          "evidence": "saved_post_fill_dom",
+          "section": "Document Type Details",
+          "row_kind": "",
+          "row_index": null
+        },
+        {
+          "field": "document_type_version",
+          "expected": "1",
+          "actual": "1.0",
+          "selector": "input#dds-form-field-658867739",
+          "evidence": "captured_form_inventory",
+          "section": "Document Type Details",
+          "row_kind": "",
+          "row_index": null
+        },
+        {
+          "field": "data_format_type",
+          "expected": "XML",
+          "actual": "XML",
+          "selector": "input#dds-form-field-936143336",
+          "evidence": "saved_post_fill_dom",
+          "section": "Document Type Details",
+          "row_kind": "",
+          "row_index": null
+        },
+        {
+          "field": "description",
+          "expected": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+          "actual": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+          "selector": "textarea#dds-form-field-571989170",
+          "evidence": "saved_post_fill_dom",
+          "section": "Document Type Details",
+          "row_kind": "",
+          "row_index": null
+        },
+        {
+          "field": "document_identifier.operation",
+          "expected": "All conditions are satisfied",
+          "actual": "All conditions are satisfied",
+          "selector": "input#dds-form-field-659866621",
+          "evidence": "saved_post_fill_dom",
+          "section": "Document Identifier",
+          "row_kind": "",
+          "row_index": null
+        },
+        {
+          "field": "document_identifier[0].derived_from",
+          "expected": "TRANSACTION_ROOT_ELEMENT",
+          "actual": "TRANSACTION_ROOT_ELEMENT",
+          "selector": "input#dds-form-field-949739904",
+          "evidence": "saved_post_fill_dom",
+          "section": "Document Identifier",
+          "row_kind": "document_identifier",
+          "row_index": 0
+        },
+        {
+          "field": "document_identifier[0].value",
+          "expected": "DellAutoASN",
+          "actual": "DellAutoASN",
+          "selector": "input#dds-form-field-940131365",
+          "evidence": "saved_post_fill_dom",
+          "section": "Document Identifier",
+          "row_kind": "document_identifier",
+          "row_index": 0
+        },
+        {
+          "field": "attributes[0].name",
+          "expected": "Receiver",
+          "actual": "Receiver",
+          "selector": "input#dds-form-field-654886962",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 0
+        },
+        {
+          "field": "attributes[0].derived_from",
+          "expected": "ELEMENT_IN_PAYLOAD",
+          "actual": "ELEMENT_IN_PAYLOAD",
+          "selector": "input#dds-form-field-975152124",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 0
+        },
+        {
+          "field": "attributes[0].usage",
+          "expected": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "actual": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "selector": "input#dds-form-field-103123566",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 0
+        },
+        {
+          "field": "attributes[0].expression",
+          "expected": "/DellAutoASN/ShipNoticeHeader/To/PartnerInformation/PartnerIdentifier",
+          "actual": "/DellAutoASN/ShipNoticeHeader/To/PartnerInformation/PartnerIdentifier",
+          "selector": "input#dds-form-field-480924002",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 0
+        },
+        {
+          "field": "attributes[1].name",
+          "expected": "Sender",
+          "actual": "Sender",
+          "selector": "input#dds-form-field-793021454",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 1
+        },
+        {
+          "field": "attributes[1].derived_from",
+          "expected": "ELEMENT_IN_PAYLOAD",
+          "actual": "ELEMENT_IN_PAYLOAD",
+          "selector": "input#dds-form-field-555001818",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 1
+        },
+        {
+          "field": "attributes[1].usage",
+          "expected": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "actual": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "selector": "input#dds-form-field-224896465",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 1
+        },
+        {
+          "field": "attributes[1].expression",
+          "expected": "/DellAutoASN/ShipNoticeHeader/From/PartnerInfomation/PartnerIdentifier",
+          "actual": "/DellAutoASN/ShipNoticeHeader/From/PartnerInfomation/PartnerIdentifier",
+          "selector": "input#dds-form-field-424182608",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 1
+        },
+        {
+          "field": "attributes[2].name",
+          "expected": "Transaction Type",
+          "actual": "Transaction Type",
+          "selector": "input#dds-form-field-763306318",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 2
+        },
+        {
+          "field": "attributes[2].derived_from",
+          "expected": "TRANSACTION_ROOT_ELEMENT",
+          "actual": "TRANSACTION_ROOT_ELEMENT",
+          "selector": "input#dds-form-field-486789106",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 2
+        },
+        {
+          "field": "attributes[2].usage",
+          "expected": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "actual": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "selector": "input#dds-form-field-841770914",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 2
+        },
+        {
+          "field": "attributes[3].name",
+          "expected": "Business Identifier",
+          "actual": "Business Identifier",
+          "selector": "input#dds-form-field-324674586",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 3
+        },
+        {
+          "field": "attributes[3].derived_from",
+          "expected": "ELEMENT_IN_PAYLOAD",
+          "actual": "ELEMENT_IN_PAYLOAD",
+          "selector": "input#dds-form-field-292304564",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 3
+        },
+        {
+          "field": "attributes[3].usage",
+          "expected": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "actual": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "selector": "input#dds-form-field-194071859",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 3
+        },
+        {
+          "field": "attributes[3].expression",
+          "expected": "/DellAutoASN/PurchaseOrder/PurchaseOrderNumber",
+          "actual": "/DellAutoASN/PurchaseOrder/PurchaseOrderNumber",
+          "selector": "input#dds-form-field-755258461",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 3
+        },
+        {
+          "field": "attributes[4].name",
+          "expected": "Alternate Business Identifier",
+          "actual": "Alternate Business Identifier",
+          "selector": "input#dds-form-field-676071745",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 4
+        },
+        {
+          "field": "attributes[4].derived_from",
+          "expected": "ELEMENT_IN_PAYLOAD",
+          "actual": "ELEMENT_IN_PAYLOAD",
+          "selector": "input#dds-form-field-211978524",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 4
+        },
+        {
+          "field": "attributes[4].usage",
+          "expected": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "actual": [
+            "Flow Identifier Expression",
+            "Logging",
+            "Mapping",
+            "Routing"
+          ],
+          "selector": "input#dds-form-field-949256182",
+          "evidence": "captured_form_inventory",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 4
+        },
+        {
+          "field": "attributes[4].expression",
+          "expected": "/DellAutoASN/PurchaseOrder/ResellerPurchaseOrderNumber",
+          "actual": "/DellAutoASN/PurchaseOrder/ResellerPurchaseOrderNumber",
+          "selector": "input#dds-form-field-424527062",
+          "evidence": "saved_post_fill_dom",
+          "section": "Attributes to Configure",
+          "row_kind": "attribute",
+          "row_index": 4
+        },
+        {
+          "field": "validation_type",
+          "expected": "Structure",
+          "actual": "Structure",
+          "selector": "input#dds-form-field-819964223",
+          "evidence": "saved_post_fill_dom",
+          "section": "Validation",
+          "row_kind": "",
+          "row_index": null
+        }
+      ],
+      "actual_control_count": 83,
+      "verification_status": "pass_with_warnings",
+      "failed_attempts_from_phase": [],
+      "warnings": [
+        "Many dropdown controls have no captured/enriched options."
+      ],
+      "screenshot_exists": true,
+      "counts": {
+        "dummy_fill_attempts": 29,
+        "required_fields": 25,
+        "dropdowns": 14,
+        "dropdowns_with_options": 3,
+        "form_controls": 29
+      },
+      "actual_state_source": "/mnt/data/run_153150_review/UHAUL-POASN-FULL-DUMMY-20260718-153150/source_document_type/dom_snapshots/doctype_add_form_after_dummy_fill_no_save.html",
+      "validation_gate": {
+        "blocking": [],
+        "accepted_nonblocking": [],
+        "object_resolution": {}
+      },
+      "object_resolution": {},
+      "active_surface_gate": {
+        "pass": true,
+        "reason": "ok",
+        "missing_markers": [],
+        "markers": {
+          "heading": true,
+          "details": true,
+          "identifier": true,
+          "attributes": true,
+          "name": true,
+          "transaction_type": true,
+          "version": true,
+          "data_format": true,
+          "cancel": true,
+          "submit_present": true
+        },
+        "filters_open": false,
+        "listing_only": false,
+        "surface_text_sample": "Dell Technologies Developer Developer MCP Blogs Open Source Community Search Activities A Adheesh Srivastava Adheesh.Srivastava@dellteam.com Contact Us Sign Out Home BizLink Partners Systems SecureLink Data Maps Document Types Rules Transport Profiles BizExchange Biz Flows Batch TransTrack Firewall Utility Track and Trace BizMon Certificate Monitor Health Monitor Service Account Monitor Transaction Manager Support Notifications Navigation expanded Loading... Back Create Document Type Create templates for any data format. It is a metadata structure template which allows for configuring consistent properties and settings across various document types. Back Document Type Details Name tooltip Can contain numbers, letters (A & a) , _ and -. Cannot start with special characters, no spaces. Can start with numbers. Length restriction to 40 chars Name already exists Transaction Type Version Data Format Type XML JSON EDIFACT EDIX12 CSV FLAT Status Enabled Disabled Description Document Identifier Operation all conditions are satisfied one or more conditions are satisfied Derived From FILENAME TRANSACTION_ROOT_ELEMENT ELEMENT_IN_PAYLOAD PAYLOAD_CONTAINS Value Attributes to Configure Attribute "
+      }
+    },
+    "text_model_judge": {
+      "status": "reconciled",
+      "pass": true,
+      "summary": "Text judge contradiction removed because exact field-bound DOM evidence proves every reported field.",
+      "missing_or_wrong": [],
+      "repair_steps": [],
+      "confidence": 0.98,
+      "unsupported_model_issues": [
+        {
+          "field": "document_type_version",
+          "expected": "1",
+          "actual": "1.0",
+          "reason": "Exact match required but version differs (expected '1' vs actual '1.0').",
+          "deterministic_proof": {
+            "field": "document_type_version",
+            "expected": "1",
+            "actual": "1.0",
+            "selector": "input#dds-form-field-658867739",
+            "evidence": "captured_form_inventory",
+            "section": "Document Type Details",
+            "row_kind": "",
+            "row_index": null
+          }
+        },
+        {
+          "field": "document_identifier.operation",
+          "expected": "All conditions are satisfied",
+          "actual": "all conditions are satisfied",
+          "reason": "Exact match required but case differs (expected capitalized 'All conditions are satisfied').",
+          "deterministic_proof": {
+            "field": "document_identifier.operation",
+            "expected": "All conditions are satisfied",
+            "actual": "All conditions are satisfied",
+            "selector": "input#dds-form-field-659866621",
+            "evidence": "saved_post_fill_dom",
+            "section": "Document Identifier",
+            "row_kind": "",
+            "row_index": null
+          }
+        }
+      ],
+      "original_pass": false,
+      "reconciliation_reason": "deterministic exact-value evidence is authoritative over unsupported model claims"
+    },
+    "vision_model_judge": {
+      "status": "reconciled",
+      "model": "gemma-3-27b-it",
+      "pass": true,
+      "summary": "Unsupported visual findings were removed because they were unbound, internally inconsistent, or contradicted by exact DOM evidence.",
+      "visible_issues": [],
+      "confidence": 0.95,
+      "unsupported_model_issues": [
+        {
+          "field": "attributes[1].expression",
+          "expected": "/DellAutoASN/ShipNoticeHeader/From/PartnerInfomation/PartnerIdentifier",
+          "observed": "/DellAutoASN/ShipNoticeHeader/From/PartnerInformation/PartnerIdentifier",
+          "exact_dom_evidence": {
+            "field": "attributes[1].expression",
+            "expected": "/DellAutoASN/ShipNoticeHeader/From/PartnerInfomation/PartnerIdentifier",
+            "actual": "/DellAutoASN/ShipNoticeHeader/From/PartnerInfomation/PartnerIdentifier",
+            "selector": "input#dds-form-field-424182608",
+            "evidence": "saved_post_fill_dom",
+            "section": "Attributes to Configure",
+            "row_kind": "attribute",
+            "row_index": 1
+          },
+          "reason": "visual issue is offscreen/ambiguous but exact row-scoped DOM proves the value"
+        }
+      ],
+      "original_pass": false,
+      "reconciliation_reason": "only concrete input-bound visual mismatches may veto an exact deterministic pass"
+    },
+    "screenshot": "/mnt/data/run_153150_review/UHAUL-POASN-FULL-DUMMY-20260718-153150/source_document_type/doctype_kb/doctype_add_form_after_dummy_fill_no_save.png",
+    "golden_screenshots": []
+  }
+}

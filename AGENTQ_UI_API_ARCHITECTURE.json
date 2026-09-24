@@ -1,0 +1,47 @@
+{
+  "schema_version": "hip.agentq-ui-api-architecture.v1",
+  "mission": [
+    "data_map",
+    "source_document_type",
+    "target_document_type",
+    "rule",
+    "source_transport_profile",
+    "target_transport_profile",
+    "biz_flow"
+  ],
+  "browser_owner": "Playwright MCP single persistent Chrome session",
+  "evidence_channels": [
+    "local Playwright DOM and Angular state",
+    "Playwright MCP accessibility and network",
+    "Chrome DevTools MCP DOM network console performance",
+    "HIP Intelligence MCP representation planner critic memory",
+    "Dell AIA gpt-oss-120b text judge",
+    "Gemma vision and golden-image comparison"
+  ],
+  "agentq": {
+    "web_representation": "compact structural state and page fingerprint",
+    "actor": "ranks only live deterministic safe UI controls and observed API contracts",
+    "critic": "exact progress, dependency, mutation, validation and judge proof",
+    "exploration": "UCB bonus for untried safe actions and unresolved contracts",
+    "exploitation": "judge-approved deterministic trajectory replay",
+    "memory": "value-free UI and API trajectories"
+  },
+  "ui_execution": {
+    "strategy": "dependency-aware sequential transactions",
+    "parent_before_child": true,
+    "repeatable_rows_sequential": true,
+    "rebind_after_rerender": true,
+    "final_mutation_default": false
+  },
+  "api_intelligence": {
+    "sources": ["form-open browser traffic", "UI-fill browser traffic", "blocked exact submit request"],
+    "invent_endpoints": false,
+    "invent_payload_keys": false,
+    "exports": ["redacted catalog", "OpenAPI", "Postman", "input-UI-API crosswalk", "request-response shapes"],
+    "capture_submit_safety": "abort POST PUT PATCH DELETE before backend delivery",
+    "modes": ["capture", "dry_run", "validate", "write"],
+    "write_confirmation": ["--allow-api-mutation", "HIP_ALLOW_API_MUTATION=YES"],
+    "exact_values_persisted": false
+  },
+  "completion": "all UI, dependency, row, judge, golden, API evidence and selected execution-mode gates pass"
+}

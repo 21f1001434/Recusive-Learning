@@ -1,0 +1,64 @@
+{
+  "phases_with_independent_sso_completion_gate": [
+    "data_map",
+    "source_document_type"
+  ],
+  "source_document_type_actions": 10,
+  "source_navigation_actions": [
+    {
+      "action_id": "act-00001",
+      "success": true,
+      "error": "SSO redirect accepted; final dual-MCP same-surface verification deferred until authenticated HIP return; Playwright MCP navigation",
+      "page_url_before": "about:blank",
+      "page_url_after": "https://myaccess.dell.com/sso/idps/DSSO?stateTokenExternalId=a3paYjdjTlZjd2QzZmhwc0dMUDhPU3g0OEhWVThoVUI0YWhxdUp4VkxZY3pDTVFLb25WM3ROKzB3UHNjOWNkOQ",
+      "timestamp_start": "2026-07-16T17:38:37.185163+00:00",
+      "timestamp_end": "2026-07-16T17:38:42.420643+00:00",
+      "duration_seconds": 5.23548
+    },
+    {
+      "action_id": "act-00002",
+      "success": false,
+      "error": "Navigation failed after retries: Playwright MCP navigate returned but neither target HIP nor Dell SSO was usable | domcontentloaded goto failed: Page.goto: Timeout 45000ms exceeded.\nCall log:\n  - navigating to \"https://developer.dell.com/hybrid-integrations/securelink/doctypes\", waiting until \"domcontentloaded\"\n | commit goto failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://developer.dell.com/hybrid-integrations/securelink/doctypes\", waiting until \"commit\"\n | location.assign failed: Page.evaluate: Execution context was destroyed, most likely because of a navigation",
+      "page_url_before": "https://developer.dell.com/hybrid-integrations/securelink/doctypes",
+      "page_url_after": "https://developer.dell.com/hybrid-integrations/securelink/doctypes",
+      "timestamp_start": "2026-07-16T17:38:58.682446+00:00",
+      "timestamp_end": "2026-07-16T17:43:46.409901+00:00",
+      "duration_seconds": 287.727455
+    }
+  ],
+  "playwright_mcp_action_log": {
+    "total": 171,
+    "failed": 77,
+    "failure_categories": {
+      "stale_or_ambiguous_locator": 2,
+      "native_select_used_on_dds_combobox": 18,
+      "loading_overlay_intercept": 51,
+      "other": 6
+    }
+  },
+  "source_network_summary": {
+    "total_events": 608,
+    "by_status": {
+      "200": 539,
+      "404": 1,
+      "None": 58,
+      "204": 2,
+      "304": 4,
+      "403": 4
+    },
+    "aborted_count": 53,
+    "403_count": 4,
+    "403_urls": [
+      "https://developer.dell.com/bff/activities/notifications"
+    ]
+  },
+  "data_map/datamap_kb_summary.json": {
+    "status": "completed",
+    "warnings": []
+  },
+  "data_map/section_judge_gate.json": {
+    "status": "pass",
+    "pass": true,
+    "phase": "data_map"
+  }
+}

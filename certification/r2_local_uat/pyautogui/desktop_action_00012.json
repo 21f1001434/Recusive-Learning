@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "create Target Document Type",
+  "selector": "role=button name=Create",
+  "point": {
+    "x": 780,
+    "y": 242,
+    "bbox": {
+      "x": 742.0,
+      "y": 221.8125,
+      "width": 56.015625,
+      "height": 21.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

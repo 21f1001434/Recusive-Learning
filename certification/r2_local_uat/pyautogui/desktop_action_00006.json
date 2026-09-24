@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "structural opener Source Document Type Add",
+  "selector": "role=button name=Add",
+  "point": {
+    "x": 1252,
+    "y": 128,
+    "bbox": {
+      "x": 1222.28125,
+      "y": 107.4375,
+      "width": 39.71875,
+      "height": 21.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

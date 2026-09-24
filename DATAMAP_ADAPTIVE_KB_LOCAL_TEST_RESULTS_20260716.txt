@@ -1,0 +1,23 @@
+HIP Data Map Adaptive KB Runtime Fix
+Date: 2026-07-16
+
+Compilation:
+  python -m compileall -q hip_id_agent tests
+  PASS
+
+Full automated suite:
+  python -m pytest -q
+  258 passed in 11.99s
+
+New targeted coverage:
+  - optional Data Map schema values are not guessed
+  - live accept contract rejects incompatible XML schema files
+  - exact existing Data Map is resolved as reuse_existing
+  - duplicate identifier is nonblocking only for an exact inventory match
+  - unsupported file errors remain blocking
+  - deterministic text evidence reconciles unsupported LLM missing claims
+  - vision issues with equal expected/observed values are rejected
+  - block diagnosis identifies real portal validation failures
+
+Live authenticated HIP Portal execution:
+  NOT PERFORMED in this environment

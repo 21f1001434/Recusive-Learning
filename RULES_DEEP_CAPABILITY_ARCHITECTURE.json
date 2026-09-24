@@ -1,0 +1,31 @@
+{
+  "schema_version": "hip.rules-deep-capability-architecture.v1",
+  "page_family": "rules",
+  "capability_graph_schema": "hip.capability-graph.v5",
+  "listing_learning": ["search", "filter_option_discovery", "pagination_next_previous", "exact_entity_row", "expand", "row_actions"],
+  "safe_surface_learning": ["edit", "clone", "view", "details", "history", "audit"],
+  "mutation_probe_learning": {
+    "actions": ["migrate", "deploy", "delete"],
+    "network_barrier": ["POST", "PUT", "PATCH", "DELETE", "mutation-token GET"],
+    "backend_delivery": false
+  },
+  "create_rule_transaction": {
+    "source": "current input.json",
+    "save_create_submit": false,
+    "section_order": ["Rule Details", "Actions", "Conditions"],
+    "critical_dependencies": [
+      "Rule Details -> default Action prerequisites",
+      "Action Type -> Mapping Identifier",
+      "Mapping Identifier -> Conditions",
+      "Condition row N exact -> row N+1 creation"
+    ],
+    "production_helpers_reused": [
+      "_apply_rule_condition_row_adds",
+      "_inspect_rule_create_form_validity",
+      "_rule_condition_rows_exact",
+      "execute_phase_state_graph"
+    ]
+  },
+  "intelligence": ["AutoGen AgentChat 0.7.5", "AgentQ", "Playwright", "Playwright MCP", "Chrome DevTools MCP", "HIP Intelligence MCP", "Dell AIA", "Gemma vision"],
+  "persistent_values": false
+}

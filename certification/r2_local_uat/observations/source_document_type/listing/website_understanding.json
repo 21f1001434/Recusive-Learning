@@ -1,0 +1,760 @@
+{
+  "schema_version": "hip.website-understanding.v1",
+  "available": true,
+  "phase": "source_document_type",
+  "stage": "listing",
+  "captured_at": "2026-09-20T06:49:56.290677+00:00",
+  "url_path": "blank",
+  "title": "HIP Final Mission Mock",
+  "framework_hints": {
+    "angular": false,
+    "dds": false,
+    "react": false
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 900,
+    "screenX": 10,
+    "screenY": 10,
+    "outerWidth": 1280,
+    "outerHeight": 900,
+    "devicePixelRatio": 1,
+    "scrollX": 0,
+    "scrollY": 0
+  },
+  "active_surface": {},
+  "surface_stack": [],
+  "controls": [
+    {
+      "index": 0,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Data Map",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 12,
+        "y": 12,
+        "width": 82,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Data Map"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.data_map.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 1,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Source Document Type",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 102,
+        "y": 12,
+        "width": 163,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Source Document Type"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.source_document_type.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 2,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Target Document Type",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 273,
+        "y": 12,
+        "width": 158,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Target Document Type"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.target_document_type.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 3,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Rule",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 439,
+        "y": 12,
+        "width": 51,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Rule"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.rule.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 4,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Source Transport Profile",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 498,
+        "y": 12,
+        "width": 168,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Source Transport Profile"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.source_transport_profile.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 5,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Target Transport Profile",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 674,
+        "y": 12,
+        "width": 163,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Target Transport Profile"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.target_transport_profile.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 6,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "BizFlow",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 844,
+        "y": 12,
+        "width": 71,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "BizFlow"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.bizflow.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 7,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Add",
+      "section": "Source Document Type",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 1222,
+        "y": 107,
+        "width": 40,
+        "height": 21,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Add"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "source_document_type.add.button",
+      "affordances": [
+        "click",
+        "open_add_form"
+      ]
+    }
+  ],
+  "foreground_control_count": 8,
+  "popup_ownership_graph": [],
+  "option_catalog": {},
+  "action_catalog": [
+    {
+      "semantic_control_key": "hip_sections.data_map.button",
+      "label": "Data Map",
+      "section": "HIP Sections",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "hip_sections.source_document_type.button",
+      "label": "Source Document Type",
+      "section": "HIP Sections",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "hip_sections.target_document_type.button",
+      "label": "Target Document Type",
+      "section": "HIP Sections",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "hip_sections.rule.button",
+      "label": "Rule",
+      "section": "HIP Sections",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "hip_sections.source_transport_profile.button",
+      "label": "Source Transport Profile",
+      "section": "HIP Sections",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "hip_sections.target_transport_profile.button",
+      "label": "Target Transport Profile",
+      "section": "HIP Sections",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "hip_sections.bizflow.button",
+      "label": "BizFlow",
+      "section": "HIP Sections",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "source_document_type.add.button",
+      "label": "Add",
+      "section": "Source Document Type",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click",
+        "open_add_form"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    }
+  ],
+  "tabs": [],
+  "accordions": [],
+  "repeatable_regions": [],
+  "forms": [
+    {
+      "index": 0,
+      "visible": false,
+      "inActiveSurface": true,
+      "nativeValid": true,
+      "angularValid": false,
+      "angularInvalid": false,
+      "angularPending": false,
+      "controlCount": 0
+    }
+  ],
+  "tables": [],
+  "recent_ui_events": [],
+  "recent_dom_mutations": [],
+  "registered_listener_capture": {
+    "available": false,
+    "candidate_count": 0,
+    "method": "chromium_cdp_DOMDebugger.getEventListeners"
+  },
+  "understanding_gate": {
+    "pass": false,
+    "confidence": 0.62,
+    "active_surface_identified": false,
+    "foreground_controls_identified": true,
+    "expanded_controls_with_unresolved_owned_surface": []
+  },
+  "safety": {
+    "read_only": true,
+    "customer_values_stored": false,
+    "selectors_persisted_as_memory": false,
+    "coordinates_persisted_as_memory": false
+  },
+  "state_fingerprint": "8d50ebb80400e35b4056e41c"
+}

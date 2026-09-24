@@ -1,0 +1,193 @@
+{
+  "schema_version": "hip.run-reanalysis.v1",
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260716-162218",
+  "generated_at": "2026-07-16T12:16:00.958208+00:00",
+  "blocked_phase": "source_document_type",
+  "data_map_status": "pass",
+  "source_document_type_status": "pass",
+  "old_runtime_model": "empty-form control inventory followed by flat fill attempts",
+  "root_cause": "Parent selections revealed conditional child controls, but those live children were never added to the executable deterministic plan. Multi-select Usage was treated as one text string instead of selecting each option.",
+  "evidence": {
+    "legacy_form_control_count": 23,
+    "new_source_document_type_graph_nodes": 29,
+    "new_source_document_type_dependency_edges": 11,
+    "missing_exact_values": [
+      {
+        "field": "input_value[9]",
+        "expected": "DellAutoASN",
+        "actual_candidates": [
+          "XML",
+          "All conditions are satisfied",
+          "TRANSACTION_ROOT_ELEMENT",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "TRANSACTION_ROOT_ELEMENT",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD"
+        ],
+        "reason": "exact committed value was not found in a field-bound control"
+      },
+      {
+        "field": "input_value[13]",
+        "expected": "/DellAutoASN/ShipNoticeHeader/To/PartnerInformation/PartnerIdentifier",
+        "actual_candidates": [
+          "XML",
+          "All conditions are satisfied",
+          "TRANSACTION_ROOT_ELEMENT",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "TRANSACTION_ROOT_ELEMENT",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD"
+        ],
+        "reason": "exact committed value was not found in a field-bound control"
+      },
+      {
+        "field": "input_value[17]",
+        "expected": "/DellAutoASN/ShipNoticeHeader/From/PartnerInfomation/PartnerIdentifier",
+        "actual_candidates": [
+          "XML",
+          "All conditions are satisfied",
+          "TRANSACTION_ROOT_ELEMENT",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "TRANSACTION_ROOT_ELEMENT",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD"
+        ],
+        "reason": "exact committed value was not found in a field-bound control"
+      },
+      {
+        "field": "input_value[24]",
+        "expected": "/DellAutoASN/PurchaseOrder/PurchaseOrderNumber",
+        "actual_candidates": [
+          "XML",
+          "All conditions are satisfied",
+          "TRANSACTION_ROOT_ELEMENT",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "TRANSACTION_ROOT_ELEMENT",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD"
+        ],
+        "reason": "exact committed value was not found in a field-bound control"
+      },
+      {
+        "field": "input_value[28]",
+        "expected": "/DellAutoASN/PurchaseOrder/ResellerPurchaseOrderNumber",
+        "actual_candidates": [
+          "XML",
+          "All conditions are satisfied",
+          "TRANSACTION_ROOT_ELEMENT",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "TRANSACTION_ROOT_ELEMENT",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD",
+          "Flow Identifier Expression, Logging, Mapping, Routing",
+          "ELEMENT_IN_PAYLOAD"
+        ],
+        "reason": "exact committed value was not found in a field-bound control"
+      }
+    ],
+    "screenshot_observation": "Create Document Type remained open; parent Derived From values were committed, conditional Value/Expression fields were blank, and Usage showed No options found after a comma-joined string was typed."
+  },
+  "required_runtime_order": [
+    "resolve exact phase-local object from current input.json",
+    "create exact repeatable row counts",
+    "fill stable top-level fields",
+    "commit parent dropdown/radio value",
+    "wait for portal state transition",
+    "recapture active surface and rediscover child controls semantically",
+    "fill child values or multi-select options individually",
+    "blur/close overlay and verify exact committed value",
+    "judge target branch before exploration",
+    "explore alternate parent values safely and capture dependency deltas",
+    "restore current input target branch and rejudge",
+    "promote knowledge only after section approval"
+  ],
+  "patched_phase_graph_coverage": {
+    "biz_flow": {
+      "graph_id": "biz_flow-e527ad792bcc60a090fd",
+      "nodes": 48,
+      "dependency_edges": 29,
+      "repeatable_rows": {
+        "flow_identifier": 2,
+        "process_step": 2,
+        "routing_condition": 2,
+        "routing_action": 1
+      },
+      "input_paths_are_phase_local": true
+    },
+    "data_map": {
+      "graph_id": "data_map-330fae8d3bed220807e3",
+      "nodes": 7,
+      "dependency_edges": 0,
+      "repeatable_rows": {},
+      "input_paths_are_phase_local": true
+    },
+    "rule": {
+      "graph_id": "rule-0c615e2bdfae9fcaed6e",
+      "nodes": 19,
+      "dependency_edges": 9,
+      "repeatable_rows": {
+        "condition": 2
+      },
+      "input_paths_are_phase_local": true
+    },
+    "source_document_type": {
+      "graph_id": "source_document_type-97e1095afeb17ad472af",
+      "nodes": 29,
+      "dependency_edges": 11,
+      "repeatable_rows": {
+        "document_identifier": 1,
+        "attribute": 5
+      },
+      "input_paths_are_phase_local": true
+    },
+    "source_transport_profile": {
+      "graph_id": "source_transport_profile-ca3e2c53bb49555433e5",
+      "nodes": 15,
+      "dependency_edges": 10,
+      "repeatable_rows": {},
+      "input_paths_are_phase_local": true
+    },
+    "target_document_type": {
+      "graph_id": "target_document_type-7762d0718103c21840e6",
+      "nodes": 29,
+      "dependency_edges": 11,
+      "repeatable_rows": {
+        "document_identifier": 1,
+        "attribute": 5
+      },
+      "input_paths_are_phase_local": true
+    },
+    "target_transport_profile": {
+      "graph_id": "target_transport_profile-b929abf14f2c57c9d9db",
+      "nodes": 15,
+      "dependency_edges": 10,
+      "repeatable_rows": {},
+      "input_paths_are_phase_local": true
+    }
+  },
+  "safety": "No Save/final Create/Submit/Delete/Deploy/Publish/Update is permitted.",
+  "live_verdict": "Local/static patch verified. Authenticated no-save rerun is still required."
+}

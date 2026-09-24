@@ -1,0 +1,275 @@
+{
+  "existing_object_resolution": {
+    "found": true,
+    "mode": "reuse_existing",
+    "natural_key": {
+      "map_identifier": "DELLCoXMLASNXX08C_U-HAUL",
+      "version": "1"
+    },
+    "match": {
+      "map_id": "",
+      "map_identifier": "DELLCoXMLASNXX08C_U-HAUL",
+      "map_identifier_version": "1.0",
+      "status": "",
+      "map_name": "DELLCoXMLASNXX08C",
+      "map_class": "Transform_DELLCoXMLASNXX08C",
+      "contivo_version": "",
+      "map_data_file": "",
+      "created_by": "",
+      "updated_by": "",
+      "created_at": "",
+      "updated_at": "",
+      "available_environments": "['DEV']",
+      "latest_dev_version": "1.0",
+      "source": "network:datamap_listing_load",
+      "source_url": "https://developer.dell.com/inaas-gateway/hipService-svc/api/mac-map/summary",
+      "raw_row_compact": {
+        "mapIdentifier": "DELLCoXMLASNXX08C_U-HAUL",
+        "mapName": "DELLCoXMLASNXX08C",
+        "mapClassName": "Transform_DELLCoXMLASNXX08C",
+        "latestDevVersion": "1.0",
+        "availableEnvironments": [
+          "DEV"
+        ]
+      }
+    },
+    "conflicts": [],
+    "evidence": "read_only_datamap_listing_inventory"
+  },
+  "validation_gate": {
+    "blocking": [
+      {
+        "message": "Browse files The following file(s) types are not allowed: o.7x50.260410004040874.XML. o.7x50.260410004040874.XML 653 Bytes o.7x50.260410004040874.XML Error: File type not supported. o.7x50.260410004040874.XML uploaded successfully",
+        "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+        "element": "div",
+        "id": "file-input-241606564",
+        "aria_invalid": true
+      },
+      {
+        "message": "The following file(s) types are not allowed: o.7x50.260410004040874.XML.",
+        "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+        "element": "small",
+        "id": "dds-error-444601307",
+        "aria_invalid": false
+      },
+      {
+        "message": "o.7x50.260410004040874.XML 653 Bytes o.7x50.260410004040874.XML Error: File type not supported.",
+        "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+        "element": "li",
+        "id": "",
+        "aria_invalid": false
+      },
+      {
+        "message": "Browse files The following file(s) types are not allowed: output_u-haul_ASN.xml. output_u-haul_ASN.xml 653 Bytes output_u-haul_ASN.xml Error: File type not supported. output_u-haul_ASN.xml uploaded successfully",
+        "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+        "element": "div",
+        "id": "file-input-108538625",
+        "aria_invalid": true
+      },
+      {
+        "message": "The following file(s) types are not allowed: output_u-haul_ASN.xml.",
+        "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+        "element": "small",
+        "id": "dds-error-607997971",
+        "aria_invalid": false
+      },
+      {
+        "message": "output_u-haul_ASN.xml 653 Bytes output_u-haul_ASN.xml Error: File type not supported.",
+        "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+        "element": "li",
+        "id": "",
+        "aria_invalid": false
+      }
+    ],
+    "accepted_nonblocking": [],
+    "object_resolution": {
+      "found": true,
+      "mode": "reuse_existing",
+      "natural_key": {
+        "map_identifier": "DELLCoXMLASNXX08C_U-HAUL",
+        "version": "1"
+      },
+      "match": {
+        "map_id": "",
+        "map_identifier": "DELLCoXMLASNXX08C_U-HAUL",
+        "map_identifier_version": "1.0",
+        "status": "",
+        "map_name": "DELLCoXMLASNXX08C",
+        "map_class": "Transform_DELLCoXMLASNXX08C",
+        "contivo_version": "",
+        "map_data_file": "",
+        "created_by": "",
+        "updated_by": "",
+        "created_at": "",
+        "updated_at": "",
+        "available_environments": "['DEV']",
+        "latest_dev_version": "1.0",
+        "source": "network:datamap_listing_load",
+        "source_url": "https://developer.dell.com/inaas-gateway/hipService-svc/api/mac-map/summary",
+        "raw_row_compact": {
+          "mapIdentifier": "DELLCoXMLASNXX08C_U-HAUL",
+          "mapName": "DELLCoXMLASNXX08C",
+          "mapClassName": "Transform_DELLCoXMLASNXX08C",
+          "latestDevVersion": "1.0",
+          "availableEnvironments": [
+            "DEV"
+          ]
+        }
+      },
+      "conflicts": [],
+      "evidence": "read_only_datamap_listing_inventory"
+    }
+  },
+  "diagnosis": {
+    "phase": "data_map",
+    "section": "Data Map",
+    "pass": false,
+    "object_resolution": {
+      "found": true,
+      "mode": "reuse_existing",
+      "natural_key": {
+        "map_identifier": "DELLCoXMLASNXX08C_U-HAUL",
+        "version": "1"
+      },
+      "match": {
+        "map_id": "",
+        "map_identifier": "DELLCoXMLASNXX08C_U-HAUL",
+        "map_identifier_version": "1.0",
+        "status": "",
+        "map_name": "DELLCoXMLASNXX08C",
+        "map_class": "Transform_DELLCoXMLASNXX08C",
+        "contivo_version": "",
+        "map_data_file": "",
+        "created_by": "",
+        "updated_by": "",
+        "created_at": "",
+        "updated_at": "",
+        "available_environments": "['DEV']",
+        "latest_dev_version": "1.0",
+        "source": "network:datamap_listing_load",
+        "source_url": "https://developer.dell.com/inaas-gateway/hipService-svc/api/mac-map/summary",
+        "raw_row_compact": {
+          "mapIdentifier": "DELLCoXMLASNXX08C_U-HAUL",
+          "mapName": "DELLCoXMLASNXX08C",
+          "mapClassName": "Transform_DELLCoXMLASNXX08C",
+          "latestDevVersion": "1.0",
+          "availableEnvironments": [
+            "DEV"
+          ]
+        }
+      },
+      "conflicts": [],
+      "evidence": "read_only_datamap_listing_inventory"
+    },
+    "reasons": [
+      {
+        "code": "blocking_portal_validation",
+        "items": [
+          {
+            "message": "Browse files The following file(s) types are not allowed: o.7x50.260410004040874.XML. o.7x50.260410004040874.XML 653 Bytes o.7x50.260410004040874.XML Error: File type not supported. o.7x50.260410004040874.XML uploaded successfully",
+            "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+            "element": "div",
+            "id": "file-input-241606564",
+            "aria_invalid": true
+          },
+          {
+            "message": "The following file(s) types are not allowed: o.7x50.260410004040874.XML.",
+            "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+            "element": "small",
+            "id": "dds-error-444601307",
+            "aria_invalid": false
+          },
+          {
+            "message": "o.7x50.260410004040874.XML 653 Bytes o.7x50.260410004040874.XML Error: File type not supported.",
+            "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+            "element": "li",
+            "id": "",
+            "aria_invalid": false
+          },
+          {
+            "message": "Browse files The following file(s) types are not allowed: output_u-haul_ASN.xml. output_u-haul_ASN.xml 653 Bytes output_u-haul_ASN.xml Error: File type not supported. output_u-haul_ASN.xml uploaded successfully",
+            "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+            "element": "div",
+            "id": "file-input-108538625",
+            "aria_invalid": true
+          },
+          {
+            "message": "The following file(s) types are not allowed: output_u-haul_ASN.xml.",
+            "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+            "element": "small",
+            "id": "dds-error-607997971",
+            "aria_invalid": false
+          },
+          {
+            "message": "output_u-haul_ASN.xml 653 Bytes output_u-haul_ASN.xml Error: File type not supported.",
+            "source": "/mnt/data/latest_run145139/UHAUL-POASN-FULL-DUMMY-20260716-145139/data_map/dom_snapshots/datamap_add_form_after_dummy_fill_no_save.html",
+            "element": "li",
+            "id": "",
+            "aria_invalid": false
+          }
+        ]
+      },
+      {
+        "code": "text_judge_block",
+        "items": [
+          {
+            "field": "input_value[1]",
+            "expected": "1",
+            "actual": "",
+            "reason": "Required field not present in saved DOM."
+          },
+          {
+            "field": "input_value[5]",
+            "expected": "6.7",
+            "actual": "",
+            "reason": "Required field not present in saved DOM."
+          },
+          {
+            "field": "input_value[6]",
+            "expected": "Transform_DELLCoXMLASNXX08C.jar",
+            "actual": "",
+            "reason": "Required field not present in saved DOM."
+          }
+        ],
+        "summary": "Required fields input_value[1], input_value[5], and input_value[6] are missing or not populated with expected values."
+      },
+      {
+        "code": "vision_judge_block",
+        "items": [
+          {
+            "field": "input_value[0]",
+            "expected": "DELLCoXMLASNXX08C_U-HAUL",
+            "observed": "DELLCoXMLASNXX08C_U-HAUL"
+          },
+          {
+            "field": "input_value[1]",
+            "expected": "1",
+            "observed": "1"
+          },
+          {
+            "field": "input_value[3]",
+            "expected": "DELLCoXMLASNXX08C",
+            "observed": "DELLCoXMLASNXX08C"
+          },
+          {
+            "field": "input_value[4]",
+            "expected": "Transform_DELLCoXMLASNXX08C",
+            "observed": "Transform_DELLCoXMLASNXX08C"
+          },
+          {
+            "field": "input_value[5]",
+            "expected": "6.7",
+            "observed": "6.7"
+          },
+          {
+            "field": "input_value[6]",
+            "expected": "Transform_DELLCoXMLASNXX08C.jar",
+            "observed": "Transform_DELLCoXMLASNXX08C.jar"
+          }
+        ],
+        "summary": "Data map values do not match the golden reference. Several input values are missing or incorrect."
+      }
+    ],
+    "next_action": "Repair only the listed blocking fields/validation, recapture evidence, and rejudge the same section. Do not advance or click a final mutation."
+  }
+}

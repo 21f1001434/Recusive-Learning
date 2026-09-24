@@ -1,0 +1,8 @@
+Targeted regression suite:
+11 passed in 0.91s
+
+Complete source suite:
+340 passed in 15.00s
+
+Python compileall:
+PASS

@@ -1,0 +1,29 @@
+{
+  "objects": {
+    "transport_profile": {
+      "transportProfileName": "DUMMY_SFTP_HAFT_TP_KB",
+      "transportProfileVersion": "1",
+      "transportProfileOperation": "create",
+      "status": "Enable",
+      "description": "Dummy Transport Profile KB capture only - no save/create",
+      "interfaceDetails": {
+        "interfaceType": "SFTP",
+        "protocol": "SFTP-HAFT",
+        "parameters": [
+          {"name": "host", "value": "dummy-sftp.example.com"},
+          {"name": "port", "value": "22"},
+          {"name": "userName", "value": "DUMMY_USER"},
+          {"name": "folderPath", "value": "/dummy/outbound"},
+          {"name": "filePattern", "value": "DUMMY_*.xml"}
+        ]
+      },
+      "documentTypeDetails": {
+        "documentTypeId": 10483,
+        "documentTypeName": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+        "documentTypeVersion": "1"
+      },
+      "requestedBy": "KB_LEARNER",
+      "workOrderId": "KB-TRANSPORT-PROFILE-LEARNER"
+    }
+  }
+}

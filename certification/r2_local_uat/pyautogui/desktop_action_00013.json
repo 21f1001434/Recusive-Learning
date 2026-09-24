@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "open Rule",
+  "selector": "role=button name=Rule",
+  "point": {
+    "x": 474,
+    "y": 40,
+    "bbox": {
+      "x": 438.703125,
+      "y": 12.0,
+      "width": 51.421875,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

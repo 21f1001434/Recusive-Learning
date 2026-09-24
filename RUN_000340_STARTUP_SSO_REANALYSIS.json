@@ -1,0 +1,17 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260718-000340",
+  "first_phase": "data_map",
+  "initial_surface": "about:blank",
+  "observed_transition": [
+    "about:blank",
+    "Dell SSO"
+  ],
+  "react_status": "sso_required",
+  "old_behavior": "raised HIP_ROUTE_NOT_COMMITTED before the user could complete SSO",
+  "root_causes": [
+    "all-phase preflight treated sso_required as a fatal route failure",
+    "prepare_phase_attempt was outside the phase self-heal exception boundary"
+  ],
+  "patched_behavior": "wait for SSO in the same persistent context, reverify target, and resume attempt 1",
+  "live_authenticated_rerun_performed": false
+}

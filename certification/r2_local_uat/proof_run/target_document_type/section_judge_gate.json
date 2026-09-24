@@ -1,0 +1,5 @@
+{
+  "phase": "target_document_type",
+  "pass": true,
+  "source": "deterministic_local_uat"
+}

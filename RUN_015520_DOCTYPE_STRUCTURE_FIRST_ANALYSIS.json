@@ -1,0 +1,76 @@
+{
+  "schema_version": "hip.run-015520-doctype-structure-first-reanalysis.v1",
+  "original_problem": {
+    "target_execution_passed": true,
+    "original_deterministic_pass": false,
+    "false_identifier_row_count": 2,
+    "post_fill_exploration_restore_file_existed": true
+  },
+  "patched_replay": {
+    "artifact_row_counts": {
+      "document_identifier_rows": 1,
+      "attribute_rows": 5
+    },
+    "deterministic_pass": true,
+    "missing_values": [],
+    "row_issues": [],
+    "matched_count": 28,
+    "exact_completion_checkpoint": {
+      "schema_version": "hip.phase-exact-completion-checkpoint.v1",
+      "phase": "source_document_type",
+      "pass": true,
+      "status": "exact_live_execution_completed",
+      "authoritative_artifact": "/mnt/data/doctype_structure_fix/_replay_015520_source_doctype/doctype_kb/doctype_target_branch_execution.json",
+      "inspected": [
+        {
+          "path": "/mnt/data/doctype_structure_fix/_replay_015520_source_doctype/doctype_kb/doctype_target_branch_execution.json",
+          "exists": true,
+          "pass": true,
+          "exact_verified": true,
+          "status": "pass",
+          "attempt_count": 29,
+          "failed_attempt_count": 0
+        }
+      ]
+    }
+  },
+  "new_runtime_contract": {
+    "structure_before_fill": true,
+    "version_policy": "verify_only_never_type",
+    "target_fill_once": true,
+    "post_fill_exploration_allowed": false,
+    "completed_doctype_full_replay_allowed_for_judge_disagreement": false
+  },
+  "observed_run_timeline": {
+    "attempt_1_exact_fill_start": "2026-07-17T20:32:43.952785+00:00",
+    "attempt_1_exact_fill_pass": "2026-07-17T20:34:06.751530+00:00",
+    "attempt_1_reporting_start": "2026-07-17T20:50:20.909696+00:00",
+    "attempt_1_post_fill_exploration_seconds": 974.158166,
+    "attempt_2_exact_fill_start": "2026-07-17T20:52:05.841208+00:00",
+    "attempt_2_exact_fill_pass": "2026-07-17T20:53:31.442804+00:00",
+    "attempt_2_reporting_start": "2026-07-17T21:11:36.323852+00:00",
+    "attempt_2_post_fill_exploration_seconds": 1084.881048,
+    "attempt_3_exact_fill_pass": "2026-07-17T21:15:26.862022+00:00",
+    "stopped_before_post_fill_exploration_completed": true
+  },
+  "old_exploration_amplification": {
+    "parent_records": 18,
+    "branch_executions": 56,
+    "control_records": 142,
+    "duplicate_parent_counts": {
+      "derived_from": 12,
+      "data_format_type": 2,
+      "document_identifier_operation": 2,
+      "validation_type": 2
+    },
+    "cause": "dynamic selector spellings and repeatable row occurrences were treated as distinct parent contracts"
+  },
+  "root_causes": [
+    "The exact 29-step Source Document Type state graph passed before the loop.",
+    "Exhaustive exploration ran after exact filling and changed/restored parent controls for 16-18 minutes.",
+    "Document Identifier Operation was miscounted as repeatable row 0; the real identifier row became raw row 1.",
+    "The verifier therefore reported 2 rows and could not bind document_identifier[0].derived_from.",
+    "Text and vision field aliases were not canonicalized, so model-only contradictions survived.",
+    "Self-heal reopened the entire completed phase for an evidence/parser mismatch."
+  ]
+}

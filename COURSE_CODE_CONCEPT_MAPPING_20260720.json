@@ -1,0 +1,90 @@
+{
+  "schema_version": "hip.course-code-concept-mapping.v1",
+  "source_artifacts": [
+    "Web Agent Architecture & Key Components course diagram",
+    "AI_AGENT_WEB_BROWSER course code ZIP"
+  ],
+  "implementation_date": "2026-07-20",
+  "principles": {
+    "web_representation_model": {
+      "course_concept": "Transform webpage into an embedding/state representation before acting.",
+      "hip_implementation": "hip_id_agent.web_representation builds a value-free 256-dimensional signed-hash representation from DOM, accessibility, Angular/DDS component state, surface gate, DOM events/mutations, console categories, and network endpoint templates.",
+      "used_for": [
+        "surface recognition",
+        "control retrieval",
+        "portal drift",
+        "trajectory similarity",
+        "same-flow reuse"
+      ],
+      "customer_values_stored": false
+    },
+    "hierarchical_planner": {
+      "course_concept": "Decompose the user task into smaller browser tasks.",
+      "hip_implementation": "build_phase_task_plan creates one ordered task per state-graph node with dependencies and exact verification requirements.",
+      "parallel_execution": false
+    },
+    "action_model": {
+      "course_concept": "Predict and execute the next action from webpage and task context.",
+      "hip_implementation": "HIPActionModel ranks only allow-listed actions through bounded UCB-style scoring, live binding evidence, and trajectory priors.",
+      "destructive_actions_considered": false
+    },
+    "actor": {
+      "course_concept": "Execute the selected browser action.",
+      "hip_implementation": "Playwright MCP is the primary actor; Python Playwright/DDS drivers provide exact component transactions. Chrome DevTools MCP independently observes the same authenticated tab.",
+      "new_browser_context": false
+    },
+    "critic": {
+      "course_concept": "Evaluate whether the action moved the browser toward the goal.",
+      "hip_implementation": "Every field transaction is critiqued using exact value, stable rerender, explicit event proof, child visibility, active-surface proof, validation, and committed-field mutation protection.",
+      "model_override_allowed": false
+    },
+    "memory_personalization": {
+      "course_concept": "Use prior context and feedback to improve future action selection.",
+      "hip_implementation": "TrajectoryMemory stores value-free successful and failed state/action transitions and retrieves structurally similar cases. Existing flow-pattern memory reuses validated form topology across same-family phases.",
+      "stores_customer_values": false
+    },
+    "mcts_agentq": {
+      "course_concept": "Explore/rank candidate action trajectories using AgentQ/MCTS-style search.",
+      "hip_implementation": "Bounded UCB-style candidate ranking is applied per field. It is intentionally not an uncontrolled full-browser MCTS search.",
+      "bounded": true,
+      "unsafe_live_exploration": false
+    },
+    "preference_learning": {
+      "course_concept": "Learn a better action policy from preferred successful trajectories.",
+      "hip_implementation": "Value-free winning/losing action preference pairs are written for optional future offline policy tuning. No online fine-tuning occurs during a portal run.",
+      "online_model_training": false
+    },
+    "skills": {
+      "course_concept": "Reuse successful browser skills.",
+      "hip_implementation": "Universal form policies, flow-pattern memory, preferred control identities, and state-transaction blueprints act as validated reusable HIP skills.",
+      "scope": "all known HIP form families plus generic /hybrid-integrations fallback"
+    }
+  },
+  "mcp_servers": [
+    {
+      "name": "Playwright MCP",
+      "role": "safe semantic browser actor and accessibility snapshots",
+      "attaches_to_browser": true
+    },
+    {
+      "name": "Chrome DevTools MCP",
+      "role": "network, console, performance, DOM and low-level independent evidence",
+      "attaches_to_browser": true
+    },
+    {
+      "name": "HIP Intelligence MCP",
+      "role": "web representation, action planning, critic, drift and trajectory memory",
+      "attaches_to_browser": false
+    }
+  ],
+  "multion": {
+    "dependency_used": false,
+    "reason": "The current agent already owns a persistent authenticated Chrome session. Adding MultiOn would introduce another browser/session/controller and conflict with single-SSO and exact-state guarantees."
+  },
+  "safety_invariants": [
+    "No Save/Create/Submit/Delete/Deploy/Publish/Update/Confirm action in dummy-fill mode.",
+    "A memory prior cannot override active-form, one-to-one binding, validation, visibility, exact-value, or mutation gates.",
+    "Customer-entered values, credentials, tokens, authorization headers, and upload contents are excluded from trajectory memory.",
+    "A completed phase remains locked against judge-triggered browser replay."
+  ]
+}

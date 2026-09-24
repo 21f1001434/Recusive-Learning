@@ -1,0 +1,19 @@
+COURSE AGENTQ WEB-AGENT ARCHITECTURE VALIDATION — 2026-07-20
+
+Python compileall: PASS
+Focused course architecture tests: 7 passed
+Complete project regression suite: 410 passed
+HIP Intelligence MCP external-CWD startup: PASS
+Web representation schema: hip.web-representation.v1
+Web representation dimensions: 256
+Customer-value redaction: PASS
+Trajectory-memory success/failure retrieval: PASS
+Preference-pair generation: PASS
+Learned control prior safe tie-break: PASS
+Hierarchical task dependency plan: PASS
+MultiOn dependency: FALSE
+Browser MCPs: Playwright MCP + Chrome DevTools MCP
+Local intelligence MCP: HIP Intelligence MCP
+Additional browser context opened by intelligence MCP: FALSE
+Strict Windows MCP profile hip_intelligence_mcp_required: TRUE
+Authenticated Dell HIP live rerun: NOT PERFORMED IN THIS ENVIRONMENT

@@ -1,0 +1,99 @@
+[
+  {
+    "semantic_control_key": "hip_sections.data_map.button",
+    "label": "Data Map",
+    "section": "HIP Sections",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "hip_sections.source_document_type.button",
+    "label": "Source Document Type",
+    "section": "HIP Sections",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "hip_sections.target_document_type.button",
+    "label": "Target Document Type",
+    "section": "HIP Sections",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "hip_sections.rule.button",
+    "label": "Rule",
+    "section": "HIP Sections",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "hip_sections.source_transport_profile.button",
+    "label": "Source Transport Profile",
+    "section": "HIP Sections",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "hip_sections.target_transport_profile.button",
+    "label": "Target Transport Profile",
+    "section": "HIP Sections",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "hip_sections.bizflow.button",
+    "label": "BizFlow",
+    "section": "HIP Sections",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "rule.add.button",
+    "label": "Add",
+    "section": "Rule",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click",
+      "open_add_form"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  }
+]

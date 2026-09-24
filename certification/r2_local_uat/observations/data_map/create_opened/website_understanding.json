@@ -1,0 +1,1013 @@
+{
+  "schema_version": "hip.website-understanding.v1",
+  "available": true,
+  "phase": "data_map",
+  "stage": "create_opened",
+  "captured_at": "2026-09-20T06:49:54.208758+00:00",
+  "url_path": "blank",
+  "title": "HIP Final Mission Mock",
+  "framework_hints": {
+    "angular": false,
+    "dds": false,
+    "react": false
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 900,
+    "screenX": 10,
+    "screenY": 10,
+    "outerWidth": 1280,
+    "outerHeight": 900,
+    "devicePixelRatio": 1,
+    "scrollX": 0,
+    "scrollY": 0
+  },
+  "active_surface": {
+    "index": 0,
+    "tag": "div",
+    "role": "dialog",
+    "ariaModal": "true",
+    "label": "Create Data Map",
+    "classes": "drawer",
+    "zIndex": 1000,
+    "position": "fixed",
+    "score": 2085.26,
+    "box": {
+      "x": 723,
+      "y": 0,
+      "width": 557,
+      "height": 936
+    }
+  },
+  "surface_stack": [
+    {
+      "index": 0,
+      "tag": "div",
+      "role": "dialog",
+      "ariaModal": "true",
+      "label": "Create Data Map",
+      "classes": "drawer",
+      "zIndex": 1000,
+      "position": "fixed",
+      "score": 2085.26,
+      "box": {
+        "x": 723,
+        "y": 0,
+        "width": 557,
+        "height": 936
+      }
+    },
+    {
+      "index": 1,
+      "tag": "form",
+      "role": "",
+      "ariaModal": "",
+      "label": "",
+      "classes": "",
+      "zIndex": 0,
+      "position": "static",
+      "score": 4.06,
+      "box": {
+        "x": 742,
+        "y": 86,
+        "width": 520,
+        "height": 90
+      }
+    }
+  ],
+  "controls": [
+    {
+      "index": 0,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Data Map",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 12,
+        "y": 12,
+        "width": 82,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Data Map"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.data_map.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 1,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Source Document Type",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 102,
+        "y": 12,
+        "width": 163,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Source Document Type"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.source_document_type.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 2,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Target Document Type",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 273,
+        "y": 12,
+        "width": 158,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Target Document Type"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.target_document_type.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 3,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Rule",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 439,
+        "y": 12,
+        "width": 51,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Rule"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.rule.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 4,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Source Transport Profile",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 498,
+        "y": 12,
+        "width": 168,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Source Transport Profile"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.source_transport_profile.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 5,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Target Transport Profile",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 674,
+        "y": 12,
+        "width": 163,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Target Transport Profile"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.target_transport_profile.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 6,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "BizFlow",
+      "section": "HIP Sections",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 844,
+        "y": 12,
+        "width": 71,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "BizFlow"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "HIP Sections"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "hip_sections.bizflow.button",
+      "affordances": [
+        "click"
+      ]
+    },
+    {
+      "index": 7,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Add",
+      "section": "Data Map",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": false,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 1222,
+        "y": 107,
+        "width": 40,
+        "height": 21,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Add"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "data_map.add.button",
+      "affordances": [
+        "click",
+        "open_add_form"
+      ]
+    },
+    {
+      "index": 8,
+      "inspectionToken": "***MASKED***",
+      "tag": "input",
+      "role": "",
+      "type": "text",
+      "name": "name",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Name",
+      "section": "Create Data Map",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": true,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {},
+      "attrs": {},
+      "layout": {
+        "x": 742,
+        "y": 108,
+        "width": 520,
+        "height": 35,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "input",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Name"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "form",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "div",
+          "role": "dialog",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Create Data Map"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "create_data_map.name.name.text",
+      "affordances": [
+        "fill_text"
+      ]
+    },
+    {
+      "index": 9,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "button",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Create",
+      "section": "Create Data Map",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 742,
+        "y": 155,
+        "width": 56,
+        "height": 21,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Create"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "form",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "div",
+          "role": "dialog",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Create Data Map"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "create_data_map.create.button",
+      "affordances": [
+        "click",
+        "create",
+        "mutation_candidate"
+      ]
+    },
+    {
+      "index": 10,
+      "inspectionToken": "***MASKED***",
+      "tag": "button",
+      "role": "",
+      "type": "button",
+      "name": "",
+      "formControlName": "",
+      "formArrayName": "",
+      "label": "Cancel",
+      "section": "Create Data Map",
+      "placeholder": "",
+      "visible": true,
+      "inActiveSurface": true,
+      "required": false,
+      "disabled": false,
+      "readOnly": false,
+      "expanded": "",
+      "checked": false,
+      "hasValue": false,
+      "valueLength": 0,
+      "ownedIds": [],
+      "ownedSurfaceVisible": false,
+      "optionCount": 0,
+      "options": [],
+      "inlineEvents": {
+        "onclick": true
+      },
+      "attrs": {},
+      "layout": {
+        "x": 806,
+        "y": 155,
+        "width": 58,
+        "height": 21,
+        "zIndex": 0,
+        "position": "static",
+        "pointerEvents": "auto"
+      },
+      "semanticPath": [
+        {
+          "tag": "button",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Cancel"
+        },
+        {
+          "tag": "div",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "form",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "div",
+          "role": "dialog",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": "Create Data Map"
+        },
+        {
+          "tag": "body",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        },
+        {
+          "tag": "html",
+          "role": "",
+          "formControlName": "",
+          "formArrayName": "",
+          "label": ""
+        }
+      ],
+      "semanticControlKey": "create_data_map.cancel.button",
+      "affordances": [
+        "click"
+      ]
+    }
+  ],
+  "foreground_control_count": 3,
+  "popup_ownership_graph": [],
+  "option_catalog": {},
+  "action_catalog": [
+    {
+      "semantic_control_key": "create_data_map.name.name.text",
+      "label": "Name",
+      "section": "Create Data Map",
+      "role": "",
+      "required": true,
+      "affordances": [
+        "fill_text"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "create_data_map.create.button",
+      "label": "Create",
+      "section": "Create Data Map",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click",
+        "create",
+        "mutation_candidate"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    },
+    {
+      "semantic_control_key": "create_data_map.cancel.button",
+      "label": "Cancel",
+      "section": "Create Data Map",
+      "role": "",
+      "required": false,
+      "affordances": [
+        "click"
+      ],
+      "option_count": 0,
+      "registered_event_types": []
+    }
+  ],
+  "tabs": [],
+  "accordions": [],
+  "repeatable_regions": [],
+  "forms": [
+    {
+      "index": 0,
+      "visible": true,
+      "inActiveSurface": true,
+      "nativeValid": false,
+      "angularValid": false,
+      "angularInvalid": false,
+      "angularPending": false,
+      "controlCount": 3
+    }
+  ],
+  "tables": [],
+  "recent_ui_events": [],
+  "recent_dom_mutations": [],
+  "registered_listener_capture": {
+    "available": false,
+    "candidate_count": 0,
+    "method": "chromium_cdp_DOMDebugger.getEventListeners"
+  },
+  "understanding_gate": {
+    "pass": true,
+    "confidence": 0.94,
+    "active_surface_identified": true,
+    "foreground_controls_identified": true,
+    "expanded_controls_with_unresolved_owned_surface": []
+  },
+  "safety": {
+    "read_only": true,
+    "customer_values_stored": false,
+    "selectors_persisted_as_memory": false,
+    "coordinates_persisted_as_memory": false
+  },
+  "state_fingerprint": "55042de267d37ac90c63000d"
+}

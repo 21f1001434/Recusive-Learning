@@ -1,0 +1,59 @@
+{
+  "schema_version": "hip.streamlit-ui-api-architecture.v1",
+  "generated_at": "2026-08-04",
+  "operator_ui": {
+    "entrypoint": "streamlit_app.py",
+    "runner": "RUN_STREAMLIT_UI.ps1",
+    "features": [
+      "launch autonomous mission",
+      "stop mission process",
+      "upload and validate input JSON",
+      "monitor seven phases",
+      "tail mission console",
+      "inspect request payload and response side by side",
+      "browse input-to-UI-to-API crosswalk",
+      "download payload-response bundle",
+      "build redacted evidence archive"
+    ]
+  },
+  "mission": {
+    "phases": [
+      "data_map",
+      "source_document_type",
+      "target_document_type",
+      "rule",
+      "source_transport_profile",
+      "target_transport_profile",
+      "biz_flow"
+    ],
+    "execution": "dependency-aware AgentQ exploration/exploitation with Playwright MCP, Chrome DevTools MCP, HIP Intelligence MCP, Dell AIA text judge and Gemma vision judge"
+  },
+  "api_capture": {
+    "stages": ["form_open", "ui_fill", "blocked_submit_capture"],
+    "transaction_fields": [
+      "phase and UI stage",
+      "method and endpoint template",
+      "redacted request headers and payload",
+      "response status and redacted response headers/body",
+      "MIME type and response capture status",
+      "initiator and source channel",
+      "mutation classification"
+    ],
+    "response_capture_scope": ["XHR", "Fetch", "POST", "PUT", "PATCH", "DELETE", "HTTP errors", "JSON MIME"],
+    "artifacts": [
+      "form_open_api_transactions.json",
+      "ui_fill_api_transactions.json",
+      "form_api_transactions.json",
+      "api_payload_response_index.json",
+      "form_api_payload_response_bundle.json"
+    ]
+  },
+  "safety": {
+    "capture_mode": "POST/PUT/PATCH/DELETE submit traffic is aborted before backend delivery",
+    "submit_response_in_capture_mode": "unavailable by design because the request is not delivered",
+    "write_mode": "requires CLI/UI confirmation plus HIP_ALLOW_API_MUTATION=YES",
+    "persisted_secrets": false,
+    "persisted_authorization": false,
+    "persisted_cookies": false
+  }
+}

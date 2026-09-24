@@ -1,0 +1,18 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260716-214611",
+  "original_gate_pass": false,
+  "deterministic_pass": true,
+  "original_vision_pass": false,
+  "patched_vision_pass": true,
+  "patched_status": "reconciled",
+  "remaining_visible_issues": [],
+  "unsupported_model_issues": [
+    {
+      "field": "checkbox",
+      "expected": "selected",
+      "observed": "not selected",
+      "reason": "generic visual control claim is not bound to an expected input field, row, section, selector, or input path"
+    }
+  ],
+  "patched_combined_gate_pass": true
+}

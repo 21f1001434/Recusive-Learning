@@ -1,0 +1,103 @@
+[
+  {
+    "semantic_control_key": "create_rule.name.name.text",
+    "label": "Name",
+    "section": "Create Rule",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "fill_text"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_rule.rule_type.rule_type.select",
+    "label": "Rule Type",
+    "section": "Create Rule",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_rule.attribute.condition_attr.select",
+    "label": "Attribute",
+    "section": "Create Rule",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_rule.operator.condition_op.select",
+    "label": "Operator",
+    "section": "Create Rule",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_rule.value.condition_value.text",
+    "label": "Value",
+    "section": "Create Rule",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "fill_text"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_rule.add_condition.button",
+    "label": "Add Condition",
+    "section": "Create Rule",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_rule.create.button",
+    "label": "Create",
+    "section": "Create Rule",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click",
+      "create",
+      "mutation_candidate"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_rule.cancel.button",
+    "label": "Cancel",
+    "section": "Create Rule",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  }
+]

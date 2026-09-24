@@ -1,0 +1,5 @@
+{
+  "phase": "rule",
+  "pass": true,
+  "source": "deterministic_local_uat"
+}

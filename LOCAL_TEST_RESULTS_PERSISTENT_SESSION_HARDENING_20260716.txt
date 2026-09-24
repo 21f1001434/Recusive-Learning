@@ -1,0 +1,45 @@
+Persistent Session Hardening — Local Test Results
+Date: 2026-07-16
+
+Compilation
+-----------
+python -m compileall -q hip_id_agent
+PASS
+
+Complete automated suite
+------------------------
+All tests were executed in isolated batches because a single all-at-once invocation exceeded the tool execution window without reporting a failure.
+
+Batch 1: 67 passed
+Batch 2: 71 passed
+Batch 3: 89 passed
+Batch 4: 82 passed
+Total: 309 passed
+
+Covered regressions
+-------------------
+- Single browser/context across all phases
+- Phase evidence directory rebinding without browser closure
+- Same-target navigation suppression
+- Authenticated session reuse without a second SSO prompt
+- Explicit target URL for every HIP phase
+- Safe phase-boundary drawer and overlay cleanup
+- DDS combobox native-select guard
+- Page recovery and observer reinjection
+- Genuine SSO expiry classification
+- Interrupted-phase-only replay
+- Notification API 403 not treated as session expiry
+
+Live validation
+---------------
+No authenticated Dell HIP live rerun was performed in this environment.
+
+Clean extracted package verification
+------------------------------------
+Full ZIP extracted into a new directory.
+Compilation: PASS
+Batch 1: 67 passed
+Batch 2: 71 passed
+Batch 3: 89 passed
+Batch 4: 82 passed
+Total: 309 passed

@@ -1,0 +1,26 @@
+{
+  "kind": "fill",
+  "selector": "label=Name",
+  "point": {
+    "x": 1012,
+    "y": 135,
+    "bbox": {
+      "x": 742.0,
+      "y": 107.8125,
+      "width": 520.0,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "value_length": 10,
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

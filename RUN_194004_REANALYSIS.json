@@ -1,0 +1,49 @@
+{
+  "schema_version": "hip.run-reanalysis.v1",
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260716-194004",
+  "phase_reached": "source_document_type",
+  "data_map_completed": true,
+  "target_document_type_started": false,
+  "source_usage_rows_failed": 5,
+  "source_usage_row_indexes": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "expected_usage_values": [
+    "Flow Identifier Expression",
+    "Logging",
+    "Mapping",
+    "Routing"
+  ],
+  "mcp_option_click_attempts": 30,
+  "mcp_option_click_successes": 0,
+  "mcp_option_click_failures": 30,
+  "ambiguous_option_selectors": [
+    "#dropdown-popup-list-200219577 button:nth-of-type(1)",
+    "#dropdown-popup-list-358135909 button:nth-of-type(1)",
+    "#dropdown-popup-list-402783979 button:nth-of-type(1)",
+    "#dropdown-popup-list-594167474 button:nth-of-type(1)",
+    "#dropdown-popup-list-989121544 button:nth-of-type(1)"
+  ],
+  "empty_usage_delete_key_events": 15,
+  "selected_icon_mutations_seen": 20,
+  "root_causes": [
+    "Option selector used descendant button:nth-of-type(1), which resolved to all nine DDS option buttons and failed Playwright strict mode.",
+    "The driver sent Delete/Backspace while the multi-select search input was empty; DDS interprets this as remove the last selected chip.",
+    "Selected-set extraction omitted aria-checked=true, while this DDS component exposes selection through aria-checked/data-selected and selected icons."
+  ],
+  "fix_scope": [
+    "source_document_type",
+    "target_document_type"
+  ],
+  "patched_behavior": [
+    "Unique option selector uses listbox id plus aria-posinset.",
+    "No destructive key is sent when the search input is empty.",
+    "Each option is added while preserving all previously selected values.",
+    "Final verification reopens the listbox and compares the exact selected option set.",
+    "aria-checked, data-selected, aria-selected, and selected-icon state are recognized."
+  ]
+}

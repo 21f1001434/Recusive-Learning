@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HIP In-Page Mock</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#fafafa}.nav{display:flex;gap:8px;padding:12px;border-bottom:1px solid #ddd;background:white}.nav button{padding:8px 12px}.shell{padding:24px}.toolbar{display:flex;justify-content:space-between;align-items:center}.add{padding:10px 18px;font-weight:700}.panel{margin-top:20px;padding:20px;background:white;border:1px solid #ddd}.hidden{display:none}.picker button{display:block;padding:14px;margin:8px 0}.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs button{padding:8px 12px}label{display:block;margin:12px 0}input{padding:8px;width:360px}
+</style></head>
+<body>
+<div class="nav" id="nav"></div>
+<div class="shell">
+  <div class="toolbar"><h1 id="title"></h1><button id="page-add" class="add">+ Add</button></div>
+  <div id="listing" class="panel">Listing surface</div>
+  <div id="picker" class="panel picker hidden"><strong>Choose BizFlow template</strong><button id="biz-template">Create BizFlow</button></div>
+  <div id="form" class="panel hidden"><div id="tabs" class="tabs hidden"><button>Details</button><button>Routing</button><button>Deployment</button></div><label>Name <input id="name" aria-label="Name"></label><button id="nested-add">+ Add Row</button><div id="row-count">Rows: 1</div></div>
+</div>
+<script>
+const sections=['Data Maps','Document Types','Rules','Transport Profiles','BizFlow']; let current=sections[0];
+const nav=document.getElementById('nav'), title=document.getElementById('title'), listing=document.getElementById('listing'), picker=document.getElementById('picker'), form=document.getElementById('form'), tabs=document.getElementById('tabs');
+function render(){title.textContent=current; listing.classList.remove('hidden'); picker.classList.add('hidden'); form.classList.add('hidden'); tabs.classList.add('hidden'); document.getElementById('name').value='';}
+for(const s of sections){const b=document.createElement('button');b.textContent=s;b.dataset.section=s;b.onclick=()=>{current=s;render()};nav.appendChild(b)}
+document.getElementById('page-add').onclick=()=>{listing.classList.add('hidden'); if(current==='BizFlow'){picker.classList.remove('hidden')}else{form.classList.remove('hidden')}};
+document.getElementById('biz-template').onclick=()=>{picker.classList.add('hidden');form.classList.remove('hidden');tabs.classList.remove('hidden')};
+let rows=1;document.getElementById('nested-add').onclick=()=>{rows++;document.getElementById('row-count').textContent='Rows: '+rows};render();
+</script></body></html>

@@ -1,0 +1,53 @@
+HIP Portal Agent v1.9.6 — Step 8 Certification
+Date: 2026-09-02
+
+Scope
+-----
+This release hardens nested detached-surface continuity after the v1.9.5
+continuous surface lease. It carries proven structural provenance across
+menu -> dialog -> drawer/listbox/confirmation transitions and prevents
+continuation actions from escaping to same-named global page controls.
+
+Implemented behavior
+--------------------
+- AutoWebGLM remains the primary browser-decision policy layer.
+- Existing semantic affordance, repeatable-row identity, compound-menu,
+  detached-overlay provenance, virtualized option scrolling and v1.9.5
+  surface-continuity lease remain enabled.
+- BrowserSession maintains a bounded structural surface ancestry chain.
+- Maximum nested surface chain depth: 8.
+- Continuation intents prefer the deepest still-proven child surface:
+  Edit, Clone, Migrate, Deploy, Delete, Save, Create, Next, Back, Close,
+  Retry, Upload and Download.
+- If a valid active child does not contain the requested continuation action,
+  execution fails closed; no global same-named fallback is allowed.
+- A newly opened child inherits provenance only from the exact structural
+  surface delta caused by the proven opener/action.
+- When a child closes, it is pruned and the nearest still-visible parent is
+  re-proven before further execution.
+- The ancestry chain is cleared on HIP module navigation.
+- Surface ancestry evidence is structural only; customer-entered values are
+  not stored in the chain.
+- Mutation actions remain subject to the existing mutation-governance gate.
+
+Verification
+------------
+Focused semantic compatibility + v1.9.6 tests: 20 / 20 PASS
+Working tree full regression: 753 / 753 PASS
+Candidate ZIP fresh extraction full regression: 753 / 753 PASS
+Python AST validation: 202 files PASS
+JavaScript syntax: app.js PASS, server.js PASS, platform.js PASS
+FastAPI /health: HTTP 200
+FastAPI /api/sections: HTTP 200
+FastAPI /api/runtime/status: HTTP 200
+Python package version: 1.9.6
+Python wheel build: PASS
+
+Environment boundary
+--------------------
+The authenticated Dell SSO/HIP production DOM, corporate Microsoft Edge
+policies, live DDS/CDK widgets, Dell AIA endpoints and Windows-only PyAutoGUI
+cannot be exercised from this Linux execution environment. The host Python
+environment also does not contain all target-pinned AutoGen/Browser-Use
+packages and contains unrelated dependency conflicts, so global host
+`pip check` is not represented as a release pass.

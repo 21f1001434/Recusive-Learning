@@ -1,0 +1,1628 @@
+{
+  "phase": "source_document_type",
+  "phase_label": "Source Document Type",
+  "status": "failed",
+  "strict_replication_gate": {
+    "surface_gate": {
+      "phase": "source_document_type",
+      "dom_text_files": [
+        "/mnt/data/run152803/UHAUL-POASN-FULL-DUMMY-20260716-152803/source_document_type/dom_snapshots/doctype_add_form_after_dummy_fill_no_save.txt",
+        "/mnt/data/run152803/UHAUL-POASN-FULL-DUMMY-20260716-152803/source_document_type/dom_snapshots/doctype_add_form_opened.txt",
+        "/mnt/data/run152803/UHAUL-POASN-FULL-DUMMY-20260716-152803/source_document_type/dom_snapshots/doctypes_listing_before_add.txt"
+      ],
+      "surface": "listing_or_lost_create_surface",
+      "filled_form_detected": false,
+      "fatal": [
+        "Document Type after-fill evidence is not the proven Create Document Type form (filters_or_listing_surface); listing/filter/background controls cannot satisfy the phase."
+      ],
+      "warnings": [],
+      "doctype_surface_classifier": {
+        "pass": false,
+        "reason": "filters_or_listing_surface",
+        "missing_markers": [
+          "heading",
+          "details",
+          "identifier",
+          "attributes",
+          "cancel",
+          "submit_present"
+        ],
+        "markers": {
+          "heading": false,
+          "details": false,
+          "identifier": false,
+          "attributes": false,
+          "name": true,
+          "transaction_type": true,
+          "version": true,
+          "data_format": true,
+          "cancel": false,
+          "submit_present": false
+        },
+        "filters_open": false,
+        "listing_only": true,
+        "surface_text_sample": "Developer MCP Blogs Open Source Community A Home BizLink SecureLink BizExchange TransTrack BizMon Navigation expanded Document Types Document Type is a metadata structure template which allows for consistent properties and settings across various document type.Learn More Filter Manage Columns Add Document Type Name Data Format Type Transaction Type Latest Version Validation Type Available Environments a-doc-type-test XML payment 3.0 Structure DEV TEST1 TEST2 PROD Abbvie_997_DocType EDIX12 997 1.0 Structure DEV Abbvie_SRC_DocType EDIX12 850 3.0 Structure DEV Abbvie_SRC_DocType_IN EDIX12 850 1.0 Structure DEV Abbvie_TRGT_Doctype XML XML 1.0 Structure DEV Abbvie_TRGT_Doctype_IN XML XML 1.0 Structure DEV abc_DocType XML catalog 1.0 Structure DEV ABNAMRO_XML_CATALOG_DOCTYPE XML catalog-832 1.0 Structure DEV aic-sap-invoice-response XML invoice 1.0 Structure DEV aic-test-invoice-sourcedoctype XML invoice 4.0 Structure DEV Showing 6 of 6 columns. 10 rows available Items per page 10 20 40 60 80 100 1 - 10 of 619 items Previous Page of 62 Next ABNAMRO_XML_CATALOG_DOCTYPE AIC_SAP_INVOICE AL-IN-ORDERS ALSTERARBEIT_IN_XML_CXML_DOC ALSTERARBEIT_PASSTHROUGH_XML_CAL ANSIX12_850_PO_00400_997_OB AN"
+      }
+    },
+    "dummy_value_leaks": [],
+    "upload_gate": {
+      "upload_attempts": 0,
+      "accepted_uploads": 0,
+      "uploads": [],
+      "fatal": []
+    },
+    "validation_gate": {
+      "blocking": [],
+      "accepted_nonblocking": [],
+      "object_resolution": {}
+    },
+    "fatal": [
+      "Document Type after-fill evidence is not the proven Create Document Type form (filters_or_listing_surface); listing/filter/background controls cannot satisfy the phase."
+    ],
+    "warnings": []
+  },
+  "run_dir": "/mnt/data/run152803/UHAUL-POASN-FULL-DUMMY-20260716-152803/source_document_type",
+  "summary_status": "completed",
+  "counts": {
+    "dummy_fill_attempts": 23,
+    "required_fields": 20,
+    "dropdowns": 2,
+    "dropdowns_with_options": 1,
+    "form_controls": 23
+  },
+  "required_fields_sample": [
+    {
+      "index": 0,
+      "tag": "input",
+      "type": "text",
+      "role": "",
+      "label": "Name",
+      "id": "dds-form-field-700584416",
+      "name": "name",
+      "placeholder": "Name",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-700584416",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 340,
+        "y": 243.1999969482422,
+        "width": 802.6500244140625,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "document_type_name",
+      "recommended_value": "XML_DellAutoASN_10_U-HAUL_ANS_IB"
+    },
+    {
+      "index": 3,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Data Format Type",
+      "id": "dds-form-field-207242909",
+      "name": "",
+      "placeholder": "Data Format Type",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-207242909",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 2446.625,
+        "y": 247.1999969482422,
+        "width": 381.32501220703125,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "format",
+      "recommended_value": "XML"
+    },
+    {
+      "index": 5,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Operation",
+      "id": "dds-form-field-860387101",
+      "name": "",
+      "placeholder": "Operation",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-860387101",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 368,
+        "y": 578.125,
+        "width": 1204,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "document_identifier_operation",
+      "recommended_value": "All conditions are satisfied"
+    },
+    {
+      "index": 6,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Derived From",
+      "id": "dds-form-field-249890964",
+      "name": "",
+      "placeholder": "Derived From",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-249890964",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 360,
+        "y": 671.3250122070312,
+        "width": 781.3250122070312,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "document_identifier_derived_from",
+      "recommended_value": "TRANSACTION_ROOT_ELEMENT"
+    },
+    {
+      "index": 7,
+      "tag": "input",
+      "type": "text",
+      "role": "",
+      "label": "Attribute Name",
+      "id": "dds-form-field-360847468",
+      "name": "attributeName",
+      "placeholder": "Attribute Name",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "Receiver",
+      "selector": "input#dds-form-field-360847468",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 360,
+        "y": 841.0499877929688,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_name",
+      "recommended_value": "Receiver"
+    },
+    {
+      "index": 8,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Derived From",
+      "id": "dds-form-field-627098602",
+      "name": "",
+      "placeholder": "Derived From",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-627098602",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 976,
+        "y": 841.0499877929688,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_derived_from",
+      "recommended_value": "ELEMENT_IN_PAYLOAD"
+    },
+    {
+      "index": 9,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Usage",
+      "id": "dds-form-field-830052718",
+      "name": "",
+      "placeholder": "Usage",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-830052718",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 1592,
+        "y": 841.0499877929688,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_usage",
+      "recommended_value": "Flow Identifier Expression, Logging, Mapping, Routing"
+    },
+    {
+      "index": 10,
+      "tag": "input",
+      "type": "text",
+      "role": "",
+      "label": "Attribute Name",
+      "id": "dds-form-field-673372969",
+      "name": "attributeName",
+      "placeholder": "Attribute Name",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "Sender",
+      "selector": "input#dds-form-field-673372969",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 360,
+        "y": 894.25,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_name",
+      "recommended_value": "Sender"
+    },
+    {
+      "index": 11,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Derived From",
+      "id": "dds-form-field-301716891",
+      "name": "",
+      "placeholder": "Derived From",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-301716891",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 976,
+        "y": 894.25,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_derived_from",
+      "recommended_value": "ELEMENT_IN_PAYLOAD"
+    },
+    {
+      "index": 12,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Usage",
+      "id": "dds-form-field-927002045",
+      "name": "",
+      "placeholder": "Usage",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-927002045",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 1592,
+        "y": 894.25,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_usage",
+      "recommended_value": "Flow Identifier Expression, Logging, Mapping, Routing"
+    },
+    {
+      "index": 13,
+      "tag": "input",
+      "type": "text",
+      "role": "",
+      "label": "Attribute Name",
+      "id": "dds-form-field-535690706",
+      "name": "attributeName",
+      "placeholder": "Attribute Name",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "Transaction Type",
+      "selector": "input#dds-form-field-535690706",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 360,
+        "y": 947.4500122070312,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_name",
+      "recommended_value": "Transaction Type"
+    },
+    {
+      "index": 14,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Derived From",
+      "id": "dds-form-field-846905238",
+      "name": "",
+      "placeholder": "Derived From",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-846905238",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 976,
+        "y": 947.4500122070312,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_derived_from",
+      "recommended_value": "TRANSACTION_ROOT_ELEMENT"
+    },
+    {
+      "index": 15,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Usage",
+      "id": "dds-form-field-716001761",
+      "name": "",
+      "placeholder": "Usage",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-716001761",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 1592,
+        "y": 947.4500122070312,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_usage",
+      "recommended_value": "Flow Identifier Expression, Logging, Mapping, Routing"
+    },
+    {
+      "index": 16,
+      "tag": "input",
+      "type": "text",
+      "role": "",
+      "label": "Attribute Name",
+      "id": "dds-form-field-951357384",
+      "name": "attributeName",
+      "placeholder": "Attribute Name",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "Business Identifier",
+      "selector": "input#dds-form-field-951357384",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 360,
+        "y": 1000.6500244140625,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_name",
+      "recommended_value": "Business Identifier"
+    },
+    {
+      "index": 17,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Derived From",
+      "id": "dds-form-field-822316218",
+      "name": "",
+      "placeholder": "Derived From",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-822316218",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 976,
+        "y": 1000.6500244140625,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_derived_from",
+      "recommended_value": "ELEMENT_IN_PAYLOAD"
+    },
+    {
+      "index": 18,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Usage",
+      "id": "dds-form-field-443928682",
+      "name": "",
+      "placeholder": "Usage",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-443928682",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 1592,
+        "y": 1000.6500244140625,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_usage",
+      "recommended_value": "Flow Identifier Expression, Logging, Mapping, Routing"
+    },
+    {
+      "index": 19,
+      "tag": "input",
+      "type": "text",
+      "role": "",
+      "label": "Attribute Name",
+      "id": "dds-form-field-554449941",
+      "name": "attributeName",
+      "placeholder": "Attribute Name",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "Alternate Business Identifier",
+      "selector": "input#dds-form-field-554449941",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 360,
+        "y": 1053.8499755859375,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_name",
+      "recommended_value": "Alternate Business Identifier"
+    },
+    {
+      "index": 20,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Derived From",
+      "id": "dds-form-field-554181980",
+      "name": "",
+      "placeholder": "Derived From",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-554181980",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 976,
+        "y": 1053.8499755859375,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_derived_from",
+      "recommended_value": "ELEMENT_IN_PAYLOAD"
+    },
+    {
+      "index": 21,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Usage",
+      "id": "dds-form-field-629943025",
+      "name": "",
+      "placeholder": "Usage",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-629943025",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 1592,
+        "y": 1053.8499755859375,
+        "width": 576,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "attribute_usage",
+      "recommended_value": "Flow Identifier Expression, Logging, Mapping, Routing"
+    },
+    {
+      "index": 22,
+      "tag": "input",
+      "type": "text",
+      "role": "combobox",
+      "label": "Validation Type",
+      "id": "dds-form-field-964710718",
+      "name": "",
+      "placeholder": "Validation Type",
+      "ariaLabel": "",
+      "required": true,
+      "disabled": false,
+      "readonly": false,
+      "value": "",
+      "selector": "input#dds-form-field-964710718",
+      "options": [],
+      "visible": true,
+      "boundingBox": {
+        "x": 340,
+        "y": 1219.2249755859375,
+        "width": 802.6500244140625,
+        "height": 49.20000076293945
+      },
+      "dom_events_to_try": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "mapped_document_type_key": "validation_type",
+      "recommended_value": "Structure"
+    }
+  ],
+  "dummy_fill_attempts_sample": [
+    {
+      "field": "document_type_name",
+      "label": "Name",
+      "selector": "input#dds-form-field-700584416",
+      "value_redacted": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "transaction_type",
+      "label": "Transaction Type",
+      "selector": "input#dds-form-field-753019415",
+      "value_redacted": "856",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 5,
+      "deterministic_plan_node": "source_document_type.document_type_details.transaction_type",
+      "brain_node_id": "source_document_type.document_type_details.transaction_type",
+      "brain_confidence": 0.0,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:Document Type Details:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "document_type_version",
+      "label": "Version",
+      "selector": "input#dds-form-field-480287113",
+      "value_redacted": "1",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "format",
+      "label": "Data Format Type",
+      "selector": "input#dds-form-field-207242909",
+      "value_redacted": "XML",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "description",
+      "label": "Description",
+      "selector": "textarea#dds-form-field-429707957",
+      "value_redacted": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 13,
+      "deterministic_plan_node": "source_document_type.source_document_type.description",
+      "brain_node_id": "source_document_type.source_document_type.description",
+      "brain_confidence": 0.25,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "document_identifier_operation",
+      "label": "Operation",
+      "selector": "input#dds-form-field-860387101",
+      "value_redacted": "All conditions are satisfied",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "document_identifier_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-249890964",
+      "value_redacted": "TRANSACTION_ROOT_ELEMENT",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-627098602",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-301716891",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-846905238",
+      "value_redacted": "TRANSACTION_ROOT_ELEMENT",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-822316218",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-554181980",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-360847468",
+      "value_redacted": "Receiver",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-673372969",
+      "value_redacted": "Sender",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-535690706",
+      "value_redacted": "Transaction Type",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-951357384",
+      "value_redacted": "Business Identifier",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-554449941",
+      "value_redacted": "Alternate Business Identifier",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "validation_type",
+      "label": "Validation Type",
+      "selector": "input#dds-form-field-964710718",
+      "value_redacted": "Structure",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 19,
+      "deterministic_plan_node": "source_document_type.document_type_details.validation_type",
+      "brain_node_id": "source_document_type.document_type_details.validation_type",
+      "brain_confidence": 0.0,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:Document Type Details:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-830052718",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-927002045",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-716001761",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-443928682",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-629943025",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    }
+  ],
+  "all_attempts": [
+    {
+      "field": "document_type_name",
+      "label": "Name",
+      "selector": "input#dds-form-field-700584416",
+      "value_redacted": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "transaction_type",
+      "label": "Transaction Type",
+      "selector": "input#dds-form-field-753019415",
+      "value_redacted": "856",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 5,
+      "deterministic_plan_node": "source_document_type.document_type_details.transaction_type",
+      "brain_node_id": "source_document_type.document_type_details.transaction_type",
+      "brain_confidence": 0.0,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:Document Type Details:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "document_type_version",
+      "label": "Version",
+      "selector": "input#dds-form-field-480287113",
+      "value_redacted": "1",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "format",
+      "label": "Data Format Type",
+      "selector": "input#dds-form-field-207242909",
+      "value_redacted": "XML",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "description",
+      "label": "Description",
+      "selector": "textarea#dds-form-field-429707957",
+      "value_redacted": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 13,
+      "deterministic_plan_node": "source_document_type.source_document_type.description",
+      "brain_node_id": "source_document_type.source_document_type.description",
+      "brain_confidence": 0.25,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "document_identifier_operation",
+      "label": "Operation",
+      "selector": "input#dds-form-field-860387101",
+      "value_redacted": "All conditions are satisfied",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "document_identifier_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-249890964",
+      "value_redacted": "TRANSACTION_ROOT_ELEMENT",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-627098602",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-301716891",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-846905238",
+      "value_redacted": "TRANSACTION_ROOT_ELEMENT",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-822316218",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_derived_from",
+      "label": "Derived From",
+      "selector": "input#dds-form-field-554181980",
+      "value_redacted": "ELEMENT_IN_PAYLOAD",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-360847468",
+      "value_redacted": "Receiver",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-673372969",
+      "value_redacted": "Sender",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-535690706",
+      "value_redacted": "Transaction Type",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-951357384",
+      "value_redacted": "Business Identifier",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_name",
+      "label": "Attribute Name",
+      "selector": "input#dds-form-field-554449941",
+      "value_redacted": "Alternate Business Identifier",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 18,
+      "deterministic_plan_node": "source_document_type.source_document_type.attribute_name",
+      "brain_node_id": "source_document_type.source_document_type.attribute_name",
+      "brain_confidence": 0.625,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:source_document_type:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "validation_type",
+      "label": "Validation Type",
+      "selector": "input#dds-form-field-964710718",
+      "value_redacted": "Structure",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": true,
+      "deterministic_plan_order": 19,
+      "deterministic_plan_node": "source_document_type.document_type_details.validation_type",
+      "brain_node_id": "source_document_type.document_type_details.validation_type",
+      "brain_confidence": 0.0,
+      "plan_executor": "playwright-mcp",
+      "plan_preconditions": [
+        "tab:Document Type Details:active"
+      ],
+      "plan_expected_effects": [
+        "exact selected/typed value visible in live DOM",
+        "value remains unchanged after section rerender"
+      ]
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-830052718",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-927002045",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-716001761",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-443928682",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    },
+    {
+      "field": "attribute_usage",
+      "label": "Usage",
+      "selector": "input#dds-form-field-629943025",
+      "value_redacted": "Flow Identifier Expression, Logging, Mapping, Routing",
+      "filled": false,
+      "dom_events": [
+        "input",
+        "change",
+        "blur"
+      ],
+      "deterministic_plan_used": false
+    }
+  ],
+  "actual_state": {
+    "controls": [
+      {
+        "selector": "input#dds-form-field-480287113",
+        "label": "Version",
+        "value": "1.0",
+        "evidence": "captured_form_inventory",
+        "disabled": true,
+        "required": false
+      },
+      {
+        "selector": "input#dds-form-field-360847468",
+        "label": "Attribute Name",
+        "value": "Receiver",
+        "evidence": "captured_form_inventory",
+        "disabled": false,
+        "required": true
+      },
+      {
+        "selector": "input#dds-form-field-673372969",
+        "label": "Attribute Name",
+        "value": "Sender",
+        "evidence": "captured_form_inventory",
+        "disabled": false,
+        "required": true
+      },
+      {
+        "selector": "input#dds-form-field-535690706",
+        "label": "Attribute Name",
+        "value": "Transaction Type",
+        "evidence": "captured_form_inventory",
+        "disabled": false,
+        "required": true
+      },
+      {
+        "selector": "input#dds-form-field-951357384",
+        "label": "Attribute Name",
+        "value": "Business Identifier",
+        "evidence": "captured_form_inventory",
+        "disabled": false,
+        "required": true
+      },
+      {
+        "selector": "input#dds-form-field-554449941",
+        "label": "Attribute Name",
+        "value": "Alternate Business Identifier",
+        "evidence": "captured_form_inventory",
+        "disabled": false,
+        "required": true
+      }
+    ],
+    "visible_text": "Dell Technologies Developer Developer MCP Blogs Open Source Community Search Activities A Adheesh Srivastava Adheesh.Srivastava@dellteam.com Contact Us Sign Out Home BizLink Partners Systems SecureLink Data Maps Document Types Rules Transport Profiles BizExchange Biz Flows Batch TransTrack Firewall Utility Track and Trace BizMon Certificate Monitor Health Monitor Service Account Monitor Transaction Manager Support Notifications Navigation expanded Loading... Document Types Document Type is a metadata structure template which allows for consistent properties and settings across various document type. Learn more Shows the detailed information page for this item, including descriptions, documentation, and helpful guidance to understand its purpose and usage. Back Filter Manage Columns Back Manage Columns Selected columns show on the table. Unselect a column to hide it. This may affect data displayed in the table. No results found for \"\". Check spelling or search another term. Select at least one column to continue. Apply changes Cancel Add Document Type Name Unsorted Ascending Descending Data Format Type Unsorted Ascending Descending Transaction Type Unsorted Ascending Descending Latest Version Unsorted Ascending Descending Validation Type Unsorted Ascending Descending Available Environments Unsorted Ascending Descending a-doc-type-test XML payment 3.0 Structure DEV DEV TEST1 TEST1 TEST2 TEST2 PROD PROD Abbvie_997_DocType EDIX12 997 1.0 Structure DEV DEV Abbvie_SRC_DocType EDIX12 850 3.0 Structure DEV DEV Abbvie_SRC_DocType_IN EDIX12 850 1.0 Structure DEV DEV Abbvie_TRGT_Doctype XML XML 1.0 Structure DEV DEV Abbvie_TRGT_Doctype_IN XML XML 1.0 Structure DEV DEV abc_DocType XML catalog 1.0 Structure DEV DEV ABNAMRO_XML_CATALOG_DOCTYPE XML catalog-832 1.0 Structure DEV DEV aic-sap-invoice-response XML invoice 1.0 Structure DEV DEV aic-test-invoice-sourcedoctype XML invoice 4.0 Structure DEV DEV Showing 6 of 6 columns. 10 rows available Items per page 10 20 40 60 80 100 1 - 10 of 619 items Previous Page of 62 Next Back Filters Use filters to narrow down results and find what you\u2019re looking for faster Document Type Name ABNAMRO_XML_CATALOG_DOCTYPE AIC_SAP_INVOICE AL-IN-ORDERS ALSTERARBEIT_IN_XML_CXML_DOC ALSTERARBEIT_PASSTHROUGH_XML_CAL ANSIX12_850_PO_00400_997_OB ANSIX12_850_PO_004010_997_OB ANSIX12_850_PO_4010_997_OB ANSIX12_850_PO_4010_COMPUCOM_CA_997_OB ANSI_X12_850_004010_AMAZONCA_PRM_IB ANSI_X12_850_004010_AMAZONJP_PRM_IB ANSI_X12_850_004010_AMAZON_ANS_OB ANSI_X12_850_004010_AMAZON_PRM_IB ANSI_X12_850_004010_ARROW_ECS_CA_PRM_IB ANSI_X12_850_004010_ARROW_ECS_US_PRM_IB ANSI_X12_850_004010_ARROW_ECS_US_PRM_OB ANSI_X12_850_004010_AVNET_OEM_PRM_IB ANSI_X12_850_004010_CDW_PO_IB ANSI_X12_850_004010_COMPUCOM_CA_PRM_IB ANSI_X12_850_004010_DANA_FARBER_PRM_IB ANSI_X12_850_004010_MILWAUKEE_PRM_IB ANSI_X12_850_004010_NCR_PRM_IB ANSI_X12_850_004010_PRM_IB ANSI_X12_850_004010_VIZIENT_PRM_IB ANSI_X12_850_004010_VUMC_GHX_PRM_IB ANSI_X12_850_004010_WAL-MART_US_PRM_IB ANSI_X12_850_004010_WINONAHEALTH_PRM_IB ANSI_X12_850_004010_YAKIMAVALLEY_PRM_IB ANSI_X12_850_00401_GHX_IB ANSI_X12_850_00401_VALLEYMEDICAL_PRM_IB ANSI_X12_850_00401_VALLEY_MEDICAL_PRM_IB ANSI_X12_855_004010_ANS_OB ANSI_X12_855_004010_ARROW_CA_PRM_OB ANSI_X12_855_004010_ARROW_US_PRM_OB ANSI_X12_855_004010_CDW_PO_IB ANSI_X12_855_004010_CDW_PRM_OB ANSI_X12_855_004010_COMPUCOM_CA_PRM_OB ANSI_X12_855_004010_DENALI_OB ANSI_X12_855_004010_EPLUS_OB ANSI_X12_855_004010_INGRAM_INDIA_ASN_OB ANSI_X12_855_004010_INGRAM_US_ANS_OB ANSI_X12_855_004010_INSIGHT_CA_ANS_OB ANSI_X12_855_004010_INTCOMEX_NOLA_OB ANSI_X12_855_004010_MCPC_PRM_OB ANSI_X12_855_004010_NEXUS_HEALTH_PRM_OB ANSI_X12_855_004010_OSUNI_PRM_OB ANSI_X12_855_004010_OVERLAKE_PRM_OB ANSI_X12_855_004010_QHS_PRM_OB ANSI_X12_855_00401_BLUUM_USA_INC_ANS_OB ANSI_X12_856_004010_ANS_OB ANSI_X12_856_004010_ARROW_ECS_CA_PRM_OB ANSI_X12_856_004010_COMPUCOM_CA_PRM_OB ANSI_X12_856_004010_DENALI_OB ANSI_X12_856_004010_ITSAVVY_OB ANSI_X12_856_004010_MOREDIRECT_PRM_OB ANSI_X12_856_004010_OHSU_PRM_OB ANSI_X12_856_004010_SAMC_PRM_OB ANSI_X12_856_005010_DENALI_OB ANSI_X12_870_005010_DENALI_OB ANSI_x12_850_004010_INGRAM_NL_PRM_IB ANSI_x12_850_004010_INGRAM_US_PRM_IB ANS_XML_855_INTCOMEX_NOLA_IB ANS_XML_856_DENALI_INTEGRATION_IB ATEA_NORWAY_PASSTHROUGH_DOC_TYPE ATEA_PT_DOCTYPE ATEA_SWEDEN_850_SRC_CXML_DOCTYPE ATEA_SWEDEN_850_TRGT_XML_DOCTYPE ATEA_SWEDEN_CXML_IN_PASSTHROUGH ATT_X12_850_XCBL_SRC_DocType ATT_X12_850_XCBL_TRGT_DocType Abbvie_997_DocType Abbvie_SRC_DocType Abbvie_SRC_DocType_IN Abbvie_TRGT_Doctype Abbvie_TRGT_Doctype_IN BLUUM_USA_INC_EDI_X12_POA_004010_OB BLUUM_USA_INC_XML_xCBL_POA_1.0_IB Boeing_SRC_AutoASN_DocType Boeing_TRGT_cXML_DocType CCI-FED-DOCTYPE CGIT_cXML_Orders_src CSV_832_10_KOHLER_P CSV_CATALOG_10_KOHLER_P CSV_CSV_SRC_DocType CSV_CSV_TRGT_DocType CSV_HRPO_TRGT_DocType CSV_PO_10_AMAZONCA_PRM_OB CSV_PO_10_AMAZONDE_PRM_OB CSV_PO_10_AMAZONJPA_PRM_OB CSV_PO_10_AMAZONJP_PRM_OB CSV_PO_10_AMAZONNL_PRM_OB CSV_PO_10_AMAZON_PRM_OB CSV_PO_10_BEST_BUY_CA_PRM_OB CSV_PO_10_BLOOM_EP_INDIA_PRM_IB CSV_PO_10_BLOOM_EP_INDIA_PRM_OB CSV_PO_10_IMC_INDIA_PRM_IB CSV_PO_10_IMC_INDIA_PRM_OB CSV_PO_10_KRISHNA_INDIA_PRM_IB CSV_PO_10_KRISHNA_INDIA_PRM_OB CSV_PO_10_PREMIER_SP_INDIA_PRM_IB CSV_PO_10_PREMIER_SP_INDIA_PRM_OB CSV_PO_10_PRM_IT_SOLUTIONS_INDIA_PRM_IB CSV_PO_10_PRM_IT_SOLUTIONS_INDIA_PRM_OB CSV_PO_10_RX_INFOTECH_INDIA_PRM_IB CSV_PO_10_RX_INFOTECH_INDIA_PRM_OB CSV_PO_10_SUPERTRON_ELECTRONICS_PRM_IB CSV_PO_10_SUPERTRON_ELECTRONICS_PRM_OB CSV_PO_10_WAL-MART_US_PRM_OB CSV_PO_AMAZONAU_10_OB CSV_PO_AMAZONBR_10_OB CSV_PO_AMAZONES_10_OB CSV_PO_AMAZONUK_10_OB CSV_PO_AMAZON_EMEA_10_OB CSV_xCBL_TRGT_DocType Consume_Pick_Order_Dev DELL_ASN_SRC_Doc_Type DEMO_XML_TRGT_DocType DOUGLAS_STEWART_SRC DOUGLAS_STEWART_TRGT_EDI_DOC DTAG_POA_SRC_Doc_Type Dell_Catalog_XML_XML_src EDF_EDIFACT_DESADVD96A_AMAZONFR_OB EDF_EDIFACT_DESADVD96A_AMAZON_OB EDF_EDIFACT_DESADVD96A_INTEL_P EDF_EDIFACT_DESADVD96A_SYNCREON_P EDF_EDIFACT_DESADV_D96A_DEUTSCHE_ANS_OB EDF_EDIFACT_ORDERSD01B_GRIT_IB EDF_EDIFACT_ORDERSD96A_AMAZONAU_IB EDF_EDIFACT_ORDERSD96A_AMAZONBR_IB EDF_EDIFACT_ORDERSD96A_AMAZONDE_IB EDF_EDIFACT_ORDERSD96A_AMAZONES_IB EDF_EDIFACT_ORDERSD96A_AMAZONNL_IB EDF_EDIFACT_ORDERSD96A_AMAZONUK_IB EDF_EDIFACT_ORDERSD96A_AMAZON_EMEA_IB EDF_EDIFACT_ORDERS_10_BROSE_AG_IB EDF_EDIFACT_ORDERS_10_DATABOX_IB EDF_EDIFACT_ORDERS_10_HOERBIGER_IB EDF_EDIFACT_ORDERS_10_HORSCH_IB EDF_EDIFACT_ORDERS_10_HORSCH_PRM_IB EDF_EDIFACT_ORDERS_10_INTEL_P EDF_EDIFACT_ORDERS_10_OTTO_FUCHS_IB EDF_EDIFACT_ORDERS_10_SWS_IB EDF_EDIFACT_ORDERS_10_VALORISTA_IB EDF_EDIFACT_ORDERS_850_AXIS_IB EDF_EDIFACT_ORDERS_D96A_JB_NZ_PRM_IB EDF_EDIFACT_ORDERS_D97A_APTIV_PRM_IB EDF_EDIFACT_ORDERS_D97A_INGRAM_CH_PRM_IB EDF_EDIFACT_ORDERS_D97A_INGRAM_DE_PRM_IB EDF_EDIFACT_ORDERS_D97A_INGRAM_FR_PRM_IB EDF_EDIFACT_ORDERS_D97A_INGRAM_NL_PRM_IB EDF_EDIFACT_ORDERS_D97A_INGRAM_SE_PRM_IB EDF_EDIFACT_ORDERS_D97A_INGRAM_UK_PRM_IB EDF_EDIFACT_ORDERS_D97A_PRM_IB EDF_EDIFACT_ORDERS_EXERTIS_Ireland_IB EDF_EDIFACT_ORDRSP_D96A_DEUTSCHE_ANS_OB EDI-997 EDIFACT_850_ALSO_DENMARK_SNS_PRM_IB EDI_850_004010_INGRAM_MICRO_FED_PRM_IB EDI_850_DETROIT_EDISON_IB EDI_ANSIX12_POA_DOUGLAS_STEWART_855 EDI_ARROW_CA_850_SRC_OB EDI_ARROW_CA_855_TRGT_OB EDI_ARROW_US_855_TRGT_OB EDI_CAT_10_DOUGLAS_STEWART_COMPANY_IB EDI_CDW_850_SRC_IB EDI_CDW_855_TRGT_OB EDI_COMPUCOM_CA_855_TRGT_OB EDI_COMPUCOM_CA_856_TRGT_OB EDI_EDIFACT_POA_DOUGLAS_STEWART_1.0_OB EDI_INV_10_DOUGLAS_STEWART_COMPANY_IB EDI_MCPC_855_TRGT_OB EDI_NEXUS_HEALTH_855_TRGT_OB EDI_OHSU_855_TRGT_OB EDI_OSU_TRGT_OB EDI_OVERLAKE_TRGT_OB EDI_POA_DESERT_OASIS_HEALTHCARE_10_OB EDI_POA_STAPLES_BUSSINESS_1.0_OB EDI_POA_US_RADIOLOGY_10_OB EDI_PO_10_BEST_BUY_CA_P EDI_PO_10_DESERT_OASIS_HEALTHCARE_IB EDI_PO_10_DETROIT_EDISON_IB EDI_PO_10_DOUGLAS_STEWART_IB EDI_PO_10_EL_CENTRO_MEDICAL_CENTER_IB EDI_PO_10_NEXUS_HEALTH_IB EDI_PO_10_OPTIM_ORTHOPEDICS_IB EDI_PO_10_SOFTCHOICE_IB EDI_PO_10_STAPLES_BUSINESS_IB EDI_PO_10_TYSON_FOODS_IB EDI_PO_10_UNION_PACFIC_IB EDI_PO_10_US_RADIOLOGY_IB EDI_PO_10_WINDSTREAM_IB EDI_PO_10_ZONES_SPS_COMMERCE_IB EDI_PO_NOVANT_HEALTH_IB EDI_QHS_TRGT_OB EDI_SAMC_TRGT_OB EDI_X12_004010_850_INDIANA_UNIVERSITY_IB EDI_X12_810_4010 EDI_X12_810_5010 EDI_X12_810_TEST4 EDI_X12_850_004010_EPLUS_PRM_IB EDI_X12_850_004010_HARRIS_HOSPITAL_IB EDI_X12_850_004010_INTCOMEX_NOLA_PRM_IB EDI_X12_850_4010_IB EDI_X12_ASN_TRAFERA_HOLDINGS_PBSO_10_OB EDI_X12_OSR_TRAFERA_HOLDINGS_PBSO_10_OB EDI_X12_POA_DOUGLAS_STEWART_10_OB EDI_X12_POA_NEXUS_HEALTH_10_OB EDI_X12_POA_NOVANT_HEALTH_10_OB EDI_X12_POA_OPTIM_ORTHOPEDICS_10_OB EDI_X12_POA_SHI_10_OB EDI_X12_POA_STATE_OF_MISSOURI_10_IB EDI_X12_POA_TRAFERA_HOLDINGS_PBSO_10_OB EPICOR_DELL_POAR_XML_SRC_Doc_Type EYTEST_COMPUTACENTER_SRC_XML_DOCTYPE EYTEST_EDI_PO_INTCOMEX_NOLA_IB EYTEST_KELSER_XML_856_DOCTYPE EYTEST_X12_850_PO_4010_IB EYTEST_X12_EDIT_4010_IB EYTEST_XML_PO_INTCOMEX_NOLA_OB EY_856_XML_POA_1_ITSAVVY_EDI_IB EY_856_XML_POA_1_ITSAVVY_EDI_OB EY_ATEA_SWEDEN_CXML_IN_PASSTHROUGH EY_ATEA_SWEDEN_XML_CATALOG_DOCTYPE EY_DOUGLAS_STEWART-SRC_XML-DOCTYPE EY_DOUGLAS_STEWART_TRGT_EDI_DOCTYPE EY_EDF_EDIFACT_ORDERSD96A_AMAZONFR_IB EY_EDF_EDIFACT_ORDERSD96A_AMAZON_EMEA_IB EY_EDI_850_004010_INGRAM_MICRO_FED_IB EY_EDI_850_HARRIS_IB EY_EDI_850_INTCOMEX_NOLA_OB EY_EDI_855_EPLUS_OB EY_EDI_856_DENALI_OB EY_EDI_EDIFACT_ORDERS_D96A_HIFI_AU EY_EDI_X12_850_HARRIS_COUNTY_HOSPITAL_IB EY_EDI_X12_850_INDIANA_UNIVERSITY_IB EY_GOLD_GROUP_WELCOME_LETTER_XML_DOCTYPE EY_TEST_ATEA_SWEDEN_850_SRC_CXML_DOCTYPE EY_TEST_ATEA_SWEDEN_850_TRGT_XML_DOCTYPE EY_TEST_DOUGLAS_STEWART-SRC_XML-DOCTYPE EY_TEST_DOUGLAS_STEWART_TRGT_EDI_DOCTYPE EY_TEST_EDI_POA_DOUGLAS_STEWART_1.0_OB EY_TEST_EDI_PO_NOVANT_HEALTH_IB EY_TEST_HR_PO_10_IMC_INDIA_PRM_OB EY_TEST_OHSU_GHX_ANS_855_ANS_SRC_OB EY_TEST_OHSU_GHX_ANS_855_ANS_TRGT_OB EY_TEST_PRM_PO_10_IMC_INDIA_PRM_OB EY_TEST_XML_POA_DOUGLAS_STEWART_1.0_OB EY_TEST_XML_PO_NOVANT_HEALTH_OB EY_WILLMOTT_DIXON_CATALOG_DOCTYPEBHC_BHC EY_XML_850_INTCOMEX_NOLA_IB EY_XML_B2B_PO_HARRIS_COUNTY_HOSPITAL_OB EY_XML_B2B_PO_INDIANA_UNIVERSITY_OB EY_XML_B2B_PO_V1_INGRAM_MICRO_FED_OB EY_XML_CXML_855_EPLUS_IB EY_XML_CXML_856_DENALI_IB EY_XML_CXML_PO_10_Copaco_PRM_P EY_XML_xCBL_ORDERS_10_TEST_JB_HIFI_NZ_OB EY_XML_xCBL_PurchaseOrder_10_HIFI_AU_OB FF_CATALOG_10_DPDHL_BHC_OB FF_CAT_10_DAIWABO_INFORMATION_SYSTEM_P FF_CAT_10_DOUGLAS_STEWART_COMPANY_OB FF_CAT_COMPUTACENTER_10_OB FF_CAT_DAIWABO_INFORMATION_SYSTEM_10_P FF_HRPO_10_AMAZONCA_PRM_OB FF_HRPO_10_AMAZONJPA_PRM_OB FF_HRPO_10_AMAZONJP_PRM_OB FF_HRPO_10_AMAZON_EMEA_PRM_OB FF_HRPO_10_AMAZON_PRM_OB FF_HRPO_10_WAL-MART_US_IB FF_HR_PO_10_AMAZONAU_PRM_OB FF_HR_PO_10_AMAZONBR_PRM_OB FF_HR_PO_10_AMAZONES_PRM_OB FF_HR_PO_10_AMAZONFR_PRM_OB FF_HR_PO_10_AMAZONNL_PRM_OB FF_HR_PO_10_AMAZONUK_PRM_OB FF_HR_PO_10_AMAZON_DE_PRM_OB FF_HR_PO_10_BLOOM_EP_INDIA_PRM_OB FF_INV_10_DAIWABO_INFORMATION_SYSTEM_P FF_INV_10_DOUGLAS_STEWART_COMPANY_OB FF_INV_DAIWABO_INFORMATION_SYSTEM_10_P FRESENIUS_AG G-REGRESSION-DOCUMENT-TEST-1 HR_PO_10_BEST_BUY_CA_PRM_OB HR_PO_10_IMC_INDIA_PRM_OB HR_PO_10_KRISHNA_INDIA_PRM_OB HR_PO_10_PREMIER_SP_INDIA_PRM_OB HR_PO_10_PRM_IT_SOLUTIONS_INDIA_PRM_OB HR_PO_10_RX_INFOTECH_INDIA_PRM_OB HR_PO_10_SUPERTRON_ELECTRONICS_PRM_OB Helmholtz_DELLCiPMRPOXX07C_SRC_DOCTYPE Helmholtz_DELLCiPMRPOXX07C_TRGT_DOCTYPE IMC_INDIA_SRC_DOCTYPE IMC_INDIA_TRGT_DOCTYPE INDRET_SRC_DOCTYPE INDRET_TRGT_DOCTYPE INGRAM_DELLCi85041EXAAC_SRC_DOCTYPE INGRAM_DELLCi85041EXAAC_TRGT_DOCTYPE INGRAM_MICRO_INDIA_DOCTYPE INVENTORY_CNTTYP INVENTORY_CNTTYP_TARGET IN_810_DATA IN_FLAT_DATA KOHLER_CSV_CATALOG_1_P Loom1_sr_doc Loom1_tg_doc MICROCENTER_CSV_DOCTYPE Mapping-1_GHX Novora_XML_810 OMEGA_OAG_INVXML PC1_DC_doc-type-test PO-850-AMDOC PRM_PO_10_BEST_BUY_CA_IB PRM_PO_10_BEST_BUY_CA_OB PRM_PO_10_IMC_INDIA_PRM_OB PRM_PO_10_KRISHNA_INDIA_PRM_OB PRM_PO_10_PREMIER_SP_INDIA_PRM_OB PRM_PO_10_PRM_IT_SOLUTIONS_INDIA_PRM_OB PRM_PO_10_RX_INFOTECH_INDIA_PRM_OB PRM_PO_10_SUPERTRON_ELECTRONICS_PRM_OB ReadJson SASOL_PO_XML_DOCTYPE SNPickOrderV1 SN_Pick_Dynamic SN_Pick_Kafka_Payload_Dynamic SN_Pick_Order_1 SN_Pick_Order_2 SN_Pick_Order_Dev SRC_Dell_B2B_Catalog_XML STAPLES_SRC_XML_DOCTYPE STAPLES_TRGT_DOCTYPE SUPERTRON_CSV_IB_DOCTYPE Staples-850-SRC-DocType Staples-850-xml-TRGT-DocType TDSY_cXML_Orders_src TECHDATA_EMEA_SPL_DOCTYPE_SRC TECHDATA_EMEA_SPL_DOCTYPE_TRGT TESTEY_APTIV_FR_EDIFACT_SRC TESTEY_APTIV_FR_XBL_TRG TESTEY_CSV_PO_10_BLOOM_EP_INDIA_PRM_IB TESTEY_CSV_PO_10_BLOOM_EP_INDIA_PRM_OB TESTEY_CSV_PO_AMAZON_FR_10_OB TESTEY_FF_HR_PO_10_AMAZON_FR_PRM_OB TESTEY_FF_HR_PO_10_BLOOM_EP_INDIA_PRM_OB TESTEY_TECHDATA_UK_SRC_XML_DOCTYPE TESTEY_TECHDATA_UK_TRGT_XML_DOCTYPE TESTEY_U-HAUL_ASN_856_SRC_XML_DOCTYPE TESTEY_U-HAUL_ASN_856_TRGT_XML_DOCTYPE TESTEY_U-HAUL_POMOD_SRC_XML_DOCTYPE TESTEY_U-HAUL_POMOD_TRGT_XML_DOCTYPE TESTEY_WILLMOTTDIXON_XML_CATALOG_DOCTYPE TESTEY_WINONAHEALTH_RECEIVER_EDI_DOCTYPE TESTEY_WINONAHEALTH_SENDER_XML_DOCTYPE TESTEY_WINONAHEALTH_SRC_XML_DOCTYPE TESTEY_WINONAHEALTH_TRGT_EDI_DOCTYPE TESTEY_WINONA_HEALTH_RECEIVER_EDI_DT TESTEY_WINONA_HEALTH_SENDER_XML_DOCTYPE TESTEY_X12_850_PO_4010_ACC TESTEY_XML_xCBL_PO_10_AMAZON_FR_PRM_OB TEST_CSV_SEND TEST_DOUGLAS TEST_EY_850_ALSO_Germany_Actebis_SRC TEST_EY_850_ALSO_Germany_Actebis_TRGT TEST_EY_ALSTERARBEIT_IN_XML_Map_ID_SRC TEST_TEXT_REC TEST_TYPE TEY_XML_xCBL_PO_10_BLOOM_EP_INDIA_PRM_OB Test_EY_ATEA_NORWAY_XML_CATALOG_DOCTYPE Test_EY_ATEA_SWEDEN_XML_CATALOG_DOCTYPE U-HAUL_POACK_SRC_XML_DOCTYPE U-HAUL_POACK_TRGT_XML_DOCTYPE U-HAUL_POACK_XML_POA_10_OB U-HAUL_POACK_XML_xCBL_POA_10_IB U-HAUL_POMOD_SRC_XML_DOCTYPE U-HAUL_POMOD_TRGT_XML_DOCTYPE U-HAUL_POMOD_XML_POM_10_OB U-HAUL_XML_xCBL_POA_10_IB WILLMOTT_DIXON_XML_CXML_CATALOG_1.0_P WILLMOTT_XML.DocType WINONAHEALTH_SRC_XML_DOCTYPE WINONAHEALTH_TRGT_EDI_DOCTYPE X12_850_004010_PC_CONNECTION_PRM_IB X12_850_004010_PROVIDENCE_ST_JSPH_PRM_IB X12_850_004010_SARASOTA_MEMORIAL_PRM_IB X12_850_004010_SE_GEORGIA_HEALTH_PRM_IB X12_850_004010_UAMS_WD_GHX_PRM_IB X12_850_004010_UNIVERSAL_HEALTH_ANS_OB X12_850_004010_UNIVERSAL_HEALTH_PRM_IB X12_850_004010_UNIVKENTUCKY_GHX_PRM_IB X12_850_004010_UNIVWASHINGTON_GHX_PRM_IB X12_850_PO_4010_997_OB X12_850_PO_4010_CSV_OB X12_850_PO_4010_HRPO_OB X12_850_PO_4010_IB X12_850_PO_4010_OB X12_EDIT_4010_IB XCBL_PURCHASEORDER XML_10_GOLD_GROUP_WL_PRM_P XML_10_HORSCH_PRM_OB XML_10_SASOL_PRM_IB XML_832_10_ALSTERARBEIT_PRM_P XML_850_10_ATEA_SWEDEN_PRM_IB XML_850_10_ATEA_SWEDEN_PRM_OB XML_850_10_ATEA_SWEDEN_PRM_P XML_850_10_DATABOX_OB XML_850_10_SWS_OB XML_850_10_VALORISTA_OB XML_856_10_KELSER_PRM_P XML_ARROW_CA_850_TRGT_DOC_OB XML_ARROW_CA_855_SRC_DOC_OB XML_ARROW_US_855_SRC_DOC_OB XML_ASN_856_ITSAVVY_ANS_IB XML_ASN_TRAFERA_HOLDINGS_PBSO_10_IB XML_B2BXML_CATALOG_10_CEMA_AG_BHC_IB XML_B2BXML_CATALOG_10_CEMA_AG_BHC_OB XML_B2BXML_CATALOG_10_DPDHL_BHC_IB XML_B2B_PO_V1_INGRAM_MICRO_FED_OB XML_CATALOG_10_ATEA_NO_BHC_P XML_CATALOG_10_ATEA_SE_BHC_P XML_CATALOG_10_WILLMOTT_DIXON_BHC_P XML_CAT_COMPUTACENTER_10_IB XML_CDW_850_TRGT_DOC_IB XML_CDW_855_SRC_DOC_OB XML_CEDI_POA_DOUGLAS_STEWART_1.0_OB XML_CEDI_POA_DOUGLAS_STEWART_1.0_OB_V2 XML_COMPUCOM_CA_855_SRC_DOC_OB XML_COMPUCOM_CA_856_SRC_DOC_OB XML_CXML_PO_10_Copaco_PRM_P XML_CXML_PO_10_INTCOMEX_NOLA_PRM_OB XML_CXML_PO_10_TD_SYNNEX_PRM_IB XML_CXML_PO_11_PRM_IB XML_CXML_PO_11_PRM_OB XML_CXML_PO_12_TECHDATA_AT_FMPRO_IB XML_CXML_PO_12_TECHDATA_AT_SPL_IB XML_CXML_PO_12_TECHDATA_EMEA_IB XML_CXML_PO_12_TECHDATA_ES_SPL_IB XML_CXML_PO_12_TECHDATA_IE_SPL_IB XML_CXML_PO_12_TECHDATA_PT_SPL_IB XML_DellAutoASN_10_ANS_IB XML_DellAutoASN_10_U-HAUL_ANS_IB XML_DellPOA_10_AMAZON_ANS_IB XML_DellPOA_10_ANS_IB XML_DellPOA_10_BLUUM_USA_INC_ANS_IB XML_DellPOA_10_INGRAM_MICRO_US_ANS_IB XML_DellPOA_10_TECHDATA_UK_ANS_IB XML_DellPOA_10_U-HAUL_ANS_IB XML_DellPOA_10_UNIVERSAL_HEALTH_ANS_IB XML_MCPC_855_SRC_DOC_OB XML_NEXUS_HEALTH_855_SRC_DOC_OB XML_OHSU_855_SRC_DOC_OB XML_ORDERS05_PO_10_ARDAGH_PRM_IB XML_ORDER_10_DESERT_OASIS_HEALTHCARE_OB XML_ORDER_10_DETROIT_EDISON_OB XML_ORDER_10_EL_CENTRO_MEDICAL_CENTER_OB XML_ORDER_10_NEXUS_HEALTH_OB XML_ORDER_10_OPTIM_ORTHOPEDICS_OB XML_ORDER_10_SOFTCHOICE_OB XML_ORDER_10_TECHDATA_EMEA_PRM_OB XML_ORDER_10_TECHDATA_EMEA_SPL_PRM_OB XML_ORDER_10_TYSON_FOODS_OB XML_ORDER_10_UNION_PACFIC_OB XML_ORDER_10_US_RADIOLOGY_OB XML_ORDER_10_WINDSTREAM_OB XML_OSR_TRAFERA_HOLDINGS_PBSO_10_IB XML_OSU_SRC_DOC_OB XML_OVERLAKE_SRC_DOC_OB XML_POA_DESERT_OASIS_HEALTHCARE_10_IB XML_POA_DOUGLAS_STEWART_10_IB XML_POA_NEXUS_HEALTH_10_IB XML_POA_NOVANT_HEALTH_10_IB XML_POA_OPTIM_ORTHOPEDICS_10_IB XML_POA_SHI_10_IB XML_POA_STAPLES_BUSINESS_1.0_IB XML_POA_STATE_OF_MISSOURI_10_OB XML_POA_TRAFERA_HOLDINGS_PBSO_10_IB XML_POA_US_RADIOLOGY_10_IB XML_PO_10_BROSE_AG_OB XML_PO_10_DETROIT_EDISON_OB XML_PO_10_GOLD_GROUP_PRM_P XML_PO_10_HARTING_IB XML_PO_10_HARTING_OB XML_PO_10_HOERBIGER_OB XML_PO_10_HORSCH_OB XML_PO_10_OTTO_FUCHS_OB XML_PO_10_SASOL_IB XML_PO_10_SASOL_OB XML_PO_10_STAPLES_BUSINESS_OB XML_PO_10_U_HAUL_IB XML_PO_10_U_HAUL_OB XML_PO_ACKNOWLEDGMENT_10_U-HAUL_ANS_OB XML_PO_DOUGLAS_STEWART_10_OB XML_PO_MODIFICATION_10_U-HAUL_ANS_OB XML_PO_NOVANT_HEALTH_OB XML_PO_SASOL_OB XML_PO_ZONES_SPS_COMMERCE_10_OB XML_QHS_SRC_DOC_OB XML_SAMC_SRC_DOC_OB XML_SFTP_ALSTERARBEIT_Catalog-832_P XML_SFTP_ATEA_NORWAY_Catalog-832_P XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB XML_TECHDATA_Belgium_OB XML_TECHDATA_FR_OB XML_TECHDATA_Germany_OB XML_TECHDATA_Italy_OB XML_TECHDATA_Netherlands_OB XML_TECHDATA_Switzerland_OB XML_TECHDATA_UK_OB XML_XCBL_850_10_INGRAM_MICRO_CH_OB XML_XCBL_850_10_INGRAM_MICRO_DE_OB XML_XCBL_850_10_INGRAM_MICRO_FR_OB XML_XCBL_850_10_INGRAM_MICRO_NL_OB XML_XCBL_850_10_INGRAM_MICRO_SE_OB XML_XCBL_850_10_INGRAM_MICRO_UK_OB XML_XCBL_PO_10_OB XML_XML_855_1.0_DEUTSCHE_TELEKOM_ANS_IB XML_XML_855_1.0_EPLUS_ASN_IB XML_XML_855_1.0_INGRAM_INDIA_ASN_IB XML_XML_855_10_INSIGHT_CA_ANS_IB XML_XML_855_10_INSIGHT_US_ASN_IB XML_XML_855_2.0_EPLUS_ASN_IB XML_XML_856_10_INSIGHT_US_ASN_IB XML_XML_856_DENALI_INTEGRATION_IB XML_XML_856_DEUTSCHE_TELEKOM_ANS_IB XML_XML_870_DENALI_INTEGRATION_IB XML_xCBL_10_ALTRON_PRM_OB XML_xCBL_10_APTIV_PRM_OB XML_xCBL_850_10_ARROW_ECS_CA_PRM_IB XML_xCBL_850_10_ARROW_ECS_CA_PRM_OB XML_xCBL_850_10_AXIS_IB XML_xCBL_850_10_CDW_PRM_IB XML_xCBL_850_10_EPLUS_PRM_OB XML_xCBL_850_10_HARRIS_HOSPITAL_OB XML_xCBL_850_10_INDIANA_UNIVERSITY_OB XML_xCBL_850_10_INGRAM_MICRO_US_PRM_IB XML_xCBL_855_10_ALSO_Denmark_SNS_PRM_OB XML_xCBL_855_10_ARROW_CA_PRM_OB XML_xCBL_855_10_ARROW_US_PRM_OB XML_xCBL_855_10_CDW_PRM_OB XML_xCBL_855_10_COMPUCOM_CA_PRM_OB XML_xCBL_855_10_MCPC_PRM_OB XML_xCBL_855_10_NEXUS_HEALTH_PRM_OB XML_xCBL_855_10_OHSU_PRM_OB XML_xCBL_855_10_OSUNI_PRM_OB XML_xCBL_855_10_OVERLAKE_PRM_OB XML_xCBL_855_10_QHS_PRM_OB XML_xCBL_855_10_SAMC_PRM_OB XML_xCBL_856_10_ARROW_ECS_CA_PRM_OB XML_xCBL_856_10_COMPUCOM_CA_PRM_OB XML_xCBL_856_10_MOREDIRECT_PRM_OB XML_xCBL_856_10_OSUNI_PRM_OB XML_xCBL_ORDERS_EXERTIS_Ireland_PRM_OB XML_xCBL_OR_10_TECHDATA_UK_ANS_OB XML_xCBL_PO_10_AMAZONAU_PRM_OB XML_xCBL_PO_10_AMAZONBR_PRM_OB XML_xCBL_PO_10_AMAZONCA_PRM_OB XML_xCBL_PO_10_AMAZONDE_PRM_OB XML_xCBL_PO_10_AMAZONES_PRM_OB XML_xCBL_PO_10_AMAZONJP_PRM_OB XML_xCBL_PO_10_AMAZONNL_PRM_OB XML_xCBL_PO_10_AMAZONUK_PRM_OB XML_xCBL_PO_10_AMAZON_EMEA_PRM_OB XML_xCBL_PO_10_AMAZON_PRM_OB XML_xCBL_PO_10_BLOOM_EP_INDIA_PRM_OB XML_xCBL_PO_10_DANA_FARBER_OB XML_xCBL_PO_10_GHX_IB XML_xCBL_PO_10_PC_CONNECTION_PRM_IB XML_xCBL_PO_10_PRM_OB XML_xCBL_PO_10_PROVIDENCE_ST_JSPH_PRM_IB XML_xCBL_PO_10_SARASOTA_MEMORIAL_PRM_IB XML_xCBL_PO_10_SE_GEORGIA_HEALTH_PRM_IB XML_xCBL_PO_10_TD_SYNNEX_PRM_IB XML_xCBL_PO_10_TECHDATA_AT_SPL_OB XML_xCBL_PO_10_TECHDATA_EMEA_PRM_IB XML_xCBL_PO_10_TECHDATA_ES_SPL_OB XML_xCBL_PO_10_TECHDATA_IE_SPL_OB XML_xCBL_PO_10_TECHDATA_PT_SPL_OB XML_xCBL_PO_10_UAMS_WD_PRM_IB XML_xCBL_PO_10_UNIVERSAL_HEALTH_PRM_OB XML_xCBL_PO_10_UNIVKENTUCKY_PRM_IB XML_xCBL_PO_10_UNIVWASHINGTON_PRM_IB XML_xCBL_PO_10_VALLEY_MEDICAL_PRM_OB XML_xCBL_PO_10_VUMC_GHX_PRM_OB XML_xCBL_PO_10_WAL-MART_US_PRM_OB XML_xCBL_PO_10_WINONA_HEALTH_PRM_OB XML_xCBL_PO_10_YAKIMAVALLEY_PRM_OB a-doc-type-test abc_DocType aic-sap-invoice-response aic-test-invoice-sourcedoctype aic-test-invoice-targetdoctype cXML_XML_TECHDATA_Belgium_IB cXML_XML_TECHDATA_FR_IB cXML_XML_TECHDATA_Germany_IB cXML_XML_TECHDATA_Italy_IB cXML_XML_TECHDATA_Netherlands_IB cXML_XML_TECHDATA_Switzerland_IB cXML_XML_TECHDATA_UK_IB cci-fed-target-doctype cci-xml-source-doctype d-EDI_sample_sanity_test d-sanity-doctype d-sanity-doctype-clone d-sanity-doctype-xml d-sanity-doctype-xml-clone doctypetest emfp-850-src-doc emfp-850-ter-doc p-prod-test-997 p-prod-test-x12 p-prod-test-xml perf_dellpoa_xml redis_fallback_test_Rec redis_fallback_test_Src sew_orders_source_doctype sew_orders_target_doctype test-doc-type-validation test-r-prod-src-doc test-r-prod-target-doc test_ey_FTP transaction-deleiveryxml Data Format Type EDIX12 CSV EDIFACT XML FLAT JSON Transaction Type Invoice XCBL EDIX12 BHC Catalog Passthrough 997 DESADVD96A BuyerCatalog ASN_Auto_ASN 850 REGRESSION EMFP Material Request catalog-832 CSV_PO ORDERSD96A PAYMENT XML INVENTORY 855 PO XML ORDERS 832 846 POA PO-CSV pick_order Catalog (832) DESADV 856 catalog ASN DellPOA POAR XML HR_PO POS PO payment invoice ORDERSD93A Welcome_letter ORDERS05 852 IN xml PO CSV ORDERS 870 Premier XCBL Orders test REQUESTS Catalog-832 Reset Apply Message is required Cancel Ok Action Ok Copyright \u00a92026 Dell Inc. Privacy Terms of Use Accessibility Your Cookie Preferences Dell uses different types of cookies to optimise your experience and enable certain website features, as well as cookies from third parties for purposes such as: improving your overall web browsing experience, connecting you with your social networks and tailoring advertising to better match your interests. Click on the categories below to learn more and adjust your settings, which will be applied to the device you are currently using. You can access this tool on your other devices to customise those settings, and use this tool from any of your devices at any time to opt out of certain cookies. Please note that blocking some types of cookies may impact your site experience and services or features we are able to offer. You can learn more about how we use cookies by visiting our Cookie Notice. Cookie Policy Allow All Manage Consent Preferences Essential Always Active These cookies are essential for enabling user movement around our website and providing access to features such as your profile and purchases, log in credentials, and other areas of the website. These cookies are necessary to enable the basic features of this site to function, such as providing secure log-in, allowing images to load, or allowing you to select your cookie preferences. This category of cookies cannot be disabled. Marketing Marketing Marketing cookies are used to understand user behavior across our websites. These cookies are also used to show ads that are more relevant to your interests. We may share this information with advertising platforms to help us display the most relevant messages to you. These cookies may also store information on user behavior obtained through their browsing habits, which allows us to develop a specific profile and display advertisements appropriate to your profile. Uncategorized Uncategorized Always Inactive Cookies that are not categorized. Statistical Statistical Statistical cookies help us to understand how visitors interact with our website by collecting and reporting information. Any information collected by means of this type of cookies is used to measure activity on any website, application or platform, for the purposes of introducing improvements in function of the analysis of the data regarding the service use made by users. Back Button Cookie List Search Icon Filter Icon Clear checkbox label label Apply Cancel Consent Leg.Interest checkbox label label checkbox label label checkbox label label Confirm My Choices",
+    "row_counts": {},
+    "source": "/mnt/data/run152803/UHAUL-POASN-FULL-DUMMY-20260716-152803/source_document_type/dom_snapshots/doctype_add_form_after_dummy_fill_no_save.html",
+    "validation_gate": {
+      "blocking": [],
+      "accepted_nonblocking": [],
+      "object_resolution": {}
+    },
+    "object_resolution": {}
+  },
+  "object_resolution": {},
+  "validation_gate": {
+    "blocking": [],
+    "accepted_nonblocking": [],
+    "object_resolution": {}
+  },
+  "failed_attempts": [],
+  "dropdowns_sample": [
+    {
+      "label": "Data Format Type",
+      "selector": "input#dds-form-field-207242909",
+      "kind": "combobox",
+      "options": [
+        {
+          "index": 0,
+          "text": "XML",
+          "value": "",
+          "visible": true
+        },
+        {
+          "index": 1,
+          "text": "JSON",
+          "value": "",
+          "visible": true
+        },
+        {
+          "index": 2,
+          "text": "EDIFACT",
+          "value": "",
+          "visible": true
+        },
+        {
+          "index": 3,
+          "text": "EDIX12",
+          "value": "",
+          "visible": true
+        },
+        {
+          "index": 4,
+          "text": "CSV",
+          "value": "",
+          "visible": true
+        },
+        {
+          "index": 5,
+          "text": "FLAT",
+          "value": "",
+          "visible": true
+        }
+      ],
+      "dom_event": "click->listbox option->change"
+    },
+    {
+      "label": "Operation",
+      "selector": "input#dds-form-field-860387101",
+      "kind": "combobox",
+      "options": [],
+      "error": "Locator.click: Timeout 2500ms exceeded.\nCall log:\n  - waiting for locator(\"input#dds-form-field-860387101\").first\n    - locator resolved to <input type=\"text\" required=\"\" role=\"combobox\" autocomplete=\"off\" aria-invalid=\"false\" aria-expanded=\"false\" placeholder=\"Operation\" id=\"dds-form-field-860387101\" class=\"dds__dropdown__input-field\" aria-labelledby=\"dds-label-558816315\" aria-controls=\"dropdown-popup-list-474696083\"/>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n    - element is not stable\n  - retrying click action\n    - waiting for element to be visible, enabled and stable\n",
+      "dom_event": "click attempted"
+    }
+  ],
+  "screenshots": [
+    "/mnt/data/run152803/UHAUL-POASN-FULL-DUMMY-20260716-152803/source_document_type/doctype_kb/doctype_add_form_after_dummy_fill_no_save.png"
+  ],
+  "golden_reference_screenshots": [],
+  "golden_replication": {
+    "enabled": false,
+    "status": "not_configured",
+    "comparison_mode": "vision_or_manual_compare_actual_after_fill_to_golden_reference",
+    "note": "Use the golden reference screenshot(s) to verify the actual filled form visually matches the known-correct UHAUL-POASN screenshots."
+  },
+  "unsafe_click_findings": [],
+  "warnings": [],
+  "vision_verification": {
+    "requested": true,
+    "status": "pending_or_not_configured",
+    "note": "A vision prompt is generated for each screenshot. Configure HIP_VISION_ENDPOINT/HIP_VISION_TOKEN/HIP_VISION_MODEL for automatic multimodal verification; deterministic DOM verification always runs."
+  }
+}

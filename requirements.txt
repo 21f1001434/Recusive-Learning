@@ -1,0 +1,32 @@
+playwright>=1.45.0
+pydantic>=2.7.0
+PyYAML>=6.0.1
+typer>=0.12.3
+rich>=13.7.0
+requests>=2.31.0
+Jinja2>=3.1.4
+beautifulsoup4>=4.12.3
+python-dotenv>=1.0.1
+pytest>=8.2.0
+pytest-asyncio>=0.23.7
+autogen-agentchat==0.7.5
+autogen-core==0.7.5
+autogen-ext[openai]==0.7.5
+certifi>=2024.7.4
+browser-use==0.13.8
+# LangChain Playwright Browser Toolkit (read-only recovery bridge).
+langchain-community==0.4.2
+psutil>=5.9.0,<8
+
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
+# Compatibility pins validated against Uvicorn, Browser Use, LangChain and the existing HIP venv.
+websockets==13.1
+packaging>=23.2,<26
+
+# Optional physical-screen fallback used only on Windows when DOM/MCP interaction fails.
+pyautogui==0.9.54; platform_system == "Windows"
+
+# MCP-backed visible-desktop primary interaction on Windows; semantic proof and verification remain mandatory.
+pyautogui-mcp==2026.1.101837; platform_system == "Windows"

@@ -1,0 +1,52 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260718-033819",
+  "overall_status": "blocked_by_section_judge",
+  "blocked_phase": "source_document_type",
+  "source_document_type_attempt_count": 1,
+  "source_document_type_exact_execution": {
+    "pass": true,
+    "status": "pass",
+    "attempt_count": 29,
+    "failed_attempt_count": 0
+  },
+  "no_repeat_guard": {
+    "status": "blocked_without_destructive_replay",
+    "browser_replay_performed": false,
+    "form_mutated": false
+  },
+  "evidence_failure": {
+    "screenshot_count": 0,
+    "strict_fatal": [
+      "No screenshot found for filled form phase."
+    ],
+    "active_surface_gate": {
+      "pass": true,
+      "reason": "ok",
+      "missing_markers": [],
+      "markers": {
+        "heading": true,
+        "details": true,
+        "identifier": true,
+        "attributes": true,
+        "name": true,
+        "transaction_type": true,
+        "version": true,
+        "data_format": true,
+        "cancel": true,
+        "submit_present": true
+      },
+      "filters_open": false,
+      "listing_only": false,
+      "surface_text_sample": "Developer MCP Blogs Open Source Community A Home BizLink SecureLink BizExchange TransTrack BizMon Navigation expanded Back Create Document Type Create templates for any data format. It is a metadata structure template which allows for configuring consistent properties and settings across various document types. Document Type Details Name tooltip Transaction Type Version Data Format Type Status Enabled Disabled Description Document Identifier Operation Derived From Attributes to Configure Attribute Name Derived From Usage Validation Validation Type Cancel Submit Document Types Document Type is a metadata structure template which allows for consistent properties and settings across various document type.Learn More Filter Manage Columns Add Document Type Name Data Format Type Transaction Type Latest Version Validation Type Available Environments a-doc-type-test XML payment 3.0 Structure DEV TEST1 TEST2 PROD Abbvie_997_DocType EDIX12 997 1.0 Structure DEV Abbvie_SRC_DocType EDIX12 850 3.0 Structure DEV Abbvie_SRC_DocType_IN EDIX12 850 1.0 Structure DEV Abbvie_TRGT_Doctype XML XML 1.0 Structure DEV Abbvie_TRGT_Doctype_IN XML XML 1.0 Structure DEV abc_DocType XML catalog 1.0 Structure DE"
+    },
+    "missing_after_fill_dom": true,
+    "root_cause": "exact-form freeze condition skipped read-only final DOM and screenshot capture together with post-fill dropdown exploration"
+  },
+  "fix": {
+    "post_fill_control_exploration": "disabled after exact pass",
+    "post_fill_dom_capture": "mandatory after exact pass",
+    "post_fill_screenshot": "mandatory with viewport fallback",
+    "evidence_lock": "doctype_filled_form_evidence_lock.json",
+    "judge_source": "locked filled-form evidence bundle"
+  }
+}

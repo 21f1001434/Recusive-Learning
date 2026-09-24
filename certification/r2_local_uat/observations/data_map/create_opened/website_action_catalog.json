@@ -1,0 +1,40 @@
+[
+  {
+    "semantic_control_key": "create_data_map.name.name.text",
+    "label": "Name",
+    "section": "Create Data Map",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "fill_text"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_data_map.create.button",
+    "label": "Create",
+    "section": "Create Data Map",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click",
+      "create",
+      "mutation_candidate"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_data_map.cancel.button",
+    "label": "Cancel",
+    "section": "Create Data Map",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  }
+]

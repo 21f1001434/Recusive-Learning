@@ -1,0 +1,56 @@
+HIP Portal Agent v1.8.0 — JavaScript UI Final Certification
+Date: 2026-08-31
+
+PRIMARY UI ARCHITECTURE
+- JavaScript SPA: webui/index.html + webui/app.js + webui/styles.css
+- Bun UI server/API proxy: webui/server.js
+- One-command Bun launcher: webui/platform.js
+- Python control plane: FastAPI backend/app.py
+- Core HIP agent: hip_id_agent/
+- Streamlit: legacy-only optional fallback; not part of default requirements or primary run scripts
+
+IMPLEMENTED JS UI CAPABILITIES
+- Full mission and independent HIP section selection
+- Data Map only
+- Source/Target/combined Document Type
+- Rule only
+- Source/Target/combined Transport Profile
+- BizFlow only
+- input.json browser upload + backend persistence
+- static mission preflight
+- exact section phase coverage
+- input-driven repeatable + row plan
+- API capture/validate/dry-run/write mode selection
+- heavy evidence and self-heal-until-complete switches
+- Start / Pause / Resume / Stop
+- live mission console polling
+- run list
+- learned capability browser
+- API contract browser
+- certified task Plan/Run
+- governed change Preview/Run + audit
+
+CORE AGENT CAPABILITIES PRESERVED
+- Browser Use same-session/CDP perception bridge
+- Playwright MCP 0.0.78 and Chrome DevTools MCP 1.6.0 enterprise-compatible defaults
+- HIP Intelligence MCP
+- Microsoft AutoGen AgentChat/Core/Ext 0.7.5 requirement and resilient existing-venv detection
+- AgentQ/self-healing browser execution
+- deterministic Transport Profile field filling
+- dynamic repeatable-row + button execution with N->N+1 verification
+- single Dell SSO persistent Chrome session
+- text + vision judging
+- governed mutation safety and audit ledger
+
+VERIFICATION
+- Python test collection: 663 tests
+- Complete suite result: 663/663 PASS (8 isolated shards; all tests accounted for)
+- JavaScript syntax: webui/app.js PASS (node --check)
+- JavaScript syntax: webui/server.js PASS (node --check)
+- JavaScript syntax: webui/platform.js PASS (node --check)
+- Python compileall: PASS
+- pyproject/package JSON parsing: PASS
+- Python wheel build: PASS (hip_portal_id_agent-1.8.0-py3-none-any.whl)
+- Transport Profile-only preflight: PASS for shipped U-HAUL input contract and exact selected phases
+- Live Dell SSO/HIP tenant execution: not executable in this sandbox; must be smoke-tested in authenticated Dell environment
+- Bun executable is not present in the certification sandbox, so Bun process launch is code/syntax tested here and must be runtime-smoke-tested on the user's Dell machine (where Bun 1.3.13 is installed).

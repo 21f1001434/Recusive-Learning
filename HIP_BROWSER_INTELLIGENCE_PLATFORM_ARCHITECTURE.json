@@ -1,0 +1,30 @@
+{
+  "schema_version": "hip.browser-intelligence-platform.v1",
+  "layers": {
+    "frontend": {
+      "technology": "Streamlit",
+      "browser_ownership": false,
+      "tabs": ["Learn HIP", "Portal Knowledge", "API Explorer", "Future Task Agent", "Runs / Console"]
+    },
+    "backend": {
+      "technology": "FastAPI",
+      "responsibilities": ["mission lifecycle", "capability queries", "API contract queries", "future task planning", "future task process launch"]
+    },
+    "core": {
+      "package": "hip_id_agent",
+      "reasoning": ["AutoGen AgentChat 0.7.5", "AgentQ", "ReAct", "trajectory memory"],
+      "browser": ["Python Playwright", "Playwright MCP", "Chrome DevTools MCP", "HIP Intelligence MCP"],
+      "knowledge": ["Portal Brain", "Flow Pattern Memory", "HIP Capability Graph", "UI/API causal contracts"]
+    }
+  },
+  "discovery_families": ["data_maps", "document_types", "rules", "transport_profiles", "bizflows"],
+  "configuration_phases": ["data_map", "source_document_type", "target_document_type", "rule", "source_transport_profile", "target_transport_profile", "biz_flow"],
+  "capability_types": ["search", "expand", "action", "row_action", "form_control"],
+  "risk_levels": ["read", "draft", "mutation"],
+  "mutation_gate": {
+    "required": ["explicit task allow flag", "HIP_ALLOW_PORTAL_MUTATION=YES", "ALLOW HIP MUTATION"],
+    "discovery_auto_mutation": false
+  },
+  "persistent_capability_graph": "data/hip_memory/portal_brain/capability_graph.json",
+  "values_promoted_to_capability_memory": false
+}

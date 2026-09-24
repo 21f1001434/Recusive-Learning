@@ -1,0 +1,12 @@
+{
+  "schema_version": "hip.bizflow-deep-architecture.v1",
+  "page_family": "bizflows",
+  "stack": ["Streamlit frontend", "FastAPI backend", "AutoGen AgentChat 0.7.5", "AgentQ", "Python Playwright", "Playwright MCP", "Chrome DevTools MCP", "HIP Intelligence MCP", "Gemma vision"],
+  "listing_learning": ["search", "filters", "filter options", "pagination", "row expansion", "row actions"],
+  "draft_actions": ["Edit", "Clone/Copy", "View/Details", "History/Audit"],
+  "mutation_prerequisite_actions": ["Migrate", "Deploy", "Delete"],
+  "form_sections": ["Flow Details", "Configure Source", "Flow Identifiers", "Configure Target(s)", "Process Steps", "Configure Routing"],
+  "repeatable_rows": ["flow_identifier", "process_step", "filename_part", "routing_condition", "routing_action"],
+  "safety": {"save_create_submit": false, "mutation_probe_network_abort": true, "persist_customer_values": false},
+  "replay": {"value_free": true, "semantic_rebind_on_drift": true, "physical_row_identity_required": true}
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "hip.website-world-model.v2",
+  "choice_branches": {
+    "b14fce75c947f50733bd6be74e0e": {
+      "branch_id": "b14fce75c947f50733bd6be74e0e",
+      "phase": "biz_flow",
+      "action_family": "select",
+      "control": {
+        "semantic_control_id": "bizflow.routing.process_step",
+        "label": "Process Step",
+        "section": "Configure Routing",
+        "role": "combobox",
+        "control_type": "dds-dropdown",
+        "confidence": 0.97,
+        "margin": 0.18,
+        "gate_status": "resolved",
+        "anchored": null,
+        "owned_surface_visible": null
+      },
+      "portal_choice": "Translation",
+      "effect_type": "dropdown_value_committed",
+      "effect_confidence": 0.99,
+      "success_count": 20,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.9645,
+      "trust": "validated",
+      "drift_status": "stable",
+      "option_catalog_size": 3,
+      "first_seen_at": "2026-09-20T06:28:00.<volatile>+00:00",
+      "last_seen_at": "2026-09-23T17:00:40.<volatile>+00:00",
+      "customer_values_stored": false,
+      "portal_metadata_only": true
+    }
+  },
+  "updated_at": "2026-09-23T17:00:40.121302+00:00"
+}

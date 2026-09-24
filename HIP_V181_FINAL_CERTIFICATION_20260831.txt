@@ -1,0 +1,56 @@
+HIP Portal Agent v1.8.1 — Final End-to-End Certification
+Date: 2026-08-31
+
+Primary architecture
+- JavaScript SPA UI served by Bun (webui/)
+- FastAPI Python backend (backend/app.py)
+- HIP browser automation/AgentQ/AutoGen/MCP/governance engine (hip_id_agent/)
+- Streamlit retained as optional legacy/debug fallback only
+
+Final hardening included
+- JavaScript package explicitly declares ESM: package.json "type": "module"
+- bun run platform verifies FastAPI /health before exposing the UI
+- Already-healthy FastAPI backend is reused
+- Direct Chrome DevTools MCP is fail-closed by library default unless explicitly enabled
+- Chrome DevTools MCP request timeout is bounded
+- MCP shutdown is bounded, including stuck child processes
+- Dell-compatible MCP packages retained:
+  @playwright/mcp@0.0.78
+  chrome-devtools-mcp@1.6.0
+- Existing-venv AutoGen 0.7.5 readiness detection retained
+- websockets==13.1 and packaging<26 compatibility pins retained
+- Section-scoped execution retained, including Source TP only, Target TP only, Transport Profiles only, Rule only, Data Map only, Document Types only, BizFlow only, and complete flow
+- Dynamic repeatable-row "+" handling retained
+- Browser Use/CDP, Playwright MCP, Chrome DevTools MCP, HIP Intelligence MCP, AgentQ, evidence capture, self-heal and governed changes retained
+
+Automated regression result
+- 667 / 667 tests PASS
+- Verified in 8 isolated shards:
+  shard 1: 103 passed
+  shard 2: 74 passed
+  shard 3: 101 passed
+  shard 4: 79 passed
+  shard 5: 77 passed
+  shard 6: 91 passed
+  shard 7: 62 passed
+  shard 8: 80 passed
+
+Additional validation
+- Python compilation: PASS (179 Python files)
+- JavaScript syntax: PASS (webui/app.js, webui/server.js, webui/platform.js)
+- JSON/YAML parsing: PASS
+- FastAPI import: PASS
+- FastAPI /health: HTTP 200 PASS
+- /api/sections: HTTP 200 PASS
+- /api/runtime/status: HTTP 200 PASS
+- Python wheel build: PASS
+  hip_portal_id_agent-1.8.1-py3-none-any.whl
+- Static private-key/AWS-key/JWT pattern scan: no findings
+
+Live-environment boundary
+The local implementation and deterministic regression suite are certified. Actual Dell SSO, corporate-network MCP process launch, and live HIP tenant form/API mutations require the authenticated Dell environment and are intentionally not represented as executed from this sandbox.
+
+Exact release-archive verification
+- Fresh extraction release manifest: 589 / 589 files verified
+- Fresh extraction focused runtime/UI/section/Transport-Profile/dynamic-row regression: 79 / 79 PASS
+- ZIP compressed-data integrity: PASS

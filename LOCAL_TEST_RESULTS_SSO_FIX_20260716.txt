@@ -1,0 +1,19 @@
+HIP Portal SSO Redirect / Dual MCP Fix
+Date: 2026-07-16
+
+python -m compileall -q hip_id_agent tests
+PASS
+
+pytest -q
+250 passed in 13.58s
+
+Targeted regression coverage:
+- Dell SSO redirect after Page.goto net::ERR_ABORTED is accepted temporarily
+- Dual-MCP same-surface gate is not run on the temporary SSO page
+- URL query/state token is removed from evidence
+- Chrome DevTools list_pages markdown format parsed
+- Chrome DevTools list_pages JSON-text format parsed
+- Chrome DevTools structured page format parsed
+- DevTools page visibility is retried before fail-closed
+- Playwright MCP actual current URL is compared
+- Official --browser-url CDP attachment flag is used

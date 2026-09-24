@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "bunx",
+      "args": [
+        "--bun",
+        "@playwright/mcp@0.0.78"
+      ]
+    },
+    "chrome-devtools": {
+      "command": "bunx",
+      "args": [
+        "--bun",
+        "chrome-devtools-mcp@1.6.0",
+        "--no-usage-statistics"
+      ]
+    },
+    "hip-intelligence": {
+      "command": "python",
+      "args": [
+        "-m",
+        "hip_id_agent.hip_intelligence_mcp_server",
+        "--memory-dir",
+        "./data/hip_memory/portal_brain/action_trajectories"
+      ]
+    }
+  },
+  "hipRuntimeNote": "The Python agent starts Playwright MCP and Chrome DevTools MCP with Bun/bunx plus the local HIP Intelligence MCP. Only Playwright/Chrome attach to the browser; HIP Intelligence is a value-free planner/critic/memory server."
+}

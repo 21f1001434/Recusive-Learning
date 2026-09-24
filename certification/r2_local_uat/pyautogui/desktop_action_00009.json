@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "open Target Document Type",
+  "selector": "role=button name=Target Document Type",
+  "point": {
+    "x": 362,
+    "y": 40,
+    "bbox": {
+      "x": 272.84375,
+      "y": 12.0,
+      "width": 157.859375,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

@@ -1,0 +1,15 @@
+Deep Portal Learning + MCP Capability Broker
+Date: 2026-07-18
+
+Python compileall: PASS
+Targeted tests: PASS
+Complete pytest suite: 354 passed in 11.24s
+
+Key regressions:
+- Judge-approved learning promotes to Portal Brain: PASS
+- Unjudged learning remains candidate: PASS
+- API endpoint IDs normalized to placeholders: PASS
+- Storage key names captured without values: PASS
+- Optional performance trace on retry: PASS
+- All phase attempts invoke learning begin/finish: PASS
+- No third browser controller is started: PASS

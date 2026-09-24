@@ -1,0 +1,34 @@
+{
+  "schema_version": "hip.website-world-model.v2",
+  "enabled": true,
+  "validated_controls": 17,
+  "candidate_controls": 0,
+  "negative_controls": 0,
+  "semantic_states": 18,
+  "validated_transitions": 17,
+  "candidate_transitions": 0,
+  "negative_transitions": 0,
+  "validated_portal_choice_branches": 3,
+  "learning_health": {
+    "learning_score": 76,
+    "effective_confidence_average": 0.7572,
+    "fresh_knowledge_count": 37,
+    "stale_knowledge_count": 0,
+    "drift_suspect_count": 0,
+    "negative_knowledge_count": 0,
+    "confidence_half_life_days": 45.0,
+    "stale_after_days": 90.0,
+    "drift_failure_threshold": 2,
+    "recency_decay_enabled": true,
+    "auto_demote_on_drift": true,
+    "memory_rule": "MEMORY PROPOSES; LIVE PAGE AUTHORIZES"
+  },
+  "safety": {
+    "customer_values_stored": false,
+    "selectors_stored": false,
+    "coordinates_stored": false,
+    "generated_dom_ids_stored": false
+  },
+  "purpose": "verified semantic website states/transitions reused as freshness-aware bounded priors; live page always reauthorizes actions",
+  "updated_at": "2026-09-20T06:50:18.297312+00:00"
+}

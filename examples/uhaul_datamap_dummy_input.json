@@ -1,0 +1,299 @@
+{
+  "profile_name": "U-HAUL_PC_856_ANS_MAPPING_OB",
+  "customer": "U-HAUL",
+  "folder": "U-HAUL - POASN",
+  "tx_standard": "X12",
+  "tx_code": "856",
+  "tx_name": "Ship Notice",
+  "direction": "Outbound",
+  "requires_data_map": true,
+  "dell_app": "ANS",
+  "_naming_source": {
+    "NOTE": "CONFIRMED WORKING — all names from working config"
+  },
+  "objects": {
+    "data_map": {
+      "map_identifier": "DELLCoXMLASNXX08C_U-HAUL",
+      "map_identifier_version": "1",
+      "status": "Enable",
+      "map_name": "DELLCoXMLASNXX08C",
+      "map_class": "Transform_DELLCoXMLASNXX08C",
+      "contivo_version": "6.7",
+      "map_data_file": "Transform_DELLCoXMLASNXX08C.jar"
+    },
+    "source_document_type": {
+      "name": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+      "transaction_type": "856",
+      "version": "1",
+      "data_format_type": "XML",
+      "status": "Enable",
+      "description": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+      "validation_type": "Structure",
+      "document_identifier": {
+        "operation": "All conditions are satisfied",
+        "rows": [
+          {
+            "derived_from": "TRANSACTION_ROOT_ELEMENT",
+            "value": "DellAutoASN"
+          }
+        ]
+      },
+      "attributes_to_configure": [
+        {
+          "attribute_name": "Receiver",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/DellAutoASN/ShipNoticeHeader/To/PartnerInformation/PartnerIdentifier"
+        },
+        {
+          "attribute_name": "Sender",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/DellAutoASN/ShipNoticeHeader/From/PartnerInfomation/PartnerIdentifier"
+        },
+        {
+          "attribute_name": "Transaction Type",
+          "derived_from": "TRANSACTION_ROOT_ELEMENT",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": ""
+        },
+        {
+          "attribute_name": "Business Identifier",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/DellAutoASN/PurchaseOrder/PurchaseOrderNumber"
+        },
+        {
+          "attribute_name": "Alternate Business Identifier",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/DellAutoASN/PurchaseOrder/ResellerPurchaseOrderNumber"
+        }
+      ],
+      "operation": "All conditions are satisfied"
+    },
+    "target_document_type": {
+      "name": "XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB",
+      "transaction_type": "856",
+      "version": "1",
+      "data_format_type": "XML",
+      "status": "Enable",
+      "description": "XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB",
+      "validation_type": "Structure",
+      "document_identifier": {
+        "operation": "All conditions are satisfied",
+        "rows": [
+          {
+            "derived_from": "TRANSACTION_ROOT_ELEMENT",
+            "value": "SHIPMENT_NOTICE"
+          }
+        ]
+      },
+      "attributes_to_configure": [
+        {
+          "attribute_name": "Receiver",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/SHIPMENT_NOTICE/ROUTING/@destination_value"
+        },
+        {
+          "attribute_name": "Sender",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/SHIPMENT_NOTICE/ROUTING/@source_value"
+        },
+        {
+          "attribute_name": "Transaction Type",
+          "derived_from": "TRANSACTION_ROOT_ELEMENT",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": ""
+        },
+        {
+          "attribute_name": "Business Identifier",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/SHIPMENT_NOTICE/SHIPMENT/PO/@po_number"
+        },
+        {
+          "attribute_name": "Alternate Business Identifier",
+          "derived_from": "ELEMENT_IN_PAYLOAD",
+          "usage": "Flow Identifier Expression, Logging, Mapping, Routing",
+          "expression": "/SHIPMENT_NOTICE/ROUTING/@source_value"
+        }
+      ],
+      "operation": "All conditions are satisfied"
+    },
+    "rule": {
+      "name": "DELLCoXMLASNXX08C_U-HAUL_RULE",
+      "version": "1",
+      "document_type_name_version": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+      "rule_type": "Mapping",
+      "rule_scope": "GLOBAL",
+      "status": "Enable",
+      "description": "DELLCoXMLASNXX08C_U-HAUL_RULE",
+      "conditions": {
+        "execute_actions_when": "one or more conditions are satisfied",
+        "rows": [
+          {
+            "condition_type": "Attributes",
+            "operator": "Equals",
+            "value": "uhaul",
+            "attribute_name_unit": "Receiver"
+          },
+          {
+            "condition_type": "Attributes",
+            "operator": "Contains",
+            "value": "DELL",
+            "attribute_name_unit": "Sender"
+          }
+        ]
+      },
+      "actions": {
+        "action_name": "DELLCoXMLASNXX08C_U-HAUL_ROUTE",
+        "action_type": "Route Document",
+        "mapping_identifier_name_version": "DELLCoXMLASNXX08C_U-HAUL(1.0)"
+      }
+    },
+    "source_transport_profile": {
+      "system_type": "Dell Application",
+      "partner_name": "AIC - DCE",
+      "profile_name": "SFTP_U-HAUL_ASN_PC_SRC_IB",
+      "profile_usage": "Sender",
+      "deployment_group": "da-sender-sftphaft-dce-shared",
+      "interface_type": "SFTP HAFT",
+      "interface_environment": "UAT",
+      "existing_account": "Yes",
+      "existing_account_name": "haftatap10251108",
+      "use_existing_folder": "No",
+      "post_transfer_action": "Move to Archive",
+      "is_compression_required": "FALSE",
+      "document_type": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+      "subscription_folder": "/SFTP_U-HAUL_ASN_PC_SRC_IB",
+      "file_filtering_pattern": ".*\\*."
+    },
+    "target_transport_profile": {
+      "system_type": "Partner",
+      "partner_name": "dce-test-partner",
+      "profile_name": "SFTP_U-HAUL_ASN_PC_TGT_OB",
+      "profile_usage": "Receiver",
+      "deployment_group": "pt-receiver-sftphaft-dce-shared",
+      "interface_type": "SFTP HAFT",
+      "interface_environment": "UAT",
+      "existing_account": "Yes",
+      "existing_account_name": "haftattp10251114",
+      "use_existing_folder": "No",
+      "post_transfer_action": "Move to Archive",
+      "is_compression_required": "FALSE",
+      "document_type": "XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB(1.0)",
+      "file_filtering_pattern": ".*\\*.",
+      "subscription_folder": "/Inbound/ASN"
+    },
+    "biz_flow": {
+      "flow_details": {
+        "current_flow_version": "1",
+        "business_flow_name": "U-HAUL_PC_856_ANS_MAPPING_OB",
+        "flow_description": "Outbound 856 Ship Notice — DELL to U-HAUL"
+      },
+      "configure_source": {
+        "source_type": "Dell Application",
+        "source_application": "AIC - DCE",
+        "source_transport_profile": "SFTP_U-HAUL_ASN_PC_SRC_IB",
+        "document_type_name_version": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)"
+      },
+      "flow_identifiers": {
+        "operator": "one or more conditions are satisfied",
+        "conditions": [
+          {
+            "document_type_name_version": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+            "attribute_name": "Receiver",
+            "operator": "Equals",
+            "value": "uhaul"
+          },
+          {
+            "document_type_name_version": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+            "attribute_name": "Sender",
+            "operator": "Contains",
+            "value": "DELL"
+          }
+        ]
+      },
+      "configure_targets": {
+        "target_type": "Partner",
+        "target_application": "dce-test-partner",
+        "target_transport_profile": "SFTP_U-HAUL_ASN_PC_TGT_OB",
+        "document_type_name_version": "XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB(1.0)"
+      },
+      "process_steps": [
+        {
+          "step_number": 1,
+          "step_type": "Mapping Transformer",
+          "step_name": "Mapping-1",
+          "configuration": {
+            "source_document_type": "Disabled(All/Other)",
+            "action": "Mapping",
+            "target_document_type_version": "XML_SHIPMENT_NOTICE_10_U-HAUL_ANS_OB(1.0)",
+            "rule_version": "DELLCoXMLASNXX08C_U-HAUL_RULE(1.0)",
+            "add_rule_if_not_listed": "Not Enabled"
+          }
+        },
+        {
+          "step_number": 2,
+          "step_type": "Enricher",
+          "step_name": "Enricher-1",
+          "configuration": {
+            "document_type_version": "Disabled(All/Other)",
+            "action": "Enrich",
+            "target_file_name_config": "yes",
+            "file_separator": "_",
+            "file_extension": ".xml",
+            "file_name_parts": [
+              {
+                "part_number": 1,
+                "derived_from": "Fixed Text",
+                "value": "Ship"
+              },
+              {
+                "part_number": 2,
+                "derived_from": "Date And Time",
+                "value": "yyyyddMMhhmmss"
+              }
+            ]
+          }
+        }
+      ],
+      "configure_routing": {
+        "rule": {
+          "name": "FLOWROUTE_U-HAUL_PC_856_ANS_XMLASN_OB",
+          "version": "3",
+          "document_type_name_version": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+          "rule_type": "Target Routing",
+          "rule_scope": "LOCAL",
+          "status": "Enabled",
+          "execute_always": "Not Enabled"
+        },
+        "conditions": {
+          "execute_actions_when": "all conditions are satisfied",
+          "rows": [
+            {
+              "condition_type": "Attributes",
+              "operator": "Equals",
+              "value": "uhaul",
+              "attribute_name": "Receiver"
+            },
+            {
+              "condition_type": "Attributes",
+              "operator": "Contains",
+              "value": "DELL",
+              "attribute_name": "Sender"
+            }
+          ]
+        },
+        "actions": {
+          "name": "FLOWACTION_U-HAUL_PC_856_ANS_XMLASN_OB_ROUTE",
+          "type": "Route Document",
+          "target": "SFTP_U-HAUL_ASN_PC_TGT_OB"
+        }
+      }
+    }
+  }
+}

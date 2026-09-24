@@ -1,0 +1,34 @@
+{
+  "schema_version": "hip.final-governed-architecture.v1",
+  "date": "2026-08-26",
+  "frontend": "Streamlit HTTP client only",
+  "backend": "FastAPI mission/control plane",
+  "core": [
+    "seven-phase input.json configuration runtime",
+    "Data Maps deep learner",
+    "Document Types deep learner",
+    "Rules deep learner",
+    "Transport Profiles deep learner",
+    "BizFlows deep learner",
+    "Full HIP capability certification",
+    "Certified Future Task Agent",
+    "Certified Change Execution & Governance"
+  ],
+  "reasoning": ["AutoGen AgentChat 0.7.5", "AgentQ exploration/exploitation", "deterministic dependency scheduler"],
+  "browser_intelligence": ["Python Playwright", "Playwright MCP", "Chrome DevTools MCP", "HIP Intelligence MCP", "Gemma/golden vision evidence"],
+  "persistent_memory": ["value-free Capability Graph", "verified form replays", "verified cross-family task replays", "hash-chained structural change audit ledger"],
+  "mutation_governance": {
+    "preview": true,
+    "role_policy": true,
+    "optional_approval_id": true,
+    "certified_family_gate": true,
+    "three_key_existing_mutation_gate": true,
+    "idempotency_duplicate_protection": true,
+    "automatic_mutation_retry": false,
+    "post_change_write_response": "HTTP 2xx required",
+    "fresh_mcp_post_verification": true,
+    "automatic_rollback": false,
+    "rollback_guidance": true,
+    "tamper_evident_audit": true
+  }
+}

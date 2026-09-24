@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HIP Agent Control Center</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast hidden"></div>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">H</div>
+        <div><strong>HIP Agent</strong><span>JavaScript Control Center</span></div>
+      </div>
+
+      <section class="side-section">
+        <h3>Description trigger</h3>
+        <label>What should the agent do?
+          <textarea id="missionDescription" rows="4" placeholder="Example: Fill only the Source and Target Transport Profiles from the uploaded input JSON"></textarea>
+        </label>
+        <label class="check"><input id="useDescriptionTrigger" type="checkbox" /> Use description to choose exact HIP skills</label>
+        <button id="descriptionPlanBtn" class="secondary wide">Plan from description</button>
+        <p class="help">The description triggers deterministic expert skills. It does not give an LLM permission to invent form steps.</p>
+      </section>
+
+      <section class="side-section">
+        <h3>Execution</h3>
+        <label>Execution scope
+          <select id="sectionSelect"></select>
+        </label>
+        <p id="sectionNote" class="help"></p>
+        <label>API mode
+          <select id="apiMode">
+            <option value="capture">Capture</option>
+            <option value="validate">Validate</option>
+            <option value="dry_run">Dry run</option>
+            <option value="write">Write</option>
+          </select>
+        </label>
+        <label class="check"><input id="liveWitnessMode" type="checkbox" checked /> Live witness mode (no mutation controls)</label>
+        <label class="check"><input id="heavyEvidence" type="checkbox" /> Capture heavy evidence</label>
+        <label class="check"><input id="untilComplete" type="checkbox" /> Self-heal until complete</label>
+        <label class="check danger-check"><input id="allowApiMutation" type="checkbox" /> Allow API mutation</label>
+        <p class="help">Use witness mode for the first Dell test. It exercises real SSO, AutoWebGLM, Playwright MCP, DevTools MCP and all selected HIP forms, but never clicks Create/Save/Submit/Finish/Deploy/Delete.</p>
+      </section>
+
+      <section class="side-section">
+        <h3>Paths</h3>
+        <label>Config<input id="configPath" value="config.yaml" /></label>
+        <label>Runs directory<input id="runsDir" value="./runs" /></label>
+        <label>Golden screenshots<input id="goldenDir" value="./golden_screenshots/UHAUL-POASN" /></label>
+        <label>Upload assets<input id="uploadsDir" value="./uploads" /></label>
+        <label>Resume run (optional)<input id="resumeRun" placeholder="run directory" /></label>
+      </section>
+
+      <section class="side-section">
+        <h3>Input JSON</h3>
+        <label class="file-button">Choose JSON<input id="inputFile" type="file" accept="application/json,.json" /></label>
+        <input id="inputPath" value="./examples/uhaul_poasn_full_dummy_input.json" />
+        <button id="preflightBtn" class="secondary wide">Run static preflight</button>
+        <button id="liveRuntimeCertBtn" class="secondary wide">Certify Windows runtime</button>
+        <button id="liveReadinessBtn" class="primary wide">Run Live GO/NO-GO</button>
+      </section>
+
+
+      <section class="side-section" id="humanAssistancePanel">
+        <h3>Human Assistance / Teach Agent</h3>
+        <div id="humanAssistState" class="badge neutral">No request</div>
+        <p id="humanAssistReason" class="help">When the agent cannot uniquely bind an input field, it will stop that field and ask you to teach the correct live control.</p>
+        <label>Unresolved input
+          <select id="humanInputPath"><option value="">No unresolved field</option></select>
+        </label>
+        <label>Selected live control<input id="humanSemanticControl" placeholder="Click a candidate in Agent Live View" readonly /></label>
+        <input id="humanControlLabel" type="hidden" />
+        <input id="humanControlSection" type="hidden" />
+        <input id="humanControlRole" type="hidden" />
+        <label>Teaching note (optional)<textarea id="humanTeachNote" rows="2" placeholder="Example: This dropdown is Source Document Type"></textarea></label>
+        <div class="two-col">
+          <button id="humanAssistRefresh" class="secondary">Refresh</button>
+          <button id="humanTeachSubmit" class="primary">Teach mapping</button>
+        </div>
+        <p class="help">For one-field teaching you can still click a candidate and Teach mapping. For a full interactive lesson, start demonstration mode and then click/navigate through the real HIP page normally.</p>
+        <div id="interactiveTeachState" class="badge neutral">Interactive teaching idle</div>
+        <div class="two-col">
+          <button id="interactiveTeachStart" class="secondary">Start teaching</button>
+          <button id="interactiveTeachFinish" class="primary">Finish & learn</button>
+        </div>
+        <p class="help">Interactive teaching records the semantic navigation/click sequence from the live HIP browser. Customer values, raw selectors and screen coordinates are not promoted. After Finish & learn, confirm the phase with Looks correct so the demonstrated path can be exact-reproved and promoted to deterministic replay.</p>
+        <hr class="soft-separator" />
+        <h3 style="margin-top:10px">Learning-phase review</h3>
+        <div id="humanPhaseReviewState" class="badge neutral">No review</div>
+        <p id="humanPhaseReviewReason" class="help">When a phase is learned for the first time, the agent asks once after judging—even when the judge says PASS—so your confirmation can train the judge/policy.</p>
+        <div id="humanPhaseReviewMeta" class="help"></div>
+        <label>Review note<textarea id="humanPhaseReviewNote" rows="2" placeholder="Optional: explain what is correct or what still needs fixing"></textarea></label>
+        <div class="two-col">
+          <button id="humanPhaseApprove" class="primary">Looks correct</button>
+          <button id="humanPhaseReject" class="danger">Needs correction</button>
+        </div>
+        <button id="humanPhaseRefresh" class="secondary wide">Refresh phase review</button>
+        <p class="help">A human approval only reconciles model/judge disagreement when exact browser evidence already proves the required values. It cannot bypass missing fields or failed row counts.</p>
+      </section>
+
+      <section class="side-section controls">
+        <button id="startBtn" class="primary wide">Start mission</button>
+        <div class="two-col">
+          <button id="pauseBtn" class="secondary">Pause</button>
+          <button id="resumeBtn" class="secondary">Resume</button>
+        </div>
+        <button id="stopBtn" class="danger wide">Stop</button>
+        <p class="help">Pause suspends only the Python agent controller. Chrome stays interactive for Dell SSO or supervised recovery.</p>
+      </section>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">HIP BROWSER INTELLIGENCE</p>
+          <h1>AgentQ UI/API Mission</h1>
+          <p class="subtitle">JavaScript UI · FastAPI · Browser Use · AutoWebGLM · LangChain · MCP · AutoGen · MLflow Async · governed execution</p>
+        </div>
+        <div class="top-actions">
+          <span id="backendBadge" class="badge neutral">Backend</span>
+          <span id="autogenBadge" class="badge neutral">AutoGen</span>
+          <button id="refreshBtn" class="icon-button" title="Refresh">↻</button>
+        </div>
+      </header>
+
+      <section class="metrics">
+        <article><span>Process</span><strong id="processMetric">—</strong><small id="pidMetric">PID —</small></article>
+        <article><span>Execution scope</span><strong id="scopeMetric">—</strong><small id="phaseMetric">—</small></article>
+        <article><span>Preflight</span><strong id="preflightMetric">Not run</strong><small id="inputMetric">Input pending</small></article>
+        <article><span>Runs</span><strong id="runsMetric">0</strong><small id="apiMetric">capture</small></article>
+        <article><span>Adaptive Learning</span><strong id="adaptiveMetric">—</strong><small id="adaptiveDetail">freshness-aware memory</small></article>
+        <article><span>Induced Skills</span><strong id="skillsMetric">—</strong><small id="skillsDetail">validated workflow memory</small></article>
+        <article><span>Replay Policy</span><strong id="policyMetric">—</strong><small id="policyDetail">explore ↔ exploit</small></article>
+        <article><span>MLflow Async</span><strong id="mlflowMetric">—</strong><small id="mlflowDetail">observability only</small></article>
+        <article><span>Model Champion</span><strong id="modelPortfolioMetric">—</strong><small id="modelPortfolioDetail">On-Prem champion/challenger</small></article>
+        <article><span>Recursive Improvement</span><strong id="recursiveMetric">—</strong><small id="recursiveDetail">bounded self-improvement</small></article>
+      </section>
+
+      <nav class="tabs" id="tabs">
+        <button class="active" data-tab="preflight">Preflight</button>
+        <button data-tab="mission">Mission</button>
+        <button data-tab="capabilities">Capabilities</button>
+        <button data-tab="apis">API Contracts</button>
+        <button data-tab="tasks">Certified Tasks</button>
+        <button data-tab="governance">Governance</button>
+      </nav>
+
+      <section id="preflight" class="tab-panel active">
+        <div class="panel-grid two">
+          <article class="panel">
+            <div class="panel-head"><h2>Mission readiness</h2><span id="preflightState" class="badge neutral">Not run</span></div>
+            <div id="preflightSummary" class="empty">Run preflight to validate input, phase coverage, golden screenshots, upload assets and AutoGen runtime.</div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h2>Input-driven + row plan</h2><span class="badge">Dynamic rows</span></div>
+            <div id="rowPlan" class="empty">No row plan loaded.</div>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-head"><h2>Windows live-runtime certification</h2><span id="liveRuntimeCertState" class="badge neutral">Not run</span></div>
+          <div id="liveRuntimeCertSummary" class="empty">Run on the HIP workstation. A headed Edge/Chrome window may open for Dell SSO. The check is non-mutating and proves Playwright MCP, DevTools MCP, HIP Intelligence MCP, Dell AIA and read-only PyAutoGUI MCP against the real desktop.</div>
+          <div id="liveRuntimeCertChecks" class="table-wrap"></div>
+          <p class="help">The resulting runtime certificate is hash-verified, runtime-fingerprinted and consumed by Live GO/NO-GO when required by config.</p>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Live GO/NO-GO readiness</h2><span id="liveReadinessState" class="badge neutral">Not run</span></div>
+          <div id="liveReadinessSummary" class="empty">Run immediately before a real mission. This launches non-invasive browser/MCP probes, tests both Dell AIA models, and proves the runs path is writable.</div>
+          <div id="liveReadinessChecks" class="table-wrap"></div>
+          <p class="help">A passing receipt is valid for 10 minutes and is bound to the exact config, input JSON, runs path, selected phases and API mode. Any change invalidates it.</p>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Model availability</h2><span class="badge">Dell AIA live probe</span></div>
+          <div class="panel-grid two">
+            <div>
+              <div class="button-row"><button id="testTextModelBtn" class="secondary">Test text model</button><span id="textModelState" class="badge neutral">Not tested</span></div>
+              <div id="textModelDetails" class="kv"><b>Purpose</b><span>Verify the configured text deployment responds before a mission starts.</span></div>
+            </div>
+            <div>
+              <div class="button-row"><button id="testVisionModelBtn" class="secondary">Test vision model</button><span id="visionModelState" class="badge neutral">Not tested</span></div>
+              <div id="visionModelDetails" class="kv"><b>Purpose</b><span>Verify real image understanding with a synthetic red/blue pixel probe.</span></div>
+            </div>
+          </div>
+        </article>
+        <div class="panel-grid two">
+          <article class="panel"><div class="panel-head"><h2>Expert skill vetting</h2><span class="badge">Vetted before run</span></div><div id="skillVetting" class="table-wrap"></div></article>
+          <article class="panel"><div class="panel-head"><h2>Context budget</h2><span class="badge">Phase-local</span></div><div id="contextBudget" class="kv"></div></article>
+        </div>
+        <article class="panel"><div class="panel-head"><h2>Selected phase coverage</h2></div><div id="phaseCoverage" class="table-wrap"></div></article>
+      </section>
+
+      <section id="mission" class="tab-panel">
+        <div class="panel-grid two">
+          <article class="panel">
+            <div class="panel-head"><h2>Live process</h2><span id="liveState" class="badge neutral">Stopped</span></div>
+            <div id="processDetails" class="kv"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h2>Recent runs</h2><button id="runsRefresh" class="small-button">Refresh</button></div>
+            <div id="runsList" class="run-list"></div>
+          </article>
+        </div>
+        <article class="panel agent-live-view" id="agentLiveViewPanel">
+          <div class="panel-head"><h2>Agent Live View</h2><div><span id="agentLiveViewState" class="badge neutral">Waiting</span> <span class="badge">What the agent sees / selects</span></div></div>
+          <p class="help">Browser-Use-style observability: the same live semantic gate that authorizes HIP actions drives these transient overlays. Private model chain-of-thought, selectors, coordinates and customer values are not stored.</p>
+          <div id="agentVisualStateBanner" class="visual-state-banner waiting"><strong>WAITING</strong><span>Memory proposes; the live page authorizes every action.</span></div>
+          <div class="visual-legend" aria-label="Visual intelligence overlay legend">
+            <span><i style="--swatch:#2f80ed"></i>See</span><span><i style="--swatch:#9b51e0"></i>Candidate</span><span><i style="--swatch:#f2c94c"></i>Identified</span><span><i style="--swatch:#f2994a"></i>Act / Fill</span>
+            <span><i style="--swatch:#27ae60"></i>Verified</span><span><i style="--swatch:#18b7b0"></i>Revealed</span><span><i style="--swatch:#eb5757"></i>Failed</span><span><i style="--swatch:#ff5ca8"></i>Foreground</span>
+          </div>
+          <div id="agentOverlayCounters" class="visual-counter-grid"></div>
+          <div class="agent-live-layout">
+            <div class="agent-live-visual">
+              <img id="agentLiveScreenshot" class="agent-live-screenshot hidden" alt="Current browser screenshot with selected target highlighted" />
+              <div id="agentLiveScreenshotEmpty" class="agent-live-empty">Waiting for the first selected browser target…</div>
+            </div>
+            <div class="agent-live-summary">
+              <div id="agentLiveIntent" class="kv"></div>
+              <div class="agent-live-block"><h3>Current website state</h3><div id="agentLiveSurface" class="kv"></div></div>
+              <div class="agent-live-block"><h3>Selected target</h3><div id="agentLiveSelected" class="kv"></div></div>
+            </div>
+          </div>
+          <div class="agent-live-block"><div class="panel-head compact"><h3>Candidate ranking</h3><span class="muted">Why this control won / others were rejected</span></div><div id="agentLiveCandidates" class="table-wrap"><div class="empty">Candidate ranking will appear before each action.</div></div></div>
+          <div class="agent-live-block"><div class="panel-head compact"><h3>Current dropdown / Process Step options</h3><span class="muted">Mounted options discovered from the live page</span></div><div id="agentLiveOptions"><div class="empty">Options will appear when a dropdown is selected.</div></div></div>
+          <div class="agent-live-block">
+            <div class="panel-head compact"><h3>Persistent semantic website memory</h3><span class="muted">Verified states/transitions only; current page always wins</span></div>
+            <div id="agentLiveMemory" class="kv"></div>
+            <div id="agentLiveMemoryHints" class="table-wrap"><div class="empty">Verified website memory will appear after successful actions.</div></div>
+          </div>
+          <div class="adaptive-learning-card">
+            <div class="panel-head compact"><h3>Adaptive Self-Improvement</h3><span class="badge info">freshness + drift aware</span></div>
+            <div class="adaptive-health-row"><strong id="agentLearningHealth">0%</strong><div class="learning-progress"><span id="agentLearningProgress" style="width:0%"></span></div></div>
+            <div class="adaptive-stats"><div><span>Stale memory</span><strong id="agentStaleKnowledge">0</strong></div><div><span>Drift suspects</span><strong id="agentDriftKnowledge">0</strong></div><div><span>Fresh knowledge</span><strong id="agentFreshKnowledge">0</strong></div></div>
+            <p class="help">Old evidence decays; repeated contradictions are demoted; successful live rediscovery restores confidence.</p>
+          </div>
+          <div class="agent-live-block">
+            <div class="panel-head compact"><h3>Recent agent decision history</h3><span class="muted">observable events, not private reasoning</span></div>
+            <div id="agentDecisionHistory" class="decision-timeline"><div class="empty">Decision history will appear during a mission.</div></div>
+          </div>
+          <div class="agent-live-grid">
+            <div class="agent-live-block"><h3>AutoWebGLM planner</h3><div id="agentLivePlanner" class="kv"></div></div>
+            <div class="agent-live-block"><h3>Executor</h3><div id="agentLiveExecution" class="kv"></div></div>
+            <div class="agent-live-block"><h3>Verification</h3><div id="agentLiveVerification" class="kv"></div></div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><h2>Mission step trace</h2><div><span id="missionTraceState" class="badge neutral">Waiting</span> <span class="badge">AutoWebGLM → PyAutoGUI MCP → Playwright fallback</span></div></div>
+          <div id="missionTraceSummary" class="muted">No live mission trace yet.</div>
+          <div id="missionTraceSteps" class="mission-trace"></div>
+        </article>
+        <article class="panel console-panel"><div class="panel-head"><h2>Mission console</h2><span>auto-refresh 3s</span></div><pre id="console">Waiting for mission output…</pre></article>
+      </section>
+
+      <section id="capabilities" class="tab-panel">
+        <article class="panel">
+          <div class="toolbar"><input id="capSearch" placeholder="Search learned capabilities" /><select id="capFamily"><option value="">All families</option></select><button id="capLoad" class="secondary">Search</button></div>
+          <div id="capabilitySummary" class="muted">Loading canonical + live learning memory…</div>
+          <div id="capabilitiesTable" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section id="apis" class="tab-panel">
+        <article class="panel">
+          <div class="toolbar"><input id="apiFamily" placeholder="Page family (optional)" /><select id="apiMethod"><option value="">Any method</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select><button id="apiLoad" class="secondary">Load</button></div>
+          <div id="apiSummary" class="muted">Loading canonical + observed API contracts…</div>
+          <div id="apisTable" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section id="tasks" class="tab-panel">
+        <div class="panel-grid two">
+          <article class="panel">
+            <h2>Certified future task · Universal portal operator</h2>
+            <p class="muted">Learn unfamiliar portal pages/actions, execute the user request from live evidence, and use input.json as the value authority for forms.</p>
+            <textarea id="taskText" rows="6" placeholder='Example: Open Partner Settings, edit "ACME", fill the form from input.json, save, validate, then deploy'></textarea>
+            <div class="two-col"><label>Input JSON<input id="taskInputJson" value="./input.json" /></label><label>Input root (optional)<input id="taskInputRoot" placeholder="$.objects.partner" /></label></div>
+            <label>Start URL (optional)<input id="taskStartUrl" placeholder="Uses portal.base_url when blank" /></label>
+            <label class="check"><input id="taskDeepLearn" type="checkbox" checked /> Learn unfamiliar pages, actions and form semantics</label>
+            <div class="two-col"><label>Operator role<input id="taskOperatorRole" value="admin" /></label><label>Approval ID<input id="taskApprovalId" placeholder="CHG-001 (when required)" /></label></div>
+            <label class="check danger-check"><input id="taskAllowMutation" type="checkbox" /> Allow requested portal mutations</label>
+            <label>Mutation confirmation<input id="taskMutationConfirmation" placeholder="ALLOW HIP MUTATION" /></label>
+            <label class="check"><input id="taskForceRepeatMutation" type="checkbox" /> Explicitly allow repeating a prior successful mutation (unresolved outcomes remain blocked)</label>
+            <div class="button-row"><button id="taskPlan" class="secondary">Plan</button><button id="taskRun" class="secondary">Run portal task</button></div>
+            <div class="button-row"><button id="productionDoctor" class="secondary">Production doctor</button><button id="productionRun" class="primary">Run full E2E</button></div>
+            <p class="help">Full E2E adds single-browser locking, live-certificate enforcement for mutations, operator/approval governance, duplicate-mutation quarantine, immutable request hashes, a hash-chained journal and a safe review bundle.</p>
+          </article>
+          <article class="panel"><h2>Plan / execution response</h2><pre id="taskOutput" class="json-output">No task submitted.</pre></article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><h2>Induced skill library</h2><button id="skillLibraryLoad" class="small-button">Refresh</button></div>
+          <p id="skillLibrarySummary" class="muted">Successful exact-verified activities become value-free reusable skills. Every replay is re-proven against the current live page.</p>
+          <div class="toolbar"><input id="skillLibrarySearch" placeholder="Search learned activity" /><select id="skillLibraryStatus"><option value="">All statuses</option><option value="validated">Validated</option><option value="drift_suspect">Drift suspect</option><option value="candidate">Candidate</option></select></div>
+          <div id="skillLibraryTable" class="table-wrap"><div class="empty">No skill library loaded yet.</div></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Dreaming / replay policy cache</h2><button id="replayPolicyLoad" class="small-button">Refresh</button></div>
+          <p id="replayPolicySummary" class="muted">Old runs become a value-free replay world. The agent scores goal success, exact input coverage and execution cost, then chooses exploration, hybrid or exploitation for the next run.</p>
+          <div id="replayPolicyTable" class="table-wrap"><div class="empty">No replay policy cache loaded yet.</div></div>
+          <pre id="replayRunHistory" class="json-output">Recent replay episodes will appear here.</pre>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>On-Prem model portfolio · champion / challenger</h2><button id="modelPortfolioLoad" class="small-button">Refresh</button></div>
+          <p id="modelPortfolioSummary" class="muted">Parallel Dell AIA candidates propose decisions; only the governed executor can act. Real task reward promotes the best model per role.</p>
+          <div id="modelPortfolioTable" class="table-wrap"><div class="empty">No model portfolio history yet.</div></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Recursive self-improvement</h2><button id="recursiveImprovementLoad" class="small-button">Refresh</button></div>
+          <p class="muted">Bounded recursive cycles improve replay policy, model routing and skill confidence from verified outcomes. Runtime source-code rewriting is disabled.</p>
+          <pre id="recursiveImprovementState" class="json-output">No recursive-improvement state yet.</pre>
+        </article>
+      </section>
+
+      <section id="governance" class="tab-panel">
+        <div class="panel-grid two">
+          <article class="panel">
+            <h2>Governed change</h2>
+            <textarea id="changeText" rows="5" placeholder="Describe the HIP change"></textarea>
+            <div class="two-col"><label>Operator role<input id="operatorRole" value="admin" /></label><label>Approval ID<input id="approvalId" placeholder="CHG-001" /></label></div>
+            <label class="check danger-check"><input id="allowPortalMutation" type="checkbox" /> Allow portal mutation</label>
+            <label>Confirmation<input id="mutationConfirmation" placeholder="Required only for mutation execution" /></label>
+            <div class="button-row"><button id="changePreview" class="secondary">Preview</button><button id="changeRun" class="danger">Execute governed change</button></div>
+          </article>
+          <article class="panel"><div class="panel-head"><h2>Governance / audit</h2><button id="auditLoad" class="small-button">Refresh</button></div><pre id="governanceOutput" class="json-output">No governance action yet.</pre></article>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

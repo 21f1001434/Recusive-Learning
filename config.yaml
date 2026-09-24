@@ -1,0 +1,840 @@
+portal:
+  # The user-supplied BizLink Partner URL is used as initial URL so Dell SSO lands close to the target area.
+  # Browser profile is persistent, so the second run normally reuses the completed Dell SSO session.
+  base_url: "https://developer.dell.com/hybrid-integrations/bizlink/partner"
+  environment: "DEV"
+  browser_user_data_dir: "./data/chrome_profile"
+  headless: false
+  timeout_ms: 45000
+  sso_timeout_seconds: 900
+  # Evidence-based loading classification. Passive inline spinners, table progress
+  # bars, and persistent aria-busy markers do not delay the agent when the
+  # requested control or active form is already interactable.
+  loading_watchdog_timeout_seconds: 300
+  loading_watchdog_poll_seconds: 1.0
+  loading_watchdog_max_refreshes_per_phase: 1
+  loading_watchdog_consecutive_blocking_samples: 2
+  loading_watchdog_min_viewport_ratio: 0.08
+  loading_watchdog_min_surface_cover_ratio: 0.45
+  loading_watchdog_ignore_passive_indicators: true
+  loading_watchdog_vision_confirm_before_refresh: true
+  loading_watchdog_vision_confidence_threshold: 0.70
+  loading_watchdog_vision_fail_closed: true
+  autonomous_page_health_enabled: true
+  # Google Chrome Stable is primary. Edge is a startup-only fallback if Chrome cannot launch before SSO.
+  chromium_channel: "chrome"
+  # Optional explicit browser paths for locked-down corporate images.
+  # Example Edge: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+  edge_executable_path: null
+  chrome_executable_path: null
+  # Startup-only fallback. The selected browser owns the single Dell SSO session
+  # for the whole mission; no browser switch is allowed after execution starts.
+  allow_browser_fallback: true
+  fallback_to_chrome: true
+  fallback_to_edge: true
+  fallback_to_playwright_chromium: true
+  chrome_user_data_dir: "./data/chrome_profile"
+  edge_user_data_dir: "./data/edge_profile"
+  chromium_user_data_dir: "./data/chromium_profile"
+  startup_cdp_probe_seconds: 8
+  slow_mo_ms: 0
+  sso_success_url_patterns:
+    - "/hybrid-integrations"
+    - "/bizlink"
+    - "/portal"
+    - "/configuration"
+  sso_login_url_keywords:
+    - "login"
+    - "signin"
+    - "sso"
+    - "auth"
+    - "saml"
+    - "oauth"
+    - "okta"
+  sso_positive_texts:
+    - "partner"
+    - "system"
+    - "bizlink"
+    - "hybrid integrations"
+
+browser:
+  search_timeout_ms: 30000
+  detail_timeout_ms: 30000
+  network_idle_timeout_ms: 5000
+
+navigation:
+  # These two exact URLs are the main route for ID exploration.
+  partner_candidate_paths:
+    - "https://developer.dell.com/hybrid-integrations/bizlink/partner"
+    - "/hybrid-integrations/bizlink/partner"
+  system_candidate_paths:
+    - "https://developer.dell.com/hybrid-integrations/bizlink/system"
+    - "/hybrid-integrations/bizlink/system"
+  partner_nav_texts:
+    - "Partners"
+    - "Partner"
+    - "Trading Partners"
+    - "Partner Management"
+  system_nav_texts:
+    - "Systems"
+    - "System"
+    - "System Management"
+  search_labels:
+    - "Search"
+    - "Filter"
+    - "Name"
+    - "Partner Name"
+    - "System Name"
+    - "Keyword"
+  detail_link_texts:
+    - "View"
+    - "Details"
+    - "Edit"
+    - "Open"
+    - "Manage"
+  menu_button_texts:
+    - "Menu"
+    - "Navigation"
+    - "Configuration"
+    - "Setup"
+    - "Admin"
+    - "Hybrid Integrations"
+    - "BizLink"
+
+extraction:
+  minimum_confidence: 0.90
+  open_first_matching_row: true
+  capture_network_json: true
+  capture_all_network_metadata: true
+  capture_cdp_network: true
+  max_network_body_chars: 150000
+  max_network_events_in_report: 120
+  collect_dom_clicks: true
+  collect_dom_events: true
+  collect_dom_mutations: true
+  max_dom_event_records: 6000
+  max_dom_mutation_records: 6000
+  # Set true only when you want a screenshot per click. It creates many files.
+  screenshot_each_click: false
+  max_explore_clicks: 12
+
+api:
+  enabled: false
+  dry_run: true
+  base_url: ""
+  token_env_var: "HIP_API_TOKEN"
+  token_command: []
+  requester_id: ""
+  account_id: ""
+  work_order_id: ""
+  requests: []
+  # AgentQ UI/API fusion. Contracts and payload keys are learned only from
+  # authenticated browser traffic; the LLM may not invent endpoints or schemas.
+  capture_observed_contracts: true
+  dual_ui_api: false
+  capture_submit_payload: false
+  execution_mode: "capture"   # capture | dry_run | validate | write
+  require_capture_for_completion: false
+  max_observed_contracts_per_phase: 500
+  export_openapi: true
+  export_postman: true
+  build_ui_api_crosswalk: true
+  replay_observed_validation_requests: true
+  allow_mutating_methods: false
+  mutation_confirmation_env_var: "HIP_ALLOW_API_MUTATION"
+  allowed_api_hosts: []
+
+# Optional Dell AIA / gpt-oss-120b fallback.
+# Normal extraction uses UI + URL + table + Network-tab JSON. AIA is only used if confidence is low.
+aia:
+  # Optional Dell AIA / AutoGen planner.  The deterministic MCP/Playwright
+  # filler still executes all safe browser actions; the LLM only plans/judges
+  # form-state dependencies and wrong-control matches.
+  enabled: true
+  endpoint_env_var: "AIA_ENDPOINT"
+  base_url_env_var: "AIA_BASE_URL"
+  token_env_var: "AIA_TOKEN"
+  token_command: []
+  auth_mode: "auto"   # auto | env | command | sso | client_credentials
+  client_id_env_var: "CLIENT_ID"
+  client_secret_env_var: "CLIENT_SECRET"
+  use_aia_auth_package: true
+  model: "gpt-oss-120b"
+  timeout_seconds: 120
+  max_snapshot_chars: 40000
+
+mcp:
+  # No additional generic browser MCP. Playwright MCP executes; Chrome DevTools MCP witnesses; the existing local HIP Intelligence MCP provides website-specific semantic intelligence.
+  browser_backend: "mcp"   # MCP required; allowed: playwright, mcp, auto
+  use_playwright_mcp: true
+  use_chrome_devtools_mcp: true
+  use_browser_mcp_for_sso: false
+  use_hip_intelligence_mcp: true
+  hip_intelligence_mcp_required: false
+  hip_intelligence_mcp_command: ""
+  hip_intelligence_mcp_args: []
+  hip_intelligence_mcp_startup_timeout_seconds: 20
+  strict_runtime_required: false
+
+  # Official Microsoft Playwright MCP. It attaches to the same Microsoft Edge instance
+  # over CDP and is the primary executor for safe selector actions.
+  playwright_mcp_command: "auto"
+  playwright_mcp_args:
+    - "@playwright/mcp@0.0.79"
+  playwright_mcp_startup_timeout_seconds: 60
+  playwright_mcp_remote_debugging_port: 9237
+  playwright_mcp_primary_for_safe_actions: true
+  playwright_mcp_find_first: true
+  playwright_mcp_fill_form_enabled: true
+  playwright_mcp_fill_form_min_fields: 2
+  playwright_mcp_verify_every_action: true
+  playwright_mcp_snapshot_after_action: true
+  playwright_mcp_required_when_require_mcp: true
+  # Chrome DevTools MCP is now implemented through a stdio adapter.
+  # It calls the pre-existing npm MCP server; no custom MCP server is created.
+  chrome_devtools_command: "auto"
+  chrome_devtools_args:
+    - "chrome-devtools-mcp@1.6.0"
+    - "--no-usage-statistics"
+  chrome_devtools_startup_timeout_seconds: 60
+  chrome_devtools_request_timeout_seconds: 30
+  chrome_devtools_shutdown_timeout_seconds: 3
+  chrome_devtools_mcp_direct_backend_enabled: true
+  chrome_devtools_attach_same_browser: true
+  chrome_devtools_experimental_page_id_routing: true
+  require_dual_mcp_same_surface: true
+  dual_mcp_same_surface_timeout_seconds: 30
+  dual_mcp_same_surface_poll_seconds: 1
+  # Same authenticated browser recovery after a CDP/MCP transport disconnect.
+  # MCP clients can reattach; the Edge/Chrome process is never switched mid-mission.
+  executor_rebind_enabled: true
+  executor_rebind_timeout_seconds: 12
+  executor_rebind_max_attempts_per_phase: 2
+  executor_rebind_fail_on_ambiguous_tabs: true
+
+
+expert_skills:
+  # Five execution principles: description triggers explicit HIP skills, skills are
+  # grounded in learned portal expertise, context is phase-local, deterministic
+  # scripts execute first, and every selected skill is vetted before browser launch.
+  enabled: true
+  description_trigger_enabled: true
+  require_skill_vetting: true
+  deterministic_first: true
+  context_max_chars: 64000
+  recovery_context_max_chars: 128000
+  max_capabilities_per_family: 48
+  browser_use_recovery_context: true
+  broad_context_only_on_recovery: true
+
+autowebglm:
+  # PRIMARY browser-decision framework. AutoWebGLM receives task + simplified
+  # HTML + viewport + action history for normal HIP interactions. Existing
+  # deterministic HIP/DDS routines are verified tool adapters under this policy.
+  # All tools operate on the SAME authenticated Microsoft Edge session.
+  enabled: true
+  primary_framework: true
+  recovery_only: false
+  deterministic_tool_fallback: true
+  require_intent_alignment: true
+  max_primary_decision_seconds: 12
+  use_existing_dell_aia: true
+  # Optional external wrapper around a local/native AutoWebGLM checkpoint. Leave
+  # empty to use the existing Dell AIA model with the AutoWebGLM protocol.
+  native_model_command: []
+  max_html_chars: 70000
+  max_history_actions: 40
+  max_tabs: 12
+  max_prompt_chars: 110000
+  timeout_seconds: 20
+  require_agentq_reward_gate: true
+  allowed_actions: [click, hover, select, type_string, scroll_page, go, jump_to, switch_tab, user_input, finish]
+  block_mutation_labels: true
+
+langchain_browser_toolkit:
+  # Upstream LangChain PlayWrightBrowserToolkit connected over CDP to the SAME
+  # HIP Chrome. Only read-only perception tools are exposed to recovery.
+  enabled: true
+  attach_same_browser: true
+  startup_attach: false
+  attach_timeout_seconds: 8
+  read_only: true
+  fail_open_if_unavailable: true
+  timeout_seconds: 6
+  max_text_chars: 30000
+  max_element_chars: 30000
+  allowed_tools: [current_webpage, extract_text, get_elements, extract_hyperlinks]
+
+vision_runtime:
+  # Multimodal perception is used during recovery and to confirm a loader before
+  # the five-minute Edge refresh watchdog reloads the page.
+  enabled: true
+  require_model: true
+  use_for_recovery: true
+  use_for_loading_watchdog: true
+  loading_refresh_after_seconds: 300
+  loading_confidence_threshold: 0.70
+  timeout_seconds: 30
+  max_prompt_chars: 24000
+  max_recovery_summary_chars: 12000
+  fail_closed_when_unavailable: true
+  auto_discovery: true
+  auto_candidates: ["gemma-3-27b-it", "pixtral-12b-2409", "florence-2-large-ft"]
+
+
+pyautogui:
+  # V229 hybrid visible-desktop executor. Semantic/DOM evidence resolves the
+  # exact HIP control first; PyAutoGUI MCP performs click/type/key physically.
+  # Playwright MCP is the deterministic fallback and independent verifier.
+  enabled: true
+  windows_only: true
+  interaction_mode: "primary"
+  primary_for_clicks: true
+  primary_for_form_fill: true
+  primary_for_search_fill: true
+  primary_for_keys: true
+  fallback_to_playwright_mcp: true
+  fallback_to_python_playwright: true
+  require_semantic_target_for_web_actions: true
+  mcp_enabled: true
+  mcp_required: false
+  mcp_command: ""   # empty => current Python: -m pyautogui_mcp --transport stdio
+  mcp_args: []
+  mcp_prefix: "pyautogui_"
+  mcp_startup_timeout_seconds: 20
+  mcp_request_timeout_seconds: 15
+  mcp_shutdown_timeout_seconds: 3
+  mcp_stream_limit_bytes: 33554432   # 32 MiB; prevents large screenshot JSON-RPC line overflow
+  prefer_mcp: true
+  prefer_mcp_before_local_web_fallback: true
+  use_for_structural_web_recovery: true
+  use_for_form_fill_recovery: true
+  use_for_key_recovery: true
+  allow_local_fallback_if_mcp_unavailable: true
+  allow_mutation_clicks: true
+  allow_native_screen_targets: true
+  native_target_confidence_threshold: 0.97
+  native_target_evidence_sources: ["vision", "native_dialog", "browser_chrome"]
+  visual_structural_recovery_enabled: true
+  visual_target_confidence_threshold: 0.94
+  visual_target_max_attempts: 2
+  ascii_only_text: true
+  max_attempts_per_action: 1
+  locator_timeout_ms: 5000
+  stability_wait_ms: 150
+  bbox_stability_tolerance_px: 3
+  screen_margin_px: 2
+  move_duration_seconds: 0.12
+  key_interval_seconds: 0.01
+  settle_ms: 300
+  pause_seconds: 0.05
+  verify_after_fill: true
+  verify_after_click_event: true
+
+browser_use:
+  # Browser-Use attaches to the SAME HIP browser over CDP for structured page
+  # state/recovery. PyAutoGUI MCP remains the primary physical interaction engine.
+  # browser-use/web-ui is optional and runs as a separate debugging sidecar.
+  enabled: true
+  webui_enabled: false
+  webui_repo_dir: "./third_party/browser-use-web-ui"
+  webui_host: "127.0.0.1"
+  webui_port: 7788
+  attach_same_browser: true
+  # Set use_own_browser=true plus cdp_url to attach ALL HIP browser layers to an
+  # already-running authenticated Chrome (Browser-Use WebUI-style own-browser mode).
+  use_own_browser: false
+  cdp_url: ""
+  keep_alive: true
+  keep_browser_open: true
+  startup_attach: false
+  recovery_only_attach: true
+  safe_managed_browser_mode: true
+  non_invasive_detach: true
+  attach_timeout_seconds: 8
+  snapshot_timeout_seconds: 4
+  detach_after_recovery: true
+  use_state_snapshot_for_recovery: true
+  dynamic_repeatable_rows: true
+  fail_open_if_unavailable: true
+  max_state_chars: 60000
+  # Optional browser evidence (off by default when it can be large/sensitive).
+  record_video: false
+  record_video_dir: ""
+  record_video_width: 1440
+  record_video_height: 950
+  capture_playwright_trace: false
+  trace_dir: ""
+  trace_screenshots: true
+  trace_snapshots: true
+  trace_sources: false
+  save_downloads: true
+  download_dir: ""
+  save_session_history: true
+  history_dir: ""
+  capture_state_on_phase_transition: true
+  capture_state_after_actions: false
+  max_history_entries: 400
+
+brain:
+  enabled: true
+  directory: "portal_brain"
+  bootstrap_from_runs: true
+  require_judge_pass_for_promotion: true
+  learn_warning_runs_as_candidates: true
+  min_validated_edge_confidence: 0.60
+  max_source_runs: 300
+  prefer_semantic_locators: true
+  reject_dynamic_selectors_as_primary: true
+  auto_import_unified_kb: true
+  unified_kb_path: "./knowledge_base/HIP_Unified_Deep_KB.json"
+  unified_kg_path: "./knowledge_base/HIP_Unified_Knowledge_Graph.json"
+  unified_kb_required: true
+  force_unified_kb_reimport: false
+  self_heal_kb: true
+  auto_apply_validated_kb_repairs: true
+  kb_repair_min_confirmations: 1
+  kb_supersede_min_confirmations: 2
+  preserve_original_kb: true
+  export_corrected_kb_after_run: true
+  revalidate_known_parent_branches: true
+  # Reuse judge-validated structure/action patterns for similar HIP flows.
+  # Current customer values always come from the active input.json.
+  flow_pattern_memory_enabled: true
+  flow_pattern_min_similarity: 0.78
+  flow_pattern_max_patterns: 500
+  flow_pattern_allow_cross_phase_same_family: true
+  # V233 Stage 3: persistent semantic website world model.
+  world_model_enabled: true
+  world_model_min_validated_confirmations: 1
+  world_model_min_validated_confidence: 0.72
+  world_model_failure_decay: 0.18
+  world_model_use_for_candidate_scoring: true
+  world_model_use_for_planning: true
+  # V234: freshness-aware confidence, stale-memory detection and portal-drift demotion.
+  world_model_recency_decay_enabled: true
+  world_model_confidence_half_life_days: 45.0
+  world_model_stale_after_days: 90.0
+  world_model_drift_failure_threshold: 2
+  world_model_drift_penalty: 0.22
+  world_model_auto_demote_on_drift: true
+
+
+portal_learning:
+  # Learn the portal as a versioned system, not only as a list of selectors.
+  # Every phase is observed through Python Playwright + both MCPs.
+  enabled: true
+  capture_accessibility_snapshots: true
+  accessibility_snapshot_depth: 12
+  capture_devtools_snapshots: true
+  capture_api_contracts: true
+  capture_validation_rules: true
+  # Only key names are retained; storage values, tokens and cookies are excluded.
+  capture_storage_key_names: true
+  # Chrome DevTools performance tracing is used only on retries by default.
+  capture_performance_trace: true
+  performance_trace_on_retry_only: true
+  max_network_contracts_per_phase: 250
+  max_control_signatures_per_phase: 800
+  max_exploration_agenda_items: 50
+  promote_only_after_judge_pass: true
+  detect_portal_drift: true
+  information_gain_agenda: true
+  fail_open_for_learning_capture: true
+  # V233 Stage 1: understand the live website before acting.
+  deep_website_understanding_enabled: true
+  website_understanding_max_controls: 3000
+  website_understanding_max_options_per_control: 500
+  website_understanding_max_events: 500
+  capture_registered_event_listener_types: true
+  website_understanding_event_listener_control_limit: 160
+  website_understanding_min_confidence: 0.72
+  # V233 Stage 2: show the current browser target/candidates/executor/effect live.
+  agent_live_view_enabled: true
+  agent_live_view_capture_screenshots: true
+  agent_live_view_capture_website_summary: true
+  agent_live_view_history_limit: 120
+  # V234 Browser-Use-style multi-color visual intelligence overlay.
+  visual_overlay_enabled: true
+  visual_overlay_max_seen_controls: 80
+  visual_overlay_max_candidates: 8
+  visual_overlay_show_labels: true
+  visual_overlay_highlight_foreground_surface: true
+  visual_overlay_result_hold_ms: 1400
+
+autonomous_form:
+  # V231 all-phase goal-driven form runtime. Screenshots/old KB are priors only; the live
+  # DOM/accessibility tree + AutoWebGLM observation are authoritative each cycle.
+  enabled: true
+  apply_to_data_map: true
+  apply_to_document_types: true
+  apply_to_rules: true
+  apply_to_transport_profiles: true
+  apply_to_biz_flow: true
+  apply_to_all_form_phases: true
+  max_adaptive_cycles: 5
+  no_progress_cycle_limit: 2
+  use_autowebglm_live_observation: true
+  use_dell_aia_binding_advisor_on_ambiguity: true
+  rediscover_controls_before_every_action: true
+  require_exact_readback: true
+  require_authoritative_executor_proof: true
+  persist_only_judge_verified_semantics: true
+  never_persist_selectors_or_coordinates: true
+  semantic_replay_blueprint_only: true
+  # V233 Stage 4 operational semantic transition planning.
+  operational_world_model_enabled: true
+  dynamic_option_resolution_enabled: true
+  allow_unique_validated_memory_option_when_input_missing: true
+  transition_planning_enabled: true
+  transition_plan_requires_live_reproof: true
+  mutation_governance_always_required: true
+
+runtime_self_heal:
+  enabled: true
+  max_phase_attempts: 5
+  max_total_repairs: 20
+  max_repeated_failure_signature: 2
+  max_no_progress_repeats: 3
+  max_phase_wall_seconds: 1200
+  no_progress_watchdog_seconds: 90
+  no_progress_poll_seconds: 5
+  no_progress_recent_signature_limit: 12
+  use_aia_advisor: true
+  aia_advisor_timeout_seconds: 20
+  aia_advisor_context_max_chars: 96000
+  capture_evidence: true
+  retry_unknown_once: true
+  fail_closed: true
+  until_complete: false
+  exploration_exploitation: true
+
+
+reporting:
+  runs_dir: "./runs"
+  memory_dir: "./data/hip_memory"
+  screenshot_dir_name: "screenshots"
+  save_html: true
+  save_markdown: true
+  save_json: true
+
+security:
+  mask_secrets: true
+  save_cookies: false
+  save_tokens: false
+  save_authorization_headers: false
+
+
+exploration:
+  enabled: false
+  collect_all_pages: false
+  prefer_nested_discovery: true
+  search_first: false
+  allow_direct_child_search_fallback: false
+  max_pages: 5
+  max_cards_per_page: 80
+  max_actions_per_entity: 6
+  max_total_actions: 80
+  allow_unsafe_clicks: false
+  open_edit_pages_for_readonly_capture: true
+  form_knowledge_agent_enabled: true
+  explore_parent_value_branches: true
+  max_parent_controls: 24
+  max_values_per_parent: 30
+  settle_ms: 700
+  use_llm_dependency_analyst: true
+  fail_closed_on_restore_error: false
+
+
+governance:
+  enabled: true
+  operator_role_env_var: "HIP_OPERATOR_ROLE"
+  default_operator_role: "viewer"
+  approval_id_env_var: "HIP_CHANGE_APPROVAL_ID"
+  require_approval_id_for_mutation: false
+  require_execution_input_immutability: true
+  require_governance_ledger_integrity_for_mutation: true
+  read_roles: ["viewer", "business", "support", "technical", "admin"]
+  draft_roles: ["business", "support", "technical", "admin"]
+  mutation_roles: ["technical", "admin"]
+  require_certified_family_for_mutation: true
+  require_preview_for_mutation: true
+  require_post_change_api_success: true
+  require_post_change_mcp_assurance: true
+  duplicate_window_hours: 168
+  mutation_reconciliation_timeout_seconds: 3.0
+  mutation_reconciliation_poll_seconds: 0.25
+  allow_pre_dispatch_rebind: true
+  block_unresolved_mutation_replay: true
+  ledger_filename: "change_audit_ledger.jsonl"
+
+semantic_understanding:
+  enabled: true
+  execute_confidence_threshold: 0.90
+  anchored_execute_confidence_threshold: 0.64
+  structural_opener_confidence_threshold: 0.52
+  anchored_ambiguity_margin: 0.02
+  prefer_vetted_locator_anchor: true
+  reobserve_confidence_threshold: 0.75
+  self_heal_confidence_threshold: 0.55
+  ambiguity_margin: 0.08
+  require_playwright_mcp_evidence: true
+  require_devtools_evidence: true
+  use_hip_intelligence_mcp_consensus: true
+  require_hip_intelligence_mcp_evidence: true
+  strict_external_evidence: false
+  use_vision_for_ambiguity: true
+  vision_confirmation_boost: 0.08
+  fail_closed: true
+  require_post_action_effect: true
+  revalidate_before_dispatch: true
+  prefer_stable_semantic_selector_for_mcp: true
+  learn_control_fingerprints: true
+  learn_state_graph: true
+  max_ranked_candidates_evidence: 6
+
+# v2.1.9: a recent passing Windows runtime certificate is required before the
+# normal Live GO/NO-GO may issue a mission receipt. Generate it with:
+#   python -m hip_id_agent.cli certify-live-runtime --config config.yaml
+live_runtime_certification:
+  enabled: true
+  require_for_live_go_no_go: true
+  ttl_seconds: 3600
+  require_pyautogui_mcp: false
+  latest_certificate_relative_path: ".hip_runtime/live_runtime_certificate.json"
+  auto_refresh_on_live_readiness: true
+  auto_refresh_only_when_mission_idle: true
+
+universal_operator:
+  enabled: true
+  deep_learning_enabled: true
+  max_execution_steps: 40
+  max_form_fill_cycles: 8
+  max_safe_discovery_actions: 12
+  learn_unknown_page_families: true
+  learn_unknown_actions: true
+  require_exact_input_coverage: true
+  require_live_reproof_every_action: true
+  persist_values: false
+
+skill_induction:
+  enabled: true
+  fast_replay_enabled: true
+  memory_subdir: "induced_skills"
+  min_verified_successes: 1
+  min_replay_confidence: 0.66
+  min_match_score: 0.45
+  confidence_half_life_days: 45.0
+  stale_after_days: 120.0
+  demote_after_failures: 2
+  max_skills: 500
+  prefer_skill_semantics_for_form_binding: true
+  require_exact_verification_for_induction: true
+  require_live_reproof_on_replay: true
+  store_values: false
+  store_selectors: false
+  store_coordinates: false
+
+replay_policy:
+  enabled: true
+  memory_subdir: "replay_policy"
+  import_old_runs: true
+  max_old_runs_to_import: 200
+  max_replay_episodes: 5000
+  dreaming_enabled: true
+  dream_after_every_run: true
+  min_replay_support: 2
+  exploitation_min_confidence: 0.78
+  exploitation_min_success_rate: 0.80
+  hybrid_min_confidence: 0.50
+  semantic_policy_match_threshold: 0.55
+  min_action_replay_support: 2
+  action_exploitation_threshold: 0.70
+  prefer_fast_replay_when_exploiting: true
+  force_exploration_on_drift: true
+  live_reproof_required: true
+  store_values: false
+  store_selectors: false
+  store_coordinates: false
+
+
+model_portfolio:
+  enabled: true
+  memory_subdir: "model_portfolio"
+  on_prem_only: true
+  parallel_models: 3
+  max_parallel_models: 6
+  learning_parallel_models: 4
+  complex_task_parallel_models: 4
+  min_distinct_models_during_learning: 2
+  force_multi_model_during_learning: true
+  force_multi_model_for_complex_tasks: true
+  fast_exploitation_single_model: true
+  disable_single_model_collapse_during_learning: true
+  shadow_reward_weight: 0.35
+  benchmark_low_confidence_only: false
+  availability_probe_enabled: true
+  availability_probe_on_task_start: true
+  availability_probe_ttl_seconds: 1800
+  availability_probe_parallelism: 4
+  record_usage_ledger: true
+  min_champion_trials: 3
+  min_champion_score: 0.78
+  text_models:
+    - "gpt-oss-120b"
+    - "gpt-oss-20b"
+    - "mistral-small-3-1-24b-instruct-2503"
+    - "llama-3-3-70b-instruct"
+    - "gemma-3-27b-it"
+    - "llama-3-2-3b-instruct"
+  vision_models:
+    - "gemma-3-27b-it"
+    - "pixtral-12b-2409"
+    - "florence-2-large-ft"
+  embedding_models:
+    - "nomic-embed-vision-v1-5"
+  persist_customer_values: false
+  persist_selectors: false
+  persist_coordinates: false
+
+continuous_learning:
+  enabled: true
+  memory_subdir: "continuous_learning"
+  learn_from_fill: true
+  learn_from_click: true
+  learn_from_navigation: true
+  learn_from_search: true
+  learn_failed_actions_as_negative_evidence: true
+  promote_only_after_exact_judge_human_pass: true
+  max_actions_per_phase: 1000
+  persist_customer_values: false
+  persist_selectors: false
+  persist_coordinates: false
+
+
+recursive_self_improvement:
+  enabled: true
+  memory_subdir: "recursive_self_improvement"
+  # 0 = open-ended RSI across persistent goal cycles; each cycle stays auditable.
+  max_recursive_cycles: 0
+  minimum_improvement: 0.005
+  update_model_portfolio: true
+  update_replay_policy: true
+  update_skill_confidence: true
+  allow_source_code_self_modification: false
+
+persistent_operator:
+  enabled: true
+  # 0 = no attempt-count termination; stop explicitly or finish with judge + human PASS.
+  max_goal_cycles: 0
+  require_final_human_confirmation: true
+  human_after_failed_cycles: 3
+  human_wait_seconds: 0
+  poll_seconds: 2.0
+  keep_browser_open: true
+  deep_learn_unknown_family: true
+  update_rsi_after_every_cycle: true
+  use_multi_model_after_failure: true
+  synthesize_inline_patch_input: true
+  stop_file_name: "STOP_HIP_OPERATOR"
+  preserve_customer_values_in_memory: false
+
+production_e2e:
+  enabled: true
+  single_active_browser_session: true
+  lock_filename: ".hip_runtime/production_execution.lock"
+  lock_stale_seconds: 14400
+  lock_heartbeat_seconds: 30
+  min_free_disk_mb: 512
+  require_autogen_075: true
+  require_input_json_when_fill_requested: true
+  require_live_runtime_certificate_for_mutation: true
+  require_golden_reference_for_known_phase_tasks: false
+  require_operator_role_for_mutation: true
+  require_approval_id_for_mutation: false
+  capture_mutation_before_after_evidence: true
+  create_safe_review_bundle: true
+  safe_review_bundle_name: "SAFE_REVIEW_BUNDLE.zip"
+  keep_sensitive_screenshots_out_of_safe_bundle: true
+  safe_review_strict_allowlist: true
+  safe_review_manifest_filename: "production_safe_review_manifest.json"
+  fail_on_stale_execution_lock: true
+  write_hash_chained_journal: true
+  journal_filename: "production_execution_journal.jsonl"
+  write_request_manifest: true
+  request_manifest_filename: "production_request_manifest.json"
+  write_execution_integrity_receipt: true
+  execution_integrity_filename: "production_execution_integrity.json"
+  write_failure_diagnostics: true
+  failure_diagnostics_filename: "production_failure_diagnostics.json"
+  write_final_summary: true
+  final_summary_filename: "production_final_summary.json"
+
+mlflow:
+  # Asynchronous observability only. MLflow never authorizes or blocks a HIP action.
+  enabled: true
+  # Leave blank to use MLFLOW_TRACKING_URI; if neither is set, HIP uses a
+  # local filesystem MLflow store under the run root (runs/mlruns).
+  # For a shared server: tracking_uri: "http://mlflow-host:5000"
+  tracking_uri: ""
+  experiment_name: "HIP Portal Agent"
+  run_name_prefix: "hip"
+  async_logging: true
+  fail_open: true
+  system_metrics: false
+  # Artifacts may contain portal/customer evidence; keep off unless your MLflow store is approved.
+  log_artifacts: false
+  log_event_artifact: true
+  flush_timeout_seconds: 8.0
+  max_pending_operations: 2048
+
+
+# V244: closed-loop trace diagnosis, bounded self-repair, deterministic promotion, and human teaching.
+trace_self_repair:
+  enabled: true
+  memory_subdir: "trace_self_repair"
+  max_trace_chars: 42000
+  auto_repair_enabled: true
+  auto_repair_min_confidence: 0.72
+  max_auto_repair_attempts: 2
+  update_policy_from_verified_outcome: true
+  allow_source_code_self_modification: false
+
+deterministic_recipe:
+  enabled: true
+  memory_subdir: "deterministic_recipes"
+  min_verified_successes: 2
+  min_average_reward: 0.90
+  min_match_score: 0.72
+  demote_after_failures: 2
+  prefer_recipe_before_skill_replay: true
+  live_reproof_required: true
+  store_values: false
+  store_selectors: false
+  store_coordinates: false
+
+human_in_the_loop:
+  enabled: true
+  memory_subdir: "human_teaching"
+  min_task_similarity: 0.35
+  create_assistance_request_on_unresolved: true
+  require_human_for_ambiguous_mapping: true
+  allow_click_to_teach: true
+  verify_taught_binding_with_exact_readback: true
+  interactive_wait_seconds: 0
+  review_newly_learned_phase_once: true
+  review_on_judge_pass: true
+  review_on_judge_block: true
+  phase_review_wait_seconds: 600
+  phase_review_poll_seconds: 2.0
+  hold_browser_on_incomplete_phase: true
+  incomplete_phase_wait_seconds: 0
+  incomplete_phase_poll_seconds: 2.0
+  keepalive_seconds: 20.0
+  never_finalize_incomplete_run: true
+  multi_model_judge_on_disagreement: true
+  multi_model_judge_force_during_learning: true
+  human_pass_requires_exact_evidence: true
+  store_values: false
+  store_selectors: false
+  store_coordinates: false

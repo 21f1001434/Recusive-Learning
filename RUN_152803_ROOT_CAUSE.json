@@ -1,0 +1,119 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260716-152803",
+  "blocked_phase": "source_document_type",
+  "form_opened_proof": {
+    "Create Document Type": 1,
+    "Document Type Details": 1,
+    "Document Identifier": 1,
+    "Attributes to Configure": 1,
+    "Submit": 11
+  },
+  "final_surface_proof": {
+    "Create Document Type": 0,
+    "Document Type Details": 0,
+    "Document Identifier": 0,
+    "Attributes to Configure": 0,
+    "Submit": 10,
+    "Filters": 8,
+    "Items per page": 1
+  },
+  "repeatable_rows": {
+    "planned_clicks": 4,
+    "successful_clicks": 0,
+    "failed_clicks": 4,
+    "bad_candidates": [
+      {
+        "selector": "app-hip > div.container > div.hipmaincontainer > app-document-types > app-generic-filter-layout > div.bgColor",
+        "tag": null,
+        "label": "Document Types Document Type is a metadata structure template which allows for consistent properties and settings across various document type.Learn More Filter Manage Columns Add Document Type Name Data Format Type Transaction Type Latest Version Validation Type Available Environments a-doc-type-te"
+      },
+      {
+        "selector": "app-hip > div.container > div.hipmaincontainer > app-document-types > app-generic-filter-layout > div.bgColor",
+        "tag": null,
+        "label": "Document Types Document Type is a metadata structure template which allows for consistent properties and settings across various document type.Learn More Filter Manage Columns Add Document Type Name Data Format Type Transaction Type Latest Version Validation Type Available Environments a-doc-type-te"
+      },
+      {
+        "selector": "app-hip > div.container > div.hipmaincontainer > app-document-types > app-generic-filter-layout > div.bgColor",
+        "tag": null,
+        "label": "Document Types Document Type is a metadata structure template which allows for consistent properties and settings across various document type.Learn More Filter Manage Columns Add Document Type Name Data Format Type Transaction Type Latest Version Validation Type Available Environments a-doc-type-te"
+      },
+      {
+        "selector": "app-hip > div.container > div.hipmaincontainer > app-document-types > app-generic-filter-layout > div.bgColor",
+        "tag": null,
+        "label": "Document Types Document Type is a metadata structure template which allows for consistent properties and settings across various document type.Learn More Filter Manage Columns Add Document Type Name Data Format Type Transaction Type Latest Version Validation Type Available Environments a-doc-type-te"
+      }
+    ]
+  },
+  "fill": {
+    "attempts": 23,
+    "filled_true": 0,
+    "filled_false": 23,
+    "stale_selector_examples": [
+      {
+        "field": "document_type_name",
+        "label": "Name",
+        "selector": "input#dds-form-field-700584416"
+      },
+      {
+        "field": "transaction_type",
+        "label": "Transaction Type",
+        "selector": "input#dds-form-field-753019415"
+      },
+      {
+        "field": "document_type_version",
+        "label": "Version",
+        "selector": "input#dds-form-field-480287113"
+      },
+      {
+        "field": "format",
+        "label": "Data Format Type",
+        "selector": "input#dds-form-field-207242909"
+      },
+      {
+        "field": "description",
+        "label": "Description",
+        "selector": "textarea#dds-form-field-429707957"
+      },
+      {
+        "field": "document_identifier_operation",
+        "label": "Operation",
+        "selector": "input#dds-form-field-860387101"
+      },
+      {
+        "field": "document_identifier_derived_from",
+        "label": "Derived From",
+        "selector": "input#dds-form-field-249890964"
+      },
+      {
+        "field": "attribute_derived_from",
+        "label": "Derived From",
+        "selector": "input#dds-form-field-627098602"
+      }
+    ]
+  },
+  "exploration": {
+    "status": "complete_with_gaps",
+    "parents": 12,
+    "unexplored_branches": 72,
+    "restore_errors": 72,
+    "dependency_edges": 0,
+    "transaction_type_expected_values": [
+      "Route Document"
+    ]
+  },
+  "judge": {
+    "status": "blocked",
+    "deterministic_pass": false,
+    "actual_control_count": 683,
+    "missing_values_count": 23
+  },
+  "root_causes": [
+    "Dropdown inventory dismissed DDS overlays using page.mouse.click(5,5), which can close the Create Document Type drawer.",
+    "Repeatable row Add discovery allowed non-actionable div/span containers and selected the entire listing div.bgColor.",
+    "Exploration reused stale dynamic DDS IDs after Angular rerender and did not reacquire controls semantically.",
+    "Exploration input lookup searched the full profile and contaminated Document Type parents with values from Rule/BizFlow.",
+    "Restore failures were non-fatal, so 72 failed branches were tolerated before stale fills ran.",
+    "Artifact extraction admitted background checkbox value=false evidence from the Filters drawer.",
+    "AutoGen client lifecycle created unawaited coroutine/httpx close warnings."
+  ]
+}

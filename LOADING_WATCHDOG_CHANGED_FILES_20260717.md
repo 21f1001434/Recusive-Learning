@@ -1,0 +1,21 @@
+# Changed Files
+
+- `hip_id_agent/browser_session.py`
+  - Adds phase/URL-scoped loading watchdog.
+  - Captures MCP/DOM/network/screenshot evidence.
+  - Refreshes the active page after 120 seconds.
+  - Preserves the authenticated persistent context.
+  - Removes premature pointer-event bypass.
+  - Integrates watchdog into readiness and interaction gates.
+- `hip_id_agent/config.py`
+  - Adds loading watchdog policy fields.
+- `hip_id_agent/runtime_self_heal.py`
+  - Adds loading-timeout classification and `refresh_page_and_reopen` repair.
+- `config.yaml`
+  - Enables the 120-second threshold and one refresh per phase.
+- `tests/test_loading_watchdog_refresh.py`
+  - Adds watchdog, refresh, fail-closed and classification regressions.
+- `LOADING_WATCHDOG_AUTO_REFRESH_FIX_20260717.md`
+- `LOADING_WATCHDOG_RERUN_GUIDE_20260717.md`
+- `LOCAL_TEST_RESULTS_LOADING_WATCHDOG_20260717.txt`
+- `CHANGELOG.md`

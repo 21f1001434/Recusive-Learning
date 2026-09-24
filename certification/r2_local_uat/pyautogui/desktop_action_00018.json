@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "open Source Transport Profile",
+  "selector": "role=button name=Source Transport Profile",
+  "point": {
+    "x": 592,
+    "y": 40,
+    "bbox": {
+      "x": 498.125,
+      "y": 12.0,
+      "width": 167.71875,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

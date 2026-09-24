@@ -1,0 +1,120 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260718-002105",
+  "original_failure": "Document Type reporting KG exporter crashed after exact form fill",
+  "original_phase_attempts": [
+    {
+      "attempt": 1,
+      "status": "failed",
+      "failure_stage": "phase_execution",
+      "error": "hip_id_agent.doctype_kb.build_doctype_api_flow_knowledge_graph.<locals>.add_node() got multiple values for keyword argument 'order'",
+      "auth_expired": "***MASKED***",
+      "route_not_committed": false,
+      "mcp_surface_drift": false,
+      "recoverable_navigation": false,
+      "self_heal": {
+        "phase": "source_document_type",
+        "attempt": 1,
+        "failure_kind": "execution_exception",
+        "classification": "reporting_only_failure",
+        "signature": "284e6b207de57fc8ee4d",
+        "action": "refresh_evidence_and_reopen",
+        "retry": true,
+        "action_success": true,
+        "reason": "safe repair executed; rerun the interrupted phase from its exact input branch",
+        "evidence_dir": "C:\\Users\\Adheesh_Srivastava\\OneDrive - Dell Technologies\\Desktop\\VishnuBaghvan\\Browser Testing\\HIP_Chatbot\\hip_portal_id_agent_kg\\runs\\UHAUL-POASN-FULL-DUMMY-20260718-002105\\runtime_self_heal\\source_document_type\\attempt_01_reporting_only_failure",
+        "recovery_id": "runtime_recovery|reporting_only_failure|refresh_evidence_and_reopen|284e6b207de57fc8ee4d",
+        "advisor": {
+          "status": "accepted",
+          "action": "refresh_evidence_and_reopen",
+          "reason": "The evidence indicates a false‑positive verifier result and selector drift, so reloading the page and refreshing evidence is the safest bounded recovery.",
+          "confidence": 0.94
+        },
+        "action_result": {
+          "action": "refresh_evidence_and_reopen",
+          "success": true,
+          "safe_no_save": true,
+          "status": "executed"
+        }
+      }
+    },
+    {
+      "attempt": 2,
+      "status": "failed",
+      "failure_stage": "phase_execution",
+      "error": "hip_id_agent.doctype_kb.build_doctype_api_flow_knowledge_graph.<locals>.add_node() got multiple values for keyword argument 'order'",
+      "auth_expired": "***MASKED***",
+      "route_not_committed": false,
+      "mcp_surface_drift": false,
+      "recoverable_navigation": false,
+      "self_heal": {
+        "phase": "source_document_type",
+        "attempt": 2,
+        "failure_kind": "execution_exception",
+        "classification": "reporting_only_failure",
+        "signature": "284e6b207de57fc8ee4d",
+        "action": "refresh_evidence_and_reopen",
+        "retry": true,
+        "action_success": true,
+        "reason": "safe repair executed; rerun the interrupted phase from its exact input branch",
+        "evidence_dir": "C:\\Users\\Adheesh_Srivastava\\OneDrive - Dell Technologies\\Desktop\\VishnuBaghvan\\Browser Testing\\HIP_Chatbot\\hip_portal_id_agent_kg\\runs\\UHAUL-POASN-FULL-DUMMY-20260718-002105\\runtime_self_heal\\source_document_type\\attempt_02_reporting_only_failure",
+        "recovery_id": "runtime_recovery|reporting_only_failure|refresh_evidence_and_reopen|284e6b207de57fc8ee4d",
+        "advisor": {
+          "status": "accepted",
+          "action": "refresh_evidence_and_reopen",
+          "reason": "The failure is classified as a reporting-only issue with negative evidence, and the safest bounded recovery is to refresh the evidence and reopen the phase.",
+          "confidence": 0.94
+        },
+        "action_result": {
+          "action": "refresh_evidence_and_reopen",
+          "success": true,
+          "safe_no_save": true,
+          "status": "executed"
+        }
+      }
+    }
+  ],
+  "checkpoint": {
+    "schema_version": "hip.phase-exact-completion-checkpoint.v1",
+    "phase": "source_document_type",
+    "pass": true,
+    "status": "exact_live_execution_completed",
+    "authoritative_artifact": "/mnt/data/run_002105/UHAUL-POASN-FULL-DUMMY-20260718-002105/source_document_type/doctype_kb/doctype_target_branch_execution.json",
+    "inspected": [
+      {
+        "path": "/mnt/data/run_002105/UHAUL-POASN-FULL-DUMMY-20260718-002105/source_document_type/doctype_kb/doctype_target_branch_execution.json",
+        "exists": true,
+        "pass": true,
+        "exact_verified": true,
+        "status": "pass",
+        "attempt_count": 29,
+        "failed_attempt_count": 0
+      }
+    ]
+  },
+  "patched_kg_replay": {
+    "pass": true,
+    "nodes": 1143,
+    "edges": 1365,
+    "summary": {
+      "nodes": 1143,
+      "edges": 1365,
+      "api_interactions": 129,
+      "old_doctypes": 638,
+      "old_doctypes_with_numeric_id": 0,
+      "detail_enrichment_attempts": 0,
+      "ui_row_action_attempts": 0,
+      "ui_row_action_report": {},
+      "form_fields": 29,
+      "required_fields": 25,
+      "dropdowns": 28,
+      "dummy_fill_attempts": 58,
+      "heavy_raw_network_included": false
+    }
+  },
+  "patched_orchestrator_decision": {
+    "phase_replay_required": false,
+    "browser_repair_executed": false,
+    "next_step": "normal deterministic/text/vision judge, then target_document_type",
+    "synthetic_summary_status": "completed_with_reporting_warning"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "kind": "fill",
+  "selector": "#condition-value",
+  "point": {
+    "x": 1120,
+    "y": 279,
+    "bbox": {
+      "x": 1002.0,
+      "y": 251.8125,
+      "width": 217.0,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "value_length": 12,
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

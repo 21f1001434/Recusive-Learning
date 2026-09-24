@@ -1,0 +1,53 @@
+{
+  "schema_version": "hip.maximum-observability-architecture.v1",
+  "mission": [
+    "data_map",
+    "source_document_type",
+    "target_document_type",
+    "rule",
+    "source_transport_profile",
+    "target_transport_profile",
+    "biz_flow"
+  ],
+  "read_only_channels": [
+    "python_playwright_structural_dom",
+    "playwright_mcp_accessibility_network_console",
+    "chrome_devtools_mcp_dom_network_console",
+    "mutation_observer_timeline",
+    "capture_phase_ui_event_timeline",
+    "resource_navigation_timing",
+    "sanitized_dom_structure",
+    "golden_image_vision_feedback"
+  ],
+  "correctness_gates": [
+    "acyclic_parent_child_dependency_contract",
+    "required_input_to_control_mapping",
+    "exact_parent_commit_before_child_mount",
+    "sequential_repeatable_row_identity",
+    "deterministic_dom_verification",
+    "text_judge",
+    "vision_judge",
+    "golden_state_comparison",
+    "deterministic_replay_readiness"
+  ],
+  "memory_policy": {
+    "customer_values_stored": false,
+    "credentials_stored": false,
+    "promotion_requires_all_gates": true,
+    "exploration_on_drift": true,
+    "exploitation_on_validated_fingerprint": true
+  },
+  "prohibited_actions": [
+    "save",
+    "create",
+    "submit",
+    "delete",
+    "deploy",
+    "publish",
+    "update",
+    "remove",
+    "enable",
+    "disable",
+    "confirm"
+  ]
+}

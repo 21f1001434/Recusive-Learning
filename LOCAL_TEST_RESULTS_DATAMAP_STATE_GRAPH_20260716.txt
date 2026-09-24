@@ -1,0 +1,15 @@
+HIP Portal Data Map semantic state-graph fix
+Date: 2026-07-16
+
+Python compilation: PASS
+Uploaded run final-control replay: PASS (7/7 exact nodes)
+Targeted new regressions: PASS (5/5)
+Navigation timeout regression: PASS
+Full suite batch 1: 69 passed
+Full suite batch 2: 72 passed
+Full suite batch 3: 30 passed
+Full suite batch 4: 50 passed
+Full suite batch 5: 67 passed
+Total: 288 passed
+
+No authenticated HIP Portal rerun was executed in this environment.

@@ -1,0 +1,40 @@
+HIP Portal Agent v1.9.7 — Step 9 Certification
+Date: 2026-09-02
+
+Scope
+-----
+This release hardens mutation execution after nested/compound UI provenance has already identified the correct control.
+
+Implemented behavior
+--------------------
+- Physical mutation click dispatch is explicitly tracked as pre_dispatch / dispatching / dispatch_returned / dispatch_exception.
+- Once a mutation click may have been dispatched, executor fallback is disabled: Playwright MCP, local Playwright, and PyAutoGUI cannot issue a second mutation for the same uncertain action.
+- Direct mutation labels including Save, Create, Submit, Delete, Remove, Deploy, Publish, Update, Enable, Disable, Confirm, Migrate and Clone are protected while mutation authorization is active.
+- Certified execution performs bounded read-only outcome reconciliation after a mutation action error or missing post-action API proof.
+- Authoritative 2xx HIP write response => committed_verified, including when the browser tool timed out after dispatch.
+- Terminal 4xx/5xx HIP write response => rejected_verified; no automatic retry.
+- Visible success with no captured 2xx => visible_success_network_unconfirmed; no automatic retry and review required.
+- Pending/no-response writes, redirect-only writes, dispatch-without-response, and mixed successful/failed writes fail closed without another mutation click.
+- Only a provable pre-dispatch failure may perform one fresh semantic rebind, because no physical mutation was sent.
+- UI reconciliation evidence stores keyword classes/hashes only; raw toast text and customer-entered values are not persisted.
+- Governed post-change reporting distinguishes failed-before-mutation, verified rejection, committed verification, and ambiguous/partial change.
+- AutoWebGLM remains primary; AgentQ, Edge session ownership, semantic row identity, detached overlay provenance, continuous surface leases, nested surface ancestry, mutation authorization and change ledger remain intact.
+
+Verification
+------------
+Working/promoted tree full regression: 757 / 757 PASS
+Focused v1.9.3-v1.9.7 semantic/mutation compatibility: PASS
+Python AST validation: 204 files PASS
+JavaScript syntax: app.js PASS, server.js PASS, platform.js PASS
+FastAPI /health: HTTP 200
+FastAPI /api/sections: HTTP 200
+FastAPI /api/runtime/status: HTTP 200
+Package version: 1.9.7
+Python wheel build: PASS
+
+Live environment boundary
+-------------------------
+The authenticated Dell SSO/HIP tenant, corporate Microsoft Edge policies, live DDS/CDK widgets,
+Dell AIA endpoints, and Windows-only PyAutoGUI can only be fully exercised on the target Dell
+Windows environment. This release prevents ambiguous mutation outcomes from triggering a second
+backend mutation while preserving read-only reconciliation evidence for that live validation.

@@ -1,0 +1,32 @@
+{
+  "schema_version": "hip.transport-profile-deep-architecture.v1",
+  "page_family": "transport_profiles",
+  "capability_graph_schema": "hip.capability-graph.v6",
+  "phases": ["source_transport_profile", "target_transport_profile"],
+  "listing_learning": ["search", "filters", "filter options", "pagination", "row expansion", "row actions"],
+  "safe_draft_surfaces": ["edit", "clone", "view", "details", "history", "audit"],
+  "safe_mutation_prerequisite_probes": ["migrate", "deploy", "delete"],
+  "create_form_dependency_chain": [
+    "System Type -> System/Partner/Application",
+    "System/Partner/Application -> Profile Name",
+    "Profile Name -> Profile Usage",
+    "Profile Usage -> Deployment Group",
+    "Deployment Group -> Interface Type",
+    "Interface Type -> Interface Environment",
+    "Interface Type -> Existing Account",
+    "Existing Account -> Existing Account Name",
+    "Existing Account Name -> Use Existing Folder",
+    "Use Existing Folder -> Subscription Folder",
+    "Interface Type -> File Filtering Pattern",
+    "Interface Type -> Post Transfer Action",
+    "Interface Type -> Compression Required",
+    "Interface Type -> Document Type Supported"
+  ],
+  "source_target_isolation": true,
+  "ui_api_causality": true,
+  "request_response_capture": true,
+  "save_create_submit_executed_during_learning": false,
+  "mutation_probe_network_abort": true,
+  "persistent_values_stored": false,
+  "reasoning_stack": ["AgentQ", "AutoGen AgentChat 0.7.5", "Dell AIA", "Playwright", "Playwright MCP", "Chrome DevTools MCP", "HIP Intelligence MCP", "Gemma vision"]
+}

@@ -1,0 +1,25 @@
+Source Document Type repeated-fill fix
+=======================================
+
+Compilation:
+  python -m compileall -q hip_id_agent
+  PASS
+
+Targeted:
+  58 passed
+
+Complete suite, split batches:
+  61 passed
+  68 passed
+  50 passed
+  43 passed
+  52 passed
+  75 passed
+  TOTAL: 349 passed
+
+Supplied run replay:
+  exact completion checkpoint: PASS
+  patched KG export: PASS
+  nodes: 1143
+  edges: 1365
+  phase replay required: false

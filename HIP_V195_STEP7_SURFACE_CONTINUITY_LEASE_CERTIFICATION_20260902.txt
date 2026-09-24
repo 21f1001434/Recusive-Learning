@@ -1,0 +1,41 @@
+HIP Portal Agent v1.9.5 — Step 7 Certification
+Date: 2026-09-02
+
+Layer
+-----
+Continuous detached-surface provenance lease + stable target membership guard.
+
+Problem fixed
+-------------
+v1.9.4 proved which detached Angular/CDK/DDS overlay belonged to a scoped opener, but the proof was effectively selector-based after initial binding. A live portal can destroy/recreate that overlay during asynchronous loading, filtering, virtual scrolling, or rerender, and a stale duplicate surface can remain visible. A selector that was correct at T0 is therefore not durable surface identity at T1.
+
+Implemented behavior
+--------------------
+- Detached-overlay provenance is now a continuously revalidated lease, not a one-time selector decision.
+- Before every semantic target read and every virtualized scroll, the runtime snapshots visible actionable surfaces and re-proves the leased surface.
+- Rebinding prefers opener aria-controls / aria-owns identity, then exact surface ID continuity, then one unique structural continuation.
+- Structural continuity uses surface kind/role, accessible label/title, bounded action overlap, and geometry.
+- Selector equality is only weak evidence and cannot independently transfer trust to a replacement surface.
+- Two similarly plausible stale/current replacement surfaces fail closed.
+- Surface-scoped targets require consecutive stable semantic reads before the normal compound-action executor accepts them.
+- Immediately before click, the runtime re-proves the surface again and requires exactly one visible matching target contained by exactly one proven surface.
+- A same-named global Edit/Deploy/etc. therefore cannot inherit a detached-menu action selector.
+- No global fallback is allowed once detached-surface provenance has been established.
+- Existing AutoWebGLM primary planning, AgentQ gates, mutation governance, Edge session ownership, effect verification, repeatable-row identity, compound actions, detached overlay binding, and virtualized scrolling remain intact.
+
+Verification before packaging
+-----------------------------
+Focused semantic/compound/overlay/lease tests: 16 / 16 PASS
+Full regression: 749 / 749 PASS
+Python AST validation: 201 files PASS
+JavaScript syntax: app.js PASS, server.js PASS, platform.js PASS
+FastAPI /health: HTTP 200
+FastAPI /api/sections: HTTP 200
+FastAPI /api/runtime/status: HTTP 200
+Package version: 1.9.5
+Python wheel build: PASS
+Wheel SHA-256: b1c2ed767a9bc3a5ac182a8f361a8741cd9b08e875036d18b00f0fdaad5f9206
+
+Host environment boundary
+-------------------------
+This Linux/offline execution environment does not have the project-pinned AutoGen 0.7.5 distributions, browser-use/langchain runtime set, corporate Microsoft Edge session, Dell SSO, authenticated HIP tenant, live Dell AIA endpoints, or Windows-only PyAutoGUI environment. `pip check` therefore reports host-environment dependency gaps/conflicts and is not represented as a release pass. Those dependencies must be installed from the project lock/requirements on the target Windows machine before live Dell execution.

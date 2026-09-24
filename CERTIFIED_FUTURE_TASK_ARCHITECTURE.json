@@ -1,0 +1,35 @@
+{
+  "schema_version": "hip.certified-future-task-architecture.v1",
+  "planner": [
+    "natural-language task",
+    "deterministic family decomposition",
+    "HIP capability certification gate",
+    "verified task replay match",
+    "verified family replay/capability plan",
+    "AutoGen 0.7.5 guarded plan refinement"
+  ],
+  "executor": [
+    "single authenticated BrowserSession",
+    "deterministic selector attempt",
+    "semantic row-scoped rebind",
+    "live DOM capability discovery",
+    "AutoGen candidate ranking over observed controls only",
+    "AgentQ/HIP Intelligence structural representation",
+    "Playwright MCP assurance",
+    "Chrome DevTools MCP assurance",
+    "UI-to-API causal capture",
+    "post-action structural/effect verification"
+  ],
+  "safety": {
+    "mutation_gates": ["explicit task flag", "HIP_ALLOW_PORTAL_MUTATION=YES", "ALLOW HIP MUTATION"],
+    "mutation_auto_retry_after_click": false,
+    "model_can_invent_capability_ids": false,
+    "adaptive_candidate_must_exist_in_live_dom": true,
+    "persistent_task_values_stored": false
+  },
+  "persistent_memory": {
+    "schema": "hip.capability-graph.v7",
+    "new_collection": "task_replay_profiles",
+    "runtime_value_source": "current_task.entity"
+  }
+}

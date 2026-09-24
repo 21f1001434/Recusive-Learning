@@ -1,0 +1,53 @@
+[
+  {
+    "semantic_control_key": "edit_bizflow.name.name.text",
+    "label": "Name",
+    "section": "Edit BizFlow",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "fill_text"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "edit_bizflow.process_step.process_step.select",
+    "label": "Process Step",
+    "section": "Edit BizFlow",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "edit_bizflow.save.button",
+    "label": "Save",
+    "section": "Edit BizFlow",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click",
+      "mutation_candidate",
+      "save"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "edit_bizflow.cancel.button",
+    "label": "Cancel",
+    "section": "Edit BizFlow",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  }
+]

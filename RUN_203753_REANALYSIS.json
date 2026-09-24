@@ -1,0 +1,249 @@
+{
+  "schema_version": "hip.run-reanalysis.v1",
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260716-203753",
+  "data_map_completed": true,
+  "source_document_type_execution_pass": false,
+  "failed_attempt_count": 5,
+  "failed_fields": [
+    {
+      "node_id": "source_document_type.attributes_to_configure.attribute[0].attribute_usage",
+      "row_index": 0,
+      "expected_value": [
+        "Flow Identifier Expression",
+        "Logging",
+        "Mapping",
+        "Routing"
+      ],
+      "actual_value": [
+        "Flow Identifier Expression",
+        "Logging",
+        "Mapping",
+        "Routing",
+        "4 selected"
+      ],
+      "selector": "input#dds-form-field-719874654",
+      "reason": "control did not commit exact expected value after blur/rerender"
+    },
+    {
+      "node_id": "source_document_type.attributes_to_configure.attribute[1].attribute_usage",
+      "row_index": 1,
+      "expected_value": [
+        "Flow Identifier Expression",
+        "Logging",
+        "Mapping",
+        "Routing"
+      ],
+      "actual_value": [],
+      "selector": "input#dds-form-field-659188839",
+      "reason": "control did not commit exact expected value after blur/rerender"
+    },
+    {
+      "node_id": "source_document_type.attributes_to_configure.attribute[2].attribute_usage",
+      "row_index": 2,
+      "expected_value": [
+        "Flow Identifier Expression",
+        "Logging",
+        "Mapping",
+        "Routing"
+      ],
+      "actual_value": [],
+      "selector": "input#dds-form-field-562576171",
+      "reason": "control did not commit exact expected value after blur/rerender"
+    },
+    {
+      "node_id": "source_document_type.attributes_to_configure.attribute[3].attribute_usage",
+      "row_index": 3,
+      "expected_value": [
+        "Flow Identifier Expression",
+        "Logging",
+        "Mapping",
+        "Routing"
+      ],
+      "actual_value": [],
+      "selector": "input#dds-form-field-655448546",
+      "reason": "control did not commit exact expected value after blur/rerender"
+    },
+    {
+      "node_id": "source_document_type.attributes_to_configure.attribute[4].attribute_usage",
+      "row_index": 4,
+      "expected_value": [
+        "Flow Identifier Expression",
+        "Logging",
+        "Mapping",
+        "Routing"
+      ],
+      "actual_value": [],
+      "selector": "input#dds-form-field-469184219",
+      "reason": "control did not commit exact expected value after blur/rerender"
+    }
+  ],
+  "successful_usage_listbox_option_clicks": {
+    "distinct_listboxes": 5,
+    "expected_rows": 5,
+    "all_listboxes_received_exact_four_options": true,
+    "listboxes": {
+      "dropdown-popup-list-364398391": [
+        {
+          "sequence": 126,
+          "position": 4,
+          "option": "Flow Identifier Expression",
+          "success": true
+        },
+        {
+          "sequence": 127,
+          "position": 5,
+          "option": "Logging",
+          "success": true
+        },
+        {
+          "sequence": 128,
+          "position": 6,
+          "option": "Mapping",
+          "success": true
+        },
+        {
+          "sequence": 129,
+          "position": 7,
+          "option": "Routing",
+          "success": true
+        }
+      ],
+      "dropdown-popup-list-317126580": [
+        {
+          "sequence": 137,
+          "position": 4,
+          "option": "Flow Identifier Expression",
+          "success": true
+        },
+        {
+          "sequence": 138,
+          "position": 5,
+          "option": "Logging",
+          "success": true
+        },
+        {
+          "sequence": 139,
+          "position": 6,
+          "option": "Mapping",
+          "success": true
+        },
+        {
+          "sequence": 140,
+          "position": 7,
+          "option": "Routing",
+          "success": true
+        }
+      ],
+      "dropdown-popup-list-141106428": [
+        {
+          "sequence": 153,
+          "position": 4,
+          "option": "Flow Identifier Expression",
+          "success": true
+        },
+        {
+          "sequence": 154,
+          "position": 5,
+          "option": "Logging",
+          "success": true
+        },
+        {
+          "sequence": 155,
+          "position": 6,
+          "option": "Mapping",
+          "success": true
+        },
+        {
+          "sequence": 156,
+          "position": 7,
+          "option": "Routing",
+          "success": true
+        }
+      ],
+      "dropdown-popup-list-790981537": [
+        {
+          "sequence": 168,
+          "position": 4,
+          "option": "Flow Identifier Expression",
+          "success": true
+        },
+        {
+          "sequence": 169,
+          "position": 5,
+          "option": "Logging",
+          "success": true
+        },
+        {
+          "sequence": 170,
+          "position": 6,
+          "option": "Mapping",
+          "success": true
+        },
+        {
+          "sequence": 171,
+          "position": 7,
+          "option": "Routing",
+          "success": true
+        }
+      ],
+      "dropdown-popup-list-122776369": [
+        {
+          "sequence": 184,
+          "position": 4,
+          "option": "Flow Identifier Expression",
+          "success": true
+        },
+        {
+          "sequence": 185,
+          "position": 5,
+          "option": "Logging",
+          "success": true
+        },
+        {
+          "sequence": 186,
+          "position": 6,
+          "option": "Mapping",
+          "success": true
+        },
+        {
+          "sequence": 187,
+          "position": 7,
+          "option": "Routing",
+          "success": true
+        }
+      ]
+    }
+  },
+  "semantic_misresolution_evidence": [
+    {
+      "usage_row_index": 1,
+      "failed_usage_selector": "input#dds-form-field-659188839",
+      "same_selector_previously_used_as_text_field": "Sender",
+      "sequence": 131
+    },
+    {
+      "usage_row_index": 2,
+      "failed_usage_selector": "input#dds-form-field-562576171",
+      "same_selector_previously_used_as_text_field": "Transaction Type",
+      "sequence": 147
+    },
+    {
+      "usage_row_index": 3,
+      "failed_usage_selector": "input#dds-form-field-655448546",
+      "same_selector_previously_used_as_text_field": "Business Identifier",
+      "sequence": 162
+    },
+    {
+      "usage_row_index": 4,
+      "failed_usage_selector": "input#dds-form-field-469184219",
+      "same_selector_previously_used_as_text_field": "Alternate Business Identifier",
+      "sequence": 178
+    }
+  ],
+  "accepted_root_cause": [
+    "Nested per-field flex wrappers were incorrectly used as business-row identity.",
+    "Post-fill resolver allowed row and section score to select Attribute Name for an attribute_usage node.",
+    "DDS cosmetic count text '4 selected' was included in the exact selected-value set."
+  ],
+  "accepted_verdict": "Portal Usage options were selected; post-fill row-scoped reconciliation produced a false failure."
+}

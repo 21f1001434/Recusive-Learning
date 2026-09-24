@@ -1,0 +1,45 @@
+HIP Portal Final Section-Scoped Browser-Use/WebUI + Bun Agent
+Release: 1.7.0
+Date: 2026-08-28
+
+FINAL FUNCTIONAL VERIFICATION
+- Full automated test suite: 652/652 PASS, 0 failed.
+- New independent-section regression tests: 10/10 PASS.
+- Focused Transport Profile + repeatable rows + Browser-Use/WebUI + input contract set: 78/78 PASS.
+- Python package wheel build: PASS (hip_portal_id_agent-1.7.0-py3-none-any.whl).
+- Python compile validation: PASS.
+- JSON/YAML static parse validation: PASS.
+
+INDEPENDENT SECTION EXECUTION IMPLEMENTED
+- data-map -> data_map only
+- source-document-type -> source_document_type only
+- target-document-type -> target_document_type only
+- document-type -> source_document_type + target_document_type only
+- rule -> rule only
+- source-transport-profile -> source_transport_profile only
+- target-transport-profile -> target_transport_profile only
+- transport-profile -> source_transport_profile + target_transport_profile only
+- bizflow -> biz_flow only
+- all -> complete seven-phase sequence
+
+TRANSPORT PROFILE EXAMPLE
+`run-section transport-profile` opens/fills/verifies Source + Target Transport Profile only. Data Map, Document Type, Rule and BizFlow are not executed. Source-only and Target-only Transport Profile modes are also supported.
+
+SECTION-SCOPED INPUT CONTRACT
+The preflight now validates only selected phases. A Transport-Profile-only input can contain only source_transport_profile and/or target_transport_profile without failing for unrelated missing forms. All provided selected-phase fields and control coverage remain validated.
+
+USER TRIGGERS
+- CLI: python -m hip_id_agent.cli run-section <section> --input-json <path>
+- CLI catalog: python -m hip_id_agent.cli list-sections
+- Backend: GET /api/sections; POST /api/section-run/start
+- Main Streamlit UI: Execution scope -> Run selected section only
+- Platform UI: Learn HIP -> Execute One HIP Section -> Run Selected Section Only
+
+PRESERVED CAPABILITIES FOR SECTION RUNS
+Browser Use same-session CDP intelligence, persistent Dell SSO Chrome, Bun-managed MCP tooling, Playwright MCP, Chrome DevTools MCP, HIP Intelligence MCP, AgentQ, AutoGen 0.7.5, deterministic form filling, parent/child dependency handling, input-driven + repeatable rows, vision/text section judges, runtime self-heal, evidence, UI/API crosswalk, and mutation governance remain in place.
+
+SAFETY/ISOLATION
+Section-only execution does not auto-create unrelated upstream objects. If a selected form references an existing HIP object, that object must already exist/be selectable in the live tenant. Normal form-fill execution remains no-save/no-create unless separately governed mutation/API-write gates are explicitly enabled.
+
+LIVE TENANT BOUNDARY
+Actual Dell SSO/HIP tenant interaction cannot be executed in this sandbox. The release certifies source/package behavior and automated tests; the final tenant smoke test must occur in the authenticated Dell environment.

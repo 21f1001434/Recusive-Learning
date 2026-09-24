@@ -1,0 +1,102 @@
+{
+  "schema_version": "hip.autonomous-mission-state.v1",
+  "run_id": "LOCAL-UAT",
+  "mode": "all_phases_until_complete",
+  "mission_status": "in_progress",
+  "started_at": "2026-09-20T06:50:18Z",
+  "updated_at": "2026-09-20T06:50:18Z",
+  "phase_sequence": [
+    "data_map",
+    "source_document_type",
+    "target_document_type",
+    "rule",
+    "source_transport_profile",
+    "target_transport_profile",
+    "biz_flow"
+  ],
+  "phase_dependencies": {
+    "data_map": [],
+    "source_document_type": [],
+    "target_document_type": [],
+    "rule": [
+      "data_map",
+      "source_document_type"
+    ],
+    "source_transport_profile": [
+      "source_document_type"
+    ],
+    "target_transport_profile": [
+      "target_document_type"
+    ],
+    "biz_flow": [
+      "source_document_type",
+      "target_document_type",
+      "rule",
+      "source_transport_profile",
+      "target_transport_profile"
+    ]
+  },
+  "phases": {
+    "data_map": {
+      "status": "complete",
+      "attempts": 1,
+      "judge_pass": true,
+      "resumed_from": "",
+      "started_at": "",
+      "completed_at": "2026-09-20T06:50:18Z"
+    },
+    "source_document_type": {
+      "status": "complete",
+      "attempts": 1,
+      "judge_pass": true,
+      "resumed_from": "",
+      "started_at": "",
+      "completed_at": "2026-09-20T06:50:18Z"
+    },
+    "target_document_type": {
+      "status": "complete",
+      "attempts": 1,
+      "judge_pass": true,
+      "resumed_from": "",
+      "started_at": "",
+      "completed_at": "2026-09-20T06:50:18Z"
+    },
+    "rule": {
+      "status": "complete",
+      "attempts": 1,
+      "judge_pass": true,
+      "resumed_from": "",
+      "started_at": "",
+      "completed_at": "2026-09-20T06:50:18Z"
+    },
+    "source_transport_profile": {
+      "status": "complete",
+      "attempts": 1,
+      "judge_pass": true,
+      "resumed_from": "",
+      "started_at": "",
+      "completed_at": "2026-09-20T06:50:18Z"
+    },
+    "target_transport_profile": {
+      "status": "complete",
+      "attempts": 1,
+      "judge_pass": true,
+      "resumed_from": "",
+      "started_at": "",
+      "completed_at": "2026-09-20T06:50:18Z"
+    },
+    "biz_flow": {
+      "status": "complete",
+      "attempts": 1,
+      "judge_pass": true,
+      "resumed_from": "",
+      "started_at": "",
+      "completed_at": "2026-09-20T06:50:18Z"
+    }
+  },
+  "resume": {
+    "resumed": false,
+    "source_run_dir": "",
+    "adopted_phases": []
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "objects": {
+    "rule": {
+      "name": "DUMMY_RULE_UHAUL_ASN_KB",
+      "version": "1",
+      "description": "Dummy Rules KB input only",
+      "sourceDocumentTypeId": "10482",
+      "sourceDocumentTypeName": "DUMMY_SOURCE_XML_DOCTYPE_KB",
+      "sourceDocumentTypeVersion": "1",
+      "targetDocumentTypeId": "10483",
+      "targetDocumentTypeName": "DUMMY_TARGET_XML_DOCTYPE_KB",
+      "targetDocumentTypeVersion": "1",
+      "conditionOperation": "All conditions are satisfied",
+      "ruleConditions": [
+        {
+          "attributeName": "Receiver",
+          "operator": "Equals",
+          "value": "DUMMY_RECEIVER"
+        }
+      ],
+      "ruleActions": [
+        {
+          "actionType": "Mapping Transformer",
+          "mappingIdentifierName": "DUMMY_MAP_IDENTIFIER_KB",
+          "mappingVersion": "1"
+        }
+      ]
+    }
+  }
+}

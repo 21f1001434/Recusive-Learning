@@ -1,0 +1,36 @@
+{
+  "schema_version": "hip.datamap-deep-capability-architecture.v1",
+  "page_family": "data_maps",
+  "learning_sequence": [
+    "listing_open",
+    "search_discovery",
+    "filter_option_inspection",
+    "pagination_discovery_and_restore",
+    "input_entity_search",
+    "matching_row_expand",
+    "row_action_inventory",
+    "draft_read_action_surface_inspection",
+    "mutation_prerequisite_probe_with_network_abort",
+    "ui_api_causal_capture",
+    "agentq_state_transition_learning",
+    "deterministic_replay_profile_promotion"
+  ],
+  "safe_actions": ["search", "filter_open_close", "pagination", "expand", "edit_open_close", "clone_open_close", "view", "details", "history", "audit"],
+  "mutation_probe_actions": ["migrate", "deploy", "delete"],
+  "mutation_probe_barrier": {
+    "blocked_methods": ["POST", "PUT", "PATCH", "DELETE"],
+    "blocked_get_path_tokens": ["deploy", "delete", "remove", "migrate", "publish", "enable", "disable"],
+    "backend_delivery": false
+  },
+  "persistent_memory": {
+    "capability_graph_schema": "hip.capability-graph.v3",
+    "stores_customer_values": false,
+    "replay_value_source": "current_task.entity",
+    "semantic_fallback": ["matching entity row", "role", "accessible name", "label", "placeholder", "stable selector"]
+  },
+  "interfaces": {
+    "cli": "learn-datamaps-deep",
+    "backend": ["POST /api/datamaps/deep/start", "GET /api/replay-profiles"],
+    "frontend": ["Deep Learn Data Maps", "Deterministic replay profiles"]
+  }
+}

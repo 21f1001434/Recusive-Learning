@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "open BizFlow lifecycle",
+  "selector": "role=button name=BizFlow",
+  "point": {
+    "x": 890,
+    "y": 40,
+    "bbox": {
+      "x": 844.375,
+      "y": 12.0,
+      "width": 70.65625,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

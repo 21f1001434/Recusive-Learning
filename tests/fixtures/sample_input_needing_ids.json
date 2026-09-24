@@ -1,0 +1,12 @@
+{
+  "customer": "UHAL",
+  "transaction": "POASN",
+  "transportProfileDetails": {
+    "partnerId": "${partner_id}",
+    "systemId": "${system_id}"
+  },
+  "flowDefinition": {
+    "partner_id": "",
+    "system_id": ""
+  }
+}

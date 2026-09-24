@@ -1,0 +1,22 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260718-162957",
+  "phase": "data_map",
+  "root_cause": "loading watchdog refreshed an active unsaved Create Map drawer; same-route reload returned to listing; strict binder then rejected listing controls",
+  "create_form_opened": true,
+  "fill_checkpoint_completed": 3,
+  "watchdog_elapsed_seconds": 120.047,
+  "page_refreshed": true,
+  "post_refresh_surface": "listing",
+  "incorrect_controls_observed": [
+    "Table search",
+    "Items per page",
+    "Page"
+  ],
+  "binder_behavior": "correctly failed closed",
+  "fix": [
+    "never refresh active unsaved form",
+    "neutralize stale DDS overlay in place when safe",
+    "verify active form surface before binding"
+  ],
+  "strict_confidence_threshold_lowered": false
+}

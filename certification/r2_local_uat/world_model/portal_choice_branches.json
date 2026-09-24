@@ -1,0 +1,78 @@
+{
+  "schema_version": "hip.website-world-model.v2",
+  "choice_branches": {
+    "110a03af4e5b514053bfa4a815bb": {
+      "branch_id": "110a03af4e5b514053bfa4a815bb",
+      "phase": "source_document_type",
+      "action_family": "select",
+      "control": {
+        "label": "Data Format Type",
+        "section": "Create",
+        "role": "combobox"
+      },
+      "portal_choice": "XML",
+      "effect_type": "option_committed",
+      "effect_confidence": 0.99,
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "option_catalog_size": 3,
+      "first_seen_at": "2026-09-20T06:49:57.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:49:57.<volatile>+00:00",
+      "customer_values_stored": false,
+      "portal_metadata_only": true
+    },
+    "c4a4430e160a597d1ce71c7d31e9": {
+      "branch_id": "c4a4430e160a597d1ce71c7d31e9",
+      "phase": "target_document_type",
+      "action_family": "select",
+      "control": {
+        "label": "Data Format Type",
+        "section": "Create",
+        "role": "combobox"
+      },
+      "portal_choice": "XML",
+      "effect_type": "option_committed",
+      "effect_confidence": 0.99,
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "option_catalog_size": 3,
+      "first_seen_at": "2026-09-20T06:50:00.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:00.<volatile>+00:00",
+      "customer_values_stored": false,
+      "portal_metadata_only": true
+    },
+    "41504b3b5ad35e190aed7b2850a3": {
+      "branch_id": "41504b3b5ad35e190aed7b2850a3",
+      "phase": "biz_flow",
+      "action_family": "select",
+      "control": {
+        "label": "Process Step",
+        "section": "Create BizFlow",
+        "role": "combobox"
+      },
+      "portal_choice": "Translation",
+      "effect_type": "dependent_controls_revealed",
+      "effect_confidence": 0.99,
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "option_catalog_size": 3,
+      "first_seen_at": "2026-09-20T06:50:13.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:13.<volatile>+00:00",
+      "customer_values_stored": false,
+      "portal_metadata_only": true
+    }
+  },
+  "updated_at": "2026-09-20T06:50:13.766257+00:00"
+}

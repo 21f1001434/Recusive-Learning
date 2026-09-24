@@ -1,0 +1,7 @@
+{
+  "phase": "rule",
+  "exact_completion_checkpoint": {
+    "pass": true,
+    "status": "local_browser_uat_verified"
+  }
+}

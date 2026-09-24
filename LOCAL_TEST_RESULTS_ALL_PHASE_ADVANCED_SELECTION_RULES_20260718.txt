@@ -1,0 +1,8 @@
+HIP Portal All-Phase Advanced Selection Rules
+Date: 2026-07-18
+
+Python compileall: PASS
+Focused policy tests: 15 passed
+Shared execution/phase regressions: 102 passed
+Complete pytest suite: 388 passed in 12.26s
+Authenticated Dell HIP live rerun: NOT PERFORMED

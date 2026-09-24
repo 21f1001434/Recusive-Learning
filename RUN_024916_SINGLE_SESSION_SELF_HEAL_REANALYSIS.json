@@ -1,0 +1,66 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260717-024916",
+  "verdict": "single_session_passed_source_doctype_blocked_by_verifier_false_negative",
+  "single_session": {
+    "browser_start_count": 1,
+    "sso_prompt_count": 1,
+    "single_persistent_context": true,
+    "phase_attempt_borrow_count": 7,
+    "unique_phases_reached": [
+      "data_map",
+      "source_document_type"
+    ],
+    "unique_phase_count": 2,
+    "phase_retry_count": 5,
+    "attempts_by_phase": {
+      "data_map": 2,
+      "source_document_type": 5
+    },
+    "note": "The original borrow_count and phase_transition_count counted retries, not seven unique completed phases."
+  },
+  "data_map": {
+    "attempt_1": "judge_evidence_mismatch",
+    "self_heal_action": "rejudge_after_evidence_refresh",
+    "attempt_2": "pass",
+    "resolved": true
+  },
+  "source_document_type": {
+    "attempts": 5,
+    "attempt_1": "false blocking overlay from a small bottom-right DDS loader marker",
+    "attempt_2": "multi-select verifier false negative",
+    "attempt_3": "same false blocking overlay pattern",
+    "attempt_4": "same multi-select verifier false negative",
+    "attempt_5": "same multi-select verifier false negative; fail-closed after repeated signature",
+    "portal_state": {
+      "attribute_rows": 5,
+      "usage_rows_exact": 5,
+      "selected_values_each": [
+        "Flow Identifier Expression",
+        "Logging",
+        "Mapping",
+        "Routing"
+      ]
+    },
+    "root_cause": "Dell removes the repeated Usage label/name/placeholder after chips render. Rows 2-5 retained exact selected values but semantic_key became blank, so final reconciliation could not resolve them.",
+    "not_reached": [
+      "target_document_type",
+      "rule",
+      "source_transport_profile",
+      "target_transport_profile",
+      "biz_flow"
+    ]
+  },
+  "fix": {
+    "structural_semantic_inference": "An exact attribute-row multiple-selection combobox is inferred as attribute_usage.",
+    "resolver_fallback": "Unique multiple-selection combobox in exact attribute row is accepted when the repeated label is absent; ambiguity still fails closed.",
+    "final_reconciliation": "Reads selected DDS option state/chips rather than empty search input value.",
+    "session_logging": "Adds unique_phases_reached, unique_phase_count, phase_retry_count and attempts_by_phase.",
+    "false_loading": "Integrated on top of the autonomous page-health package so the small bottom-right loader is treated as passive when it does not intercept the active control."
+  },
+  "verification": {
+    "compile": "pass",
+    "targeted_tests": 25,
+    "full_tests": 335,
+    "authenticated_live_rerun": false
+  }
+}

@@ -1,0 +1,43 @@
+HIP Portal Agent v1.9.3 — Step 5 Certification
+Date: 2026-09-01
+
+Scope
+-----
+This release extends v1.9.2 with generation-safe compound semantic action execution:
+1) scoped More Actions / kebab / ellipsis traversal for hidden row actions;
+2) just-in-time semantic re-resolution before click after Angular/DDS rerender;
+3) volatile generated-ID avoidance in semantic selector construction;
+4) delta-based structural effect proof that rejects pre-existing action text as success.
+
+Implemented behavior
+--------------------
+- v1.9.2 repeatable-row semantic identity and semantic affordances remain intact.
+- Compound-menu intents: Edit, Clone, Migrate, Deploy, Delete, Download.
+- A compound overflow menu is opened only when positive entity/section alias evidence scopes it locally.
+- Global/unscoped kebab or ellipsis controls are rejected for compound traversal.
+- Menu opener is re-resolved immediately before click.
+- Target action is inventoried only after the menu exists, then re-resolved immediately before target click.
+- Future-task execution falls back to the governed compound semantic path when a learned row action is hidden.
+- Mutation governance remains required for mutation-class actions.
+- Dynamic DDS/Angular-style IDs are treated as generation-volatile and are not preferred as stable semantic selectors.
+- Edit/Clone/Migrate/Deploy/Delete/etc. effect proof requires a new structural surface/URL transition, not merely action text already present before the click.
+
+Verification
+------------
+Targeted v1.9.2 + v1.9.3 semantic tests: 13 / 13 PASS
+Full source regression: 741 / 741 PASS
+Python AST validation: 289 files PASS
+JavaScript syntax: webui/app.js PASS, webui/server.js PASS, webui/platform.js PASS
+Package version: 1.9.3
+
+Environment notes
+-----------------
+`python -m pip check` on the ChatGPT execution environment reports a pre-existing global environment conflict:
+moviepy 2.2.1 requires pillow <12.0, while the environment has pillow 12.3.0.
+The HIP project's pyproject/requirements do not declare moviepy or pillow, so this is not introduced by this release.
+
+A wheel could not be rebuilt in this offline execution container because PEP-517 build isolation attempted to download setuptools>=68 and network access is disabled. The source ZIP is fully created and regression-tested.
+
+Live environment boundary
+-------------------------
+Dell SSO, the authenticated HIP production DOM, corporate Edge policies, current DDS widgets, and Dell AIA endpoints are not available in this container. Those must still be exercised on the authenticated Dell Windows environment. This release specifically bounds those live differences with semantic re-resolution, local scoping, mutation governance, and effect verification.

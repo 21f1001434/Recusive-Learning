@@ -1,0 +1,36 @@
+HIP Portal Agent v1.9.4 — Step 6 Certification
+Date: 2026-09-02
+
+Layer
+-----
+Detached Angular/CDK/DDS overlay provenance + virtualized/off-screen option resolution.
+
+Implemented behavior
+--------------------
+- Scoped opener (for example UHAL row -> More Actions) remains the authority anchor.
+- Detached menu/listbox/popover is bound by aria-controls / aria-owns when available.
+- Otherwise exactly one unambiguous newly opened actionable surface is required.
+- Multiple equal-confidence new surfaces fail closed.
+- Target actions are resolved only inside the proven detached surface.
+- Virtualized/off-screen actions are discovered by bounded scroll-only traversal inside that surface.
+- No click or mutation occurs during virtualized discovery.
+- Target is re-resolved inside the same proven surface immediately before click.
+- Existing AutoWebGLM primary decision path, AgentQ gates, effect verification, and mutation governance remain intact.
+
+Verification before packaging
+-----------------------------
+Focused v1.9.3 + v1.9.4 tests: 8 / 8 PASS
+Full regression: 745 / 745 PASS
+Python AST: PASS
+JavaScript syntax: app.js PASS, server.js PASS, platform.js PASS
+FastAPI /health: HTTP 200
+FastAPI /api/sections: HTTP 200
+FastAPI /api/runtime/status: HTTP 200
+Package version: 1.9.4
+
+Environment boundary
+--------------------
+The authenticated Dell HIP tenant, Dell SSO, corporate Microsoft Edge policies, live DDS/CDK widget behavior,
+Dell AIA endpoints, and Windows-only PyAutoGUI cannot be exercised in this Linux/offline build environment.
+The runtime status endpoint therefore reports missing AutoGen 0.7.5 distributions here; install the pinned project
+dependencies on the target Windows environment before live execution.

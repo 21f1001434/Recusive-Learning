@@ -1,0 +1,3 @@
+Targeted regression suite: 19 passed
+Full automated suite: 338 passed
+Python compilation: passed

@@ -1,0 +1,6 @@
+{
+  "phase": "target_transport_profile",
+  "status": "pass",
+  "pass": true,
+  "source": "local_browser_uat"
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "hip.full-deep-architecture.v1",
+  "sequence": ["data_maps", "document_types", "rules", "transport_profiles", "bizflows"],
+  "orchestrator": "hip_id_agent.full_deep_learning.FullHIPDeepLearningMission",
+  "certifier": "hip_id_agent.full_deep_learning.HIPCapabilityCertifier",
+  "persistent_sso": {
+    "mode": "persistent_chrome_profile_reuse",
+    "profile": "portal.browser_user_data_dir",
+    "expected_user_authentications": 1
+  },
+  "knowledge_outputs": [
+    "capability graph",
+    "global API catalog",
+    "replay registry",
+    "capability inventory",
+    "gap queue"
+  ],
+  "readiness_dimensions": [
+    "input contract",
+    "page/listing capability",
+    "row actions",
+    "form topology",
+    "API contracts",
+    "API response evidence",
+    "UI-to-API causality",
+    "verified deterministic replay",
+    "safe mutation probe",
+    "value-free persistent memory"
+  ],
+  "interfaces": {
+    "cli": ["learn-hip-full-deep", "full-deep-readiness"],
+    "backend": ["POST /api/full-deep/start", "GET /api/full-deep/readiness"],
+    "frontend": ["Deep Learn ALL HIP + Certify", "Full HIP Readiness"]
+  }
+}

@@ -1,0 +1,12 @@
+python -m compileall -q hip_id_agent tests
+PASS
+
+python -m pytest -q
+300 passed in 23.28s
+
+Supplied run offline replay
+- deterministic pass: true
+- original vision pass: false
+- patched vision pass: true
+- patched combined gate pass: true
+- remaining visible issues: 0

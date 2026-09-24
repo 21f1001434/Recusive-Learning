@@ -1,0 +1,84 @@
+{
+  "schema_version": "hip.assured-agentq-full-e2e.v1",
+  "objective": "Fill every current input.json value in the correct parent-child HIP form sequence, capture UI/API evidence, self-heal on drift, and promote only a fully proven deterministic replay path.",
+  "phases": [
+    "data_map",
+    "source_document_type",
+    "target_document_type",
+    "rule",
+    "source_transport_profile",
+    "target_transport_profile",
+    "biz_flow"
+  ],
+  "execution": {
+    "dependency_aware": true,
+    "repeatable_rows_sequential": true,
+    "verify_every_commit": true,
+    "angular_rerender_rebind": true,
+    "exploration_then_exploitation": true,
+    "validated_replay_first": true,
+    "fallback_to_exploration_on_drift": true,
+    "unbounded_safe_self_heal": true
+  },
+  "reasoning_and_observation": {
+    "agentq_actor_critic": true,
+    "react_recovery": true,
+    "portal_brain": true,
+    "flow_pattern_memory": true,
+    "playwright_mcp": "required",
+    "chrome_devtools_mcp": "required",
+    "hip_intelligence_mcp": "required",
+    "fresh_three_mcp_quorum_after_phase": true,
+    "dell_aia_text_judge": "required",
+    "gemma_vision_judge": "required",
+    "golden_image_comparison": "required in assured autonomous profile"
+  },
+  "evidence": {
+    "visible_hidden_controls": true,
+    "angular_validity": true,
+    "dds_aria_ownership": true,
+    "dom_mutation_timeline": true,
+    "ui_event_timeline": true,
+    "console": true,
+    "network": true,
+    "performance_trace_on_retry": true,
+    "storage_key_names_only": true,
+    "sanitized_dom_structure": true,
+    "input_to_control_coverage": true,
+    "action_to_api_causal_trace": true,
+    "redacted_har": true,
+    "api_error_ledger": true
+  },
+  "api": {
+    "form_open_requests_responses": true,
+    "form_fill_requests_responses": true,
+    "response_body_capture": true,
+    "ui_api_crosswalk": true,
+    "observed_openapi": true,
+    "postman_collection": true,
+    "submit_payload_capture": "network-aborted in capture mode",
+    "write_mode": "two-key explicit confirmation only",
+    "invented_endpoints_allowed": false,
+    "invented_payload_keys_allowed": false
+  },
+  "promotion_gate": {
+    "100_percent_input_accounting": true,
+    "deterministic_ui_exact": true,
+    "independent_judges": true,
+    "maximum_observability_coverage": true,
+    "api_response_evidence": true,
+    "fresh_mcp_quorum": true,
+    "validated_trajectory": true,
+    "parent_child_contract": true,
+    "golden_reference": true,
+    "resume_requires_assurance_for_assured_runs": true
+  },
+  "safety": {
+    "normal_ui_save_create_submit_delete_deploy": false,
+    "capture_mode_backend_mutation": false,
+    "authorization_persisted": false,
+    "cookies_persisted": false,
+    "customer_values_in_long_term_memory": false
+  },
+  "live_authenticated_certification": false
+}

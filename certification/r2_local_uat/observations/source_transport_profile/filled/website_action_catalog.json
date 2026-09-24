@@ -1,0 +1,92 @@
+[
+  {
+    "semantic_control_key": "create_source_transport_profile.name.name.text",
+    "label": "Name",
+    "section": "Create Source Transport Profile",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "fill_text"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_transport_profile.profile_usage.profile_usage.select",
+    "label": "Profile Usage",
+    "section": "Create Source Transport Profile",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_transport_profile.interface_type.interface_type.select",
+    "label": "Interface Type",
+    "section": "Create Source Transport Profile",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_transport_profile.deployment_group.deployment_group.select",
+    "label": "Deployment Group",
+    "section": "Create Source Transport Profile",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "mutation_candidate",
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_transport_profile.remote_path.remote_path.text",
+    "label": "Remote Path",
+    "section": "Create Source Transport Profile",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "fill_text"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_transport_profile.create.button",
+    "label": "Create",
+    "section": "Create Source Transport Profile",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click",
+      "create",
+      "mutation_candidate"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_transport_profile.cancel.button",
+    "label": "Cancel",
+    "section": "Create Source Transport Profile",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  }
+]

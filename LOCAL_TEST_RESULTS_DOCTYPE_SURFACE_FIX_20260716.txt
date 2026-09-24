@@ -1,0 +1,11 @@
+HIP Portal Document Type active-surface fix local verification
+Date: 2026-07-16
+Python compileall: PASS
+pytest: 266 passed
+Uploaded run replay: source_document_type correctly FAILED as filters_or_listing_surface
+Live authenticated full HIP pass: NOT PERFORMED
+........................................................................ [ 27%]
+........................................................................ [ 54%]
+........................................................................ [ 81%]
+..................................................                       [100%]
+266 passed in 12.16s

@@ -1,0 +1,191 @@
+{
+  "schema": "hip.v215.direct-dispatch-audit.v1",
+  "version": "2.1.5",
+  "pass": true,
+  "checks": [
+    {
+      "check": "guard:hip_id_agent.datamap_kb._set_control_value",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.datamap_kb._set_datamap_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.datamap_kb._clear_datamap_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.datamap_kb._click_safe_datamap_row_action",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.doctype_kb._set_control_value",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.doctype_kb._force_open_doctypes_listing",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.doctype_kb._set_doctype_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.doctype_kb._clear_doctype_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.doctype_kb._click_safe_doctype_row_action",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.rules_kb._set_control_value",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.rules_kb._set_rule_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.rules_kb._clear_rule_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.rules_kb._click_safe_rule_row_action",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.rules_kb._click_rule_condition_add_exact",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.rules_kb._select_rule_condition_attribute_exact",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.rules_kb._select_rule_mapping_identifier_exact",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.transport_profile_kb._set_control_value",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.transport_profile_kb._select_transport_profile_combobox_option",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.transport_profile_kb._try_set_transport_profiles_items_per_page_100",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.transport_profile_kb._click_transport_profiles_next_page",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.transport_profile_kb._set_transport_profile_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.transport_profile_kb._clear_transport_profile_listing_search",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.transport_profile_kb._click_safe_transport_profile_row_action",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.bizflow_kb._governed_bizflow_click",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.bizflow_kb._click_bizflow_template_link_after_add",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.bizflow_kb._click_bizflow_section_add",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "guard:hip_id_agent.bizflow_kb._expand_bizflow_process_step_row",
+      "pass": true,
+      "detail": "semantic/governed dispatch marker present"
+    },
+    {
+      "check": "no_raw_add_dom:_click_add_doctype_with_overlay_recovery",
+      "pass": true,
+      "detail": "final Add recovery contains no raw DOM/force click"
+    },
+    {
+      "check": "no_raw_add_dom:_click_add_rule_with_overlay_recovery",
+      "pass": true,
+      "detail": "final Add recovery contains no raw DOM/force click"
+    },
+    {
+      "check": "no_raw_add_dom:_click_add_transport_profile_with_overlay_recovery",
+      "pass": true,
+      "detail": "final Add recovery contains no raw DOM/force click"
+    },
+    {
+      "check": "tp_combobox_guard_order",
+      "pass": true,
+      "detail": "semantic fail-closed return precedes legacy pointer fallback"
+    },
+    {
+      "check": "rule_condition_add_semantic",
+      "pass": true,
+      "detail": "raw add is standalone-only else branch"
+    },
+    {
+      "check": "tp_pagination_no_semantic_js_fallback",
+      "pass": true,
+      "detail": "deep JS Next fallback disabled under semantic runtime"
+    }
+  ],
+  "classified_cleanup_only_functions": {
+    "doctype": [
+      "_dismiss_safe_doctype_overlays",
+      "_confirm_doctype_discard_dialog",
+      "_discard_doctype_structure_probe_surface",
+      "_learn_old_doctype_ids_from_ui_row_actions"
+    ],
+    "rules": [
+      "_close_rule_transient_surfaces",
+      "_settle_rule_condition_dropdowns"
+    ],
+    "transport_profile": [
+      "_close_transport_profile_transient_surfaces"
+    ],
+    "bizflow": [
+      "_dismiss_bizflow_overlays"
+    ]
+  },
+  "policy": "Governed HIP operational actions must resolve semantically and fail closed. Raw dispatch may remain only in explicit standalone legacy branches or transient consent/discard cleanup that cannot commit tenant data."
+}

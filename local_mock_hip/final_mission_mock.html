@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HIP Final Mission Mock</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f4f6f8;color:#1f2937}.nav{display:flex;gap:8px;padding:12px;background:#fff;border-bottom:1px solid #ddd;flex-wrap:wrap}.nav button{padding:8px 10px}.page{padding:18px}#toolbar{display:flex;justify-content:space-between;align-items:center}.drawer{position:fixed;top:0;right:0;width:520px;height:100vh;background:#fff;border-left:1px solid #aaa;box-shadow:-6px 0 16px #0002;padding:18px;overflow:auto;z-index:1000}.drawer[hidden]{display:none}.field{display:flex;flex-direction:column;gap:4px;margin:10px 0}.field input,.field select{padding:8px}.row{display:flex;gap:8px;align-items:end}.status{font-weight:700;margin-left:12px}.card{padding:12px;background:#fff;border:1px solid #ddd;margin-top:12px}.actions{display:flex;gap:8px;margin-top:12px}.child{padding:8px;background:#eef6ff;margin:8px 0}
+</style></head>
+<body>
+<div class="nav" aria-label="HIP Sections">
+  <button onclick="go('Data Map')">Data Map</button>
+  <button onclick="go('Source Document Type')">Source Document Type</button>
+  <button onclick="go('Target Document Type')">Target Document Type</button>
+  <button onclick="go('Rule')">Rule</button>
+  <button onclick="go('Source Transport Profile')">Source Transport Profile</button>
+  <button onclick="go('Target Transport Profile')">Target Transport Profile</button>
+  <button onclick="go('BizFlow')">BizFlow</button>
+</div>
+<div class="page">
+ <div id="toolbar"><h1 id="title">Data Map</h1><button id="page-add" aria-label="Add" onclick="openCreate()">Add</button></div>
+ <div id="listing" class="card">No object created yet.</div>
+</div>
+<div id="drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <h2 id="drawer-title">Create</h2>
+  <form id="form" onsubmit="return false"></form>
+</div>
+<script>
+const state={phase:'Data Map',objects:{},bizStatus:'Draft'};
+const byId=id=>document.getElementById(id);
+function go(p){state.phase=p;byId('title').textContent=p;renderListing();closeDrawer();}
+function closeDrawer(){byId('drawer').hidden=true;byId('form').innerHTML='';}
+function field(label,id,type='text'){return `<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" ${type==='text'?'required':''}></div>`}
+function selectField(label,id,opts){return `<div class="field"><label for="${id}">${label}</label><select id="${id}" name="${id}" required>${opts.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></div>`}
+function baseForm(){return field('Name','name');}
+function createMarkup(p){
+ let h=baseForm();
+ if(p.includes('Document Type')) h+=selectField('Data Format Type','data-format',['XML','EDI','JSON']);
+ if(p==='Rule') h+=selectField('Rule Type','rule-type',['Routing','Validation','Transformation'])+`<div id="conditions"><div class="row">${selectField('Attribute','condition-attr',['Sender','Receiver','Transaction Type'])}${selectField('Operator','condition-op',['Equals','Contains','Starts With'])}${field('Value','condition-value')}</div></div><button type="button" id="add-condition" onclick="addCondition()">Add Condition</button>`;
+ if(p.includes('Transport Profile')){
+   const usage=p.startsWith('Source')?'Sender':'Receiver';
+   h+=selectField('Profile Usage','profile-usage',['Sender','Receiver'])+selectField('Interface Type','interface-type',['FTP','SFTP HAFT','HTTPS AS2'])+`<div id="interface-children"></div>`;
+   setTimeout(()=>{byId('profile-usage').value=usage; byId('interface-type').addEventListener('change',renderTPChildren); renderTPChildren();},0);
+ }
+ if(p==='BizFlow') h+=selectField('Process Step','process-step',['Translation','Passthrough','Split'])+`<div id="process-child" class="child">Process branch: Translation</div>`;
+ h+=`<div class="actions"><button type="button" id="create-btn" onclick="commitCreate()">Create</button><button type="button" onclick="closeDrawer()">Cancel</button></div>`;
+ return h;
+}
+function openCreate(){byId('drawer-title').textContent='Create '+state.phase;byId('form').innerHTML=createMarkup(state.phase);byId('drawer').hidden=false;if(state.phase==='BizFlow')setTimeout(()=>byId('process-step').addEventListener('change',()=>byId('process-child').textContent='Process branch: '+byId('process-step').value),0);}
+function addCondition(){const d=document.createElement('div');d.className='row';d.innerHTML=selectField('Attribute','condition-attr-'+Date.now(),['Sender','Receiver','Transaction Type'])+selectField('Operator','condition-op-'+Date.now(),['Equals','Contains','Starts With'])+field('Value','condition-value-'+Date.now());byId('conditions').appendChild(d);}
+function renderTPChildren(){const t=byId('interface-type')?.value||'FTP';const u=byId('profile-usage')?.value||'Sender';let h='';if(t==='SFTP HAFT'){const groups=u==='Sender'?['da-sender-sftphaft-dce-shared','other-da-group']:['pt-receiver-sftphaft-dce-shared','other-pt-group'];h=selectField('Deployment Group','deployment-group',groups)+field('Remote Path','remote-path');}else if(t==='FTP'){h=field('Host','ftp-host')+field('Port','ftp-port');}else{h=field('AS2 ID','as2-id')+field('SSL Certificate','ssl-cert');}byId('interface-children').innerHTML=h;}
+function commitCreate(){const f=byId('form'); if(!f.checkValidity()){f.reportValidity();return;} const obj={name:byId('name').value}; if(state.phase.includes('Transport Profile')){obj.usage=byId('profile-usage').value;obj.interfaceType=byId('interface-type').value;obj.deploymentGroup=byId('deployment-group')?.value||'';} if(state.phase==='BizFlow'){obj.processStep=byId('process-step').value;obj.status='Draft';state.bizStatus='Draft';} state.objects[state.phase]=obj;closeDrawer();renderListing();}
+function renderListing(){const o=state.objects[state.phase];if(!o){byId('listing').innerHTML='No object created yet.';return;}let x=`<strong>${o.name}</strong><span class="status">${state.phase==='BizFlow'?state.bizStatus:'Created'}</span>`; if(state.phase==='BizFlow'){x+=`<div class="actions"><button id="edit-btn" onclick="openEdit()">Edit</button><button id="validate-btn" onclick="validateFlow()">Validate</button><button id="deploy-btn" onclick="deployFlow()">Deploy</button></div>`;}byId('listing').innerHTML=x;}
+function openEdit(){const o=state.objects['BizFlow'];byId('drawer-title').textContent='Edit BizFlow';byId('form').innerHTML=field('Name','name')+selectField('Process Step','process-step',['Translation','Passthrough','Split'])+`<div id="process-child" class="child">Process branch: ${o.processStep}</div><div class="actions"><button type="button" id="save-btn" onclick="saveEdit()">Save</button><button type="button" onclick="closeDrawer()">Cancel</button></div>`;byId('name').value=o.name;byId('process-step').value=o.processStep;byId('process-step').addEventListener('change',()=>byId('process-child').textContent='Process branch: '+byId('process-step').value);byId('drawer').hidden=false;}
+function saveEdit(){const o=state.objects['BizFlow'];o.name=byId('name').value;o.processStep=byId('process-step').value;closeDrawer();renderListing();}
+function validateFlow(){state.bizStatus='Validated';renderListing();}
+function deployFlow(){state.bizStatus='Deployed';renderListing();}
+renderListing();
+</script></body></html>

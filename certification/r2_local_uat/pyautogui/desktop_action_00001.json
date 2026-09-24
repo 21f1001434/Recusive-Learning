@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "open Data Map",
+  "selector": "role=button name=Data Map",
+  "point": {
+    "x": 63,
+    "y": 40,
+    "bbox": {
+      "x": 12.0,
+      "y": 12.0,
+      "width": 81.796875,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

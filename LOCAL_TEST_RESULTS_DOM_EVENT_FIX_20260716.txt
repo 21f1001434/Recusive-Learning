@@ -1,0 +1,16 @@
+HIP Portal DOM Event and Mutation Learning Fix
+Date: 2026-07-16
+
+Python compileall: PASS
+Targeted DOM event tests: 4 passed
+Full test suite: 283 passed
+
+Validated areas:
+- full browser event observer installation
+- input/change/focus/blur/keyboard capture
+- MutationObserver child/attribute capture
+- event/mutation bounding configuration
+- secret-field redaction
+- transition summarization
+- graph-node event evidence and contracts
+- existing project regression suite

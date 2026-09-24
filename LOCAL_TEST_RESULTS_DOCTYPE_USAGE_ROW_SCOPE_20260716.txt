@@ -1,0 +1,32 @@
+HIP Portal Document Type Usage row-scope reconciliation
+Date: 2026-07-16
+
+Compilation:
+  python -m compileall -q hip_id_agent tests
+  PASS
+
+Targeted:
+  python -m pytest -q tests/test_stateful_document_type_runtime.py
+  21 passed in 1.97s
+
+Complete suite:
+  python -m pytest -q
+  298 passed in 16.79s
+
+Reviewed live run:
+  UHAUL-POASN-FULL-DUMMY-20260716-203753
+
+Evidence result:
+  Five distinct Usage listboxes received all four required option clicks.
+  Rows 1-4 were later falsely reconciled to Attribute Name selectors.
+  Row 0 included cosmetic text '4 selected' in the exact set.
+
+Live authenticated rerun:
+  Not performed in this environment.
+
+Clean extracted ZIP validation:
+  Batch 1: 97 passed
+  Batch 2: 54 passed
+  Batch 3: 54 passed
+  Batch 4: 93 passed
+  Total: 298 passed

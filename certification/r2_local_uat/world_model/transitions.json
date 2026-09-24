@@ -1,0 +1,2544 @@
+{
+  "schema_version": "hip.website-world-model.v2",
+  "transitions": {
+    "53b390f935c8872a782ab50d91fb": {
+      "transition_id": "53b390f935c8872a782ab50d91fb",
+      "phase": "data_map",
+      "from_state": "dd8ceddb99de93d608a548423331",
+      "to_state": "5a730d211eacf03f900733f10f90",
+      "action_family": "open_add_form",
+      "semantic_control_key": "b3505e508518516c6fee591f8085",
+      "control": {
+        "label": "Add",
+        "section": "Data Map",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "open_add_form"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "foreground_create_drawer_opened",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "cancel",
+          "section": "create_data_map",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_data_map",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "name",
+          "section": "create_data_map",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add",
+          "section": "data_map",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:49:54.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:49:54.<volatile>+00:00",
+      "values_stored": false
+    },
+    "3749301e5e6bdfbcdd8b912b081a": {
+      "transition_id": "3749301e5e6bdfbcdd8b912b081a",
+      "phase": "data_map",
+      "from_state": "5a730d211eacf03f900733f10f90",
+      "to_state": "dd8ceddb99de93d608a548423331",
+      "action_family": "create",
+      "semantic_control_key": "e01246eea88668de1028e3a119ca",
+      "control": {
+        "label": "Create",
+        "section": "Create Data Map",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "create",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "object_created_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "data_map",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "cancel",
+          "section": "create_data_map",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_data_map",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "name",
+          "section": "create_data_map",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:49:55.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:49:55.<volatile>+00:00",
+      "values_stored": false
+    },
+    "ecfb7e5665d579a67f8318d69554": {
+      "transition_id": "ecfb7e5665d579a67f8318d69554",
+      "phase": "source_document_type",
+      "from_state": "32bb407e3e6dba90f06645916772",
+      "to_state": "ec18208261c75272d80c3b81bbd3",
+      "action_family": "open_add_form",
+      "semantic_control_key": "bebb802754fecfe7c070b0568364",
+      "control": {
+        "label": "Add",
+        "section": "Source Document Type",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "open_add_form"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "foreground_create_drawer_opened",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "cancel",
+          "section": "create_source_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_source_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_format_type",
+          "section": "create_source_document_type",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_source_document_type",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add",
+          "section": "source_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:49:56.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:49:56.<volatile>+00:00",
+      "values_stored": false
+    },
+    "0162690a1f3f9cc55d8146dd21a0": {
+      "transition_id": "0162690a1f3f9cc55d8146dd21a0",
+      "phase": "source_document_type",
+      "from_state": "ec18208261c75272d80c3b81bbd3",
+      "to_state": "32bb407e3e6dba90f06645916772",
+      "action_family": "create",
+      "semantic_control_key": "e40c982bdc9414805265dce9766c",
+      "control": {
+        "label": "Create",
+        "section": "Create Source Document Type",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "create",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "object_created_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "source_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "cancel",
+          "section": "create_source_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_source_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_format_type",
+          "section": "create_source_document_type",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_source_document_type",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:49:58.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:49:58.<volatile>+00:00",
+      "values_stored": false
+    },
+    "8421fa80eb009149dc3182c1d298": {
+      "transition_id": "8421fa80eb009149dc3182c1d298",
+      "phase": "target_document_type",
+      "from_state": "81dfde8397e45fd0d3abc5801402",
+      "to_state": "077836675e3b261cc40b0a3ef8ff",
+      "action_family": "open_add_form",
+      "semantic_control_key": "48954a887c11f5847f28ea041e5e",
+      "control": {
+        "label": "Add",
+        "section": "Target Document Type",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "open_add_form"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "foreground_create_drawer_opened",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "cancel",
+          "section": "create_target_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_target_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_format_type",
+          "section": "create_target_document_type",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_target_document_type",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add",
+          "section": "target_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:49:59.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:49:59.<volatile>+00:00",
+      "values_stored": false
+    },
+    "954a603ccb280d900ede0fc05e2b": {
+      "transition_id": "954a603ccb280d900ede0fc05e2b",
+      "phase": "target_document_type",
+      "from_state": "077836675e3b261cc40b0a3ef8ff",
+      "to_state": "81dfde8397e45fd0d3abc5801402",
+      "action_family": "create",
+      "semantic_control_key": "9b310b76359574c5be902cb23873",
+      "control": {
+        "label": "Create",
+        "section": "Create Target Document Type",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "create",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "object_created_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "target_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "cancel",
+          "section": "create_target_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_target_document_type",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_format_type",
+          "section": "create_target_document_type",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_target_document_type",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:01.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:01.<volatile>+00:00",
+      "values_stored": false
+    },
+    "d4cdf6215534fa915591e2c5bce4": {
+      "transition_id": "d4cdf6215534fa915591e2c5bce4",
+      "phase": "rule",
+      "from_state": "09284ffa59bccb5d39db8455848f",
+      "to_state": "944b3f72e2d19a60053f1de8e737",
+      "action_family": "open_add_form",
+      "semantic_control_key": "3f97d81bfb04624d08dc1b9fc58c",
+      "control": {
+        "label": "Add",
+        "section": "Rule",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "open_add_form"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "foreground_create_drawer_opened",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add_condition",
+          "section": "create_rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "cancel",
+          "section": "create_rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "attribute",
+          "section": "create_rule",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "operator",
+          "section": "create_rule",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "rule_type",
+          "section": "create_rule",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_rule",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "value",
+          "section": "create_rule",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add",
+          "section": "rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:02.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:02.<volatile>+00:00",
+      "values_stored": false
+    },
+    "08a85419db88a91722c84294d66d": {
+      "transition_id": "08a85419db88a91722c84294d66d",
+      "phase": "rule",
+      "from_state": "944b3f72e2d19a60053f1de8e737",
+      "to_state": "09284ffa59bccb5d39db8455848f",
+      "action_family": "create",
+      "semantic_control_key": "f2d56bece6a7a5b0ab45bffaee11",
+      "control": {
+        "label": "Create",
+        "section": "Create Rule",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "create",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "object_created_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add_condition",
+          "section": "create_rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "cancel",
+          "section": "create_rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_rule",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "attribute",
+          "section": "create_rule",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "operator",
+          "section": "create_rule",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "rule_type",
+          "section": "create_rule",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_rule",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "value",
+          "section": "create_rule",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:04.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:04.<volatile>+00:00",
+      "values_stored": false
+    },
+    "0791f7cd5a08cfdad8b8f1959fb1": {
+      "transition_id": "0791f7cd5a08cfdad8b8f1959fb1",
+      "phase": "source_transport_profile",
+      "from_state": "1cf7bdec8a2b1216ed58e47fb347",
+      "to_state": "072c43881ead27c916477d998154",
+      "action_family": "open_add_form",
+      "semantic_control_key": "9586dc48f3cd04c12243373ccbcd",
+      "control": {
+        "label": "Add",
+        "section": "Source Transport Profile",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "open_add_form"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "foreground_create_drawer_opened",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "cancel",
+          "section": "create_source_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_source_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "interface_type",
+          "section": "create_source_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "profile_usage",
+          "section": "create_source_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "host",
+          "section": "create_source_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_source_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "port",
+          "section": "create_source_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add",
+          "section": "source_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:05.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:05.<volatile>+00:00",
+      "values_stored": false
+    },
+    "f03c262d22580718053338572173": {
+      "transition_id": "f03c262d22580718053338572173",
+      "phase": "source_transport_profile",
+      "from_state": "cdac80ee0480ce615924b807b106",
+      "to_state": "1cf7bdec8a2b1216ed58e47fb347",
+      "action_family": "create",
+      "semantic_control_key": "7d79c3053b1a247f935b8f77218a",
+      "control": {
+        "label": "Create",
+        "section": "Create Source Transport Profile",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "create",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "object_created_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "source_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "cancel",
+          "section": "create_source_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_source_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "deployment_group",
+          "section": "create_source_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "interface_type",
+          "section": "create_source_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "profile_usage",
+          "section": "create_source_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_source_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "remote_path",
+          "section": "create_source_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:08.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:08.<volatile>+00:00",
+      "values_stored": false
+    },
+    "e4044ce3990a95d2c8be3f4861cb": {
+      "transition_id": "e4044ce3990a95d2c8be3f4861cb",
+      "phase": "target_transport_profile",
+      "from_state": "640c56065267343cc96fc06c37b5",
+      "to_state": "f2e68977ffacfae26fac835516ee",
+      "action_family": "open_add_form",
+      "semantic_control_key": "abb7a9e7e9495879ac8c9383a350",
+      "control": {
+        "label": "Add",
+        "section": "Target Transport Profile",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "open_add_form"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "foreground_create_drawer_opened",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "cancel",
+          "section": "create_target_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_target_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "interface_type",
+          "section": "create_target_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "profile_usage",
+          "section": "create_target_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "host",
+          "section": "create_target_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_target_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "port",
+          "section": "create_target_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add",
+          "section": "target_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:09.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:09.<volatile>+00:00",
+      "values_stored": false
+    },
+    "0296016e99672422e0d9eda89a0e": {
+      "transition_id": "0296016e99672422e0d9eda89a0e",
+      "phase": "target_transport_profile",
+      "from_state": "d56b7ad5d237721f2abbb311e715",
+      "to_state": "640c56065267343cc96fc06c37b5",
+      "action_family": "create",
+      "semantic_control_key": "4c3fae096bfef369d15962a8ded1",
+      "control": {
+        "label": "Create",
+        "section": "Create Target Transport Profile",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "create",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "object_created_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "target_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "cancel",
+          "section": "create_target_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_target_transport_profile",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "deployment_group",
+          "section": "create_target_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "interface_type",
+          "section": "create_target_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "profile_usage",
+          "section": "create_target_transport_profile",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_target_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "remote_path",
+          "section": "create_target_transport_profile",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:11.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:11.<volatile>+00:00",
+      "values_stored": false
+    },
+    "170895c57d0732199d2925bec562": {
+      "transition_id": "170895c57d0732199d2925bec562",
+      "phase": "biz_flow",
+      "from_state": "c9ac138eee7df6152a49f765ae3f",
+      "to_state": "b14100741b7291c86a368f6d18c8",
+      "action_family": "open_add_form",
+      "semantic_control_key": "dca33d2530fc866c554fe1717519",
+      "control": {
+        "label": "Add",
+        "section": "BizFlow",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "open_add_form"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "foreground_create_drawer_opened",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "cancel",
+          "section": "create_bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "process_step",
+          "section": "create_bizflow",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_bizflow",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "add",
+          "section": "bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:12.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:12.<volatile>+00:00",
+      "values_stored": false
+    },
+    "17e17111882924767232b619a348": {
+      "transition_id": "17e17111882924767232b619a348",
+      "phase": "biz_flow",
+      "from_state": "b14100741b7291c86a368f6d18c8",
+      "to_state": "61e85ffb2330647b48a243e4961d",
+      "action_family": "create",
+      "semantic_control_key": "546d228bdde5fa49f72aa32f0a88",
+      "control": {
+        "label": "Create",
+        "section": "Create BizFlow",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "create",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "object_created_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "deploy",
+          "section": "",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "edit",
+          "section": "",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "validate",
+          "section": "",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "cancel",
+          "section": "create_bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "create",
+          "section": "create_bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "process_step",
+          "section": "create_bizflow",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "create_bizflow",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:14.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:14.<volatile>+00:00",
+      "values_stored": false
+    },
+    "5f7d2e9106a861b5b85d892b793c": {
+      "transition_id": "5f7d2e9106a861b5b85d892b793c",
+      "phase": "biz_flow",
+      "from_state": "7cc5cdd92789926451642bfca408",
+      "to_state": "61e85ffb2330647b48a243e4961d",
+      "action_family": "save",
+      "semantic_control_key": "88ec6830745604bfbbca035227a1",
+      "control": {
+        "label": "Save",
+        "section": "Edit BizFlow",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "mutation_candidate",
+          "save"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "edit_saved_and_drawer_closed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [
+        {
+          "label": "add",
+          "section": "bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "bizflow",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "data_map",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "deploy",
+          "section": "",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "edit",
+          "section": "",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "rule",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "source_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_document_type",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "target_transport_profile",
+          "section": "hip_sections",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "validate",
+          "section": "",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        }
+      ],
+      "hidden_controls": [
+        {
+          "label": "cancel",
+          "section": "edit_bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "save",
+          "section": "edit_bizflow",
+          "role": "button",
+          "control_type": "button",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": false
+        },
+        {
+          "label": "process_step",
+          "section": "edit_bizflow",
+          "role": "select",
+          "control_type": "select",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        },
+        {
+          "label": "name",
+          "section": "edit_bizflow",
+          "role": "input",
+          "control_type": "text",
+          "form_control_name": "",
+          "row_kind": "",
+          "required": true
+        }
+      ],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:17.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:17.<volatile>+00:00",
+      "values_stored": false
+    },
+    "368d4afaea1e2e6542c3843a5e58": {
+      "transition_id": "368d4afaea1e2e6542c3843a5e58",
+      "phase": "biz_flow",
+      "from_state": "61e85ffb2330647b48a243e4961d",
+      "to_state": "61e85ffb2330647b48a243e4961d",
+      "action_family": "validate",
+      "semantic_control_key": "5c2f5d280fbc16e21a3d5415faa0",
+      "control": {
+        "label": "Validate",
+        "section": "BizFlow",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "validate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "status_validated",
+      "effect_confidence": 0.99,
+      "revealed_controls": [],
+      "hidden_controls": [],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:17.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:17.<volatile>+00:00",
+      "values_stored": false
+    },
+    "423b51fba5bab124a51b6837d26a": {
+      "transition_id": "423b51fba5bab124a51b6837d26a",
+      "phase": "biz_flow",
+      "from_state": "61e85ffb2330647b48a243e4961d",
+      "to_state": "61e85ffb2330647b48a243e4961d",
+      "action_family": "deploy",
+      "semantic_control_key": "e2742fd0fd9a63d4202a1e106375",
+      "control": {
+        "label": "Deploy",
+        "section": "BizFlow",
+        "role": "button",
+        "control_type": "button",
+        "name": "",
+        "form_control_name": null,
+        "form_array_name": null,
+        "row_kind": null,
+        "selection_mode": null,
+        "required": false,
+        "in_active_surface": true,
+        "affordances": [
+          "click",
+          "deploy",
+          "mutation_candidate"
+        ],
+        "registered_event_types": []
+      },
+      "effect_type": "status_deployed",
+      "effect_confidence": 0.99,
+      "revealed_controls": [],
+      "hidden_controls": [],
+      "success_count": 1,
+      "failure_count": 0,
+      "consecutive_failure_count": 0,
+      "confidence": 0.7572,
+      "trust": "validated",
+      "drift_status": "stable",
+      "first_seen_at": "2026-09-20T06:50:18.<volatile>+00:00",
+      "last_seen_at": "2026-09-20T06:50:18.<volatile>+00:00",
+      "values_stored": false
+    }
+  },
+  "updated_at": "2026-09-20T06:50:18.286897+00:00"
+}

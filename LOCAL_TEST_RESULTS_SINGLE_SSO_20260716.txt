@@ -1,0 +1,17 @@
+HIP Portal Single-SSO Persistent Browser Session Fix
+Date: 2026-07-16
+
+Compilation:
+  python -m compileall -q hip_id_agent tests
+  PASS
+
+Targeted tests:
+  python -m pytest -q tests/test_single_sso_browser_session_reuse.py tests/test_sso_redirect_dual_mcp_gate.py tests/test_browser_session_navigation_timeout_patch.py
+  12 passed
+
+Full suite:
+  python -m pytest -q
+  305 passed
+
+Authenticated live HIP Portal rerun:
+  Not performed in this environment.

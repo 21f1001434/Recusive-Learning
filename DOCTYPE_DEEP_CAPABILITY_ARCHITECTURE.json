@@ -1,0 +1,63 @@
+{
+  "schema_version": "hip.doctype-deep-capability-architecture.v1",
+  "date": "2026-08-25",
+  "page_family": "document_types",
+  "listing_learning": [
+    "search",
+    "filter option inspection without selection",
+    "pagination capability inventory",
+    "Next-to-Previous pagination validation",
+    "exact entity row restoration",
+    "row expansion",
+    "revealed row action inventory"
+  ],
+  "safe_surface_learning": [
+    "Edit",
+    "Clone/Copy",
+    "View/Details",
+    "History/Audit"
+  ],
+  "safe_mutation_prerequisite_probes": [
+    "Migrate",
+    "Deploy",
+    "Delete"
+  ],
+  "form_phases": [
+    "source_document_type",
+    "target_document_type"
+  ],
+  "form_sections": [
+    "Document Type Details",
+    "Document Identifier",
+    "Attributes To Configure",
+    "Validation"
+  ],
+  "parent_child_examples": [
+    "Data Format Type -> Document Identifier/Validation availability",
+    "Document Identifier Operation -> identifier rows",
+    "Identifier Derived From -> conditional Value",
+    "Attribute Name -> Derived From",
+    "Attribute Derived From -> Usage",
+    "Attribute Derived From -> conditional Expression"
+  ],
+  "repeatable_policy": "complete and verify row N before row N+1",
+  "api_capture": "request/response transactions plus capability-caused contract shapes",
+  "persistent_memory": {
+    "schema_version": "hip.capability-graph.v4",
+    "stores_values": false,
+    "verified_replay_profiles": [
+      "create_source_document_type",
+      "create_target_document_type"
+    ]
+  },
+  "safety": {
+    "save_create_submit_executed": false,
+    "mutation_probe_network_abort": true,
+    "future_real_mutation_requires_explicit_task_authorization": true
+  },
+  "frontend_backend": {
+    "cli": "learn-doctypes-deep",
+    "backend_endpoint": "/api/document-types/deep/start",
+    "frontend_action": "Deep Learn Document Types"
+  }
+}

@@ -1,0 +1,53 @@
+[
+  {
+    "semantic_control_key": "create_source_document_type.name.name.text",
+    "label": "Name",
+    "section": "Create Source Document Type",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "fill_text"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_document_type.data_format_type.data_format.select",
+    "label": "Data Format Type",
+    "section": "Create Source Document Type",
+    "role": "",
+    "required": true,
+    "affordances": [
+      "open_options",
+      "select_option"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_document_type.create.button",
+    "label": "Create",
+    "section": "Create Source Document Type",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click",
+      "create",
+      "mutation_candidate"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  },
+  {
+    "semantic_control_key": "create_source_document_type.cancel.button",
+    "label": "Cancel",
+    "section": "Create Source Document Type",
+    "role": "",
+    "required": false,
+    "affordances": [
+      "click"
+    ],
+    "option_count": 0,
+    "registered_event_types": []
+  }
+]

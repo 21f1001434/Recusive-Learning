@@ -1,0 +1,17 @@
+{
+  "run_id": "UHAUL-POASN-FULL-DUMMY-20260717-013312",
+  "original_observation": {
+    "expected_url": "https://developer.dell.com/hybrid-integrations/securelink/doctypes",
+    "python_playwright_url": "https://developer.dell.com/hybrid-integrations/securelink/datamaps",
+    "playwright_mcp_url": "https://developer.dell.com/hybrid-integrations/securelink/datamaps",
+    "chrome_devtools_mcp_url": "https://developer.dell.com/hybrid-integrations/securelink/datamaps"
+  },
+  "patched_classification": {
+    "same_actual_surface": true,
+    "target_match": false,
+    "error_class": "route_not_committed",
+    "next_action": "navigate_target",
+    "requires_sso": false
+  },
+  "secondary_exception_fixed": "mask_sensitive_string imported and route/MCP errors classified before retry"
+}

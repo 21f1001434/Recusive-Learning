@@ -1,0 +1,26 @@
+{
+  "kind": "click",
+  "action": "open Source Document Type",
+  "selector": "role=button name=Source Document Type",
+  "point": {
+    "x": 193,
+    "y": 40,
+    "bbox": {
+      "x": 101.796875,
+      "y": 12.0,
+      "width": 163.046875,
+      "height": 35.0
+    },
+    "screen": {
+      "width": 1280,
+      "height": 900
+    },
+    "scale": {
+      "x": 1.0,
+      "y": 1.0
+    },
+    "executor": "pyautogui-mcp"
+  },
+  "pass": true,
+  "executor": "pyautogui-mcp"
+}

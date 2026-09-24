@@ -1,0 +1,19 @@
+{
+  "customer": "UHAUL",
+  "objects": {
+    "biz_flow": {
+      "flow_name": "DUMMY_UHAUL_POASN_BIZFLOW_KB",
+      "flow_identifier": "DUMMY_UHAUL_POASN_BIZFLOW_KB",
+      "flow_version": "1",
+      "environment": "DEV",
+      "source_document_type": "XML_U-HAUL_ANS_IB",
+      "target_document_type": "XML_DellAutoASN_10_U-HAUL_ANS_IB",
+      "rule_name": "DUMMY_UHAUL_POASN_RULE_KB",
+      "mapping_identifier": "DUMMY_DELLCoXMLASNXX08C_UHAUL_KB",
+      "source_transport_profile": "UHAUL_POASN_SOURCE_TP_DUMMY",
+      "target_transport_profile": "DELL_U-HAUL_POASN_TARGET_TP_DUMMY",
+      "deployment_group": "dce-shared-sender",
+      "process_step_type": "Translation"
+    }
+  }
+}
