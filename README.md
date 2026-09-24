@@ -1,3 +1,20 @@
+## V243R14 — Document Type fills the whole form and repairs itself (2026-09-24)
+
+Fixes Source/Target Document Type filling only the *Document Type Details* section and then asking for human feedback.
+
+- **Every section is filled:**
+  - Operation;
+  - the identifier's Derived From and Value;
+  - each attribute's Derived From, Usage and Expression/Value;
+  - Validation Type.
+
+  Previously, committing Name or Data Format Type waited for fields that only appear later, such as the Expression after Derived From. That wait always failed, and every later field was skipped.
+- **The agent repairs itself.** A failed field no longer skips unrelated later fields. The rest of the form is filled, and a repair pass retries only what is still wrong: first within the same cycle, then in the next adaptive cycle. A human is asked only when a field cannot be proven after the bounded cycles.
+- **Controls below the fold are scrolled into view** before they are clicked. Before this fix they were refused as "target center intercepted".
+- This applies to Target Document Type and, through the shared executor, to Rule, Transport Profile and BizFlow.
+
+See `V243R14_DOCUMENT_TYPE_FULL_FORM_FIX_20260924.md`. Apply with `APPLY_V243R14_IN_PLACE.ps1`; it also carries all R13 fixes.
+
 ## V243R13 — All-phase completion + learning/RSI unblock (2026-09-24)
 
 Fixes missions stalling at Data Map (`goal not proven ... failed_attempts: []`, *exact checkpoint: not proven*). It also fixes the hidden blockers waiting in every later phase and in learning.

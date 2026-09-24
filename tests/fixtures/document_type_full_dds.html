@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>HIP Create Document Type replica</title>
+<style>
+  /* Dell DDS sets smooth scrolling; Playwright's own scroll can then report
+     "element is not stable" while the page is still gliding. */
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: Arial, sans-serif; font-size: 14px; }
+  header.app-header { position: fixed; top: 0; left: 0; right: 0; height: 64px; background: #0e2e5c; color: #fff; z-index: 1000; display: flex; align-items: center; padding: 0 24px; }
+  main { padding: 84px 40px 40px 40px; }
+  fieldset { border: 1px solid #ccc; margin: 0 0 18px 0; padding: 10px 16px; }
+  legend { font-weight: bold; }
+  .row { display: flex; gap: 18px; align-items: flex-start; margin: 6px 0; min-height: 64px; }
+  .dds__form-group { display: flex; flex-direction: column; }
+  .dds__label { font-size: 12px; margin-bottom: 2px; }
+  input[type=text], textarea { width: 300px; height: 34px; box-sizing: border-box; }
+  textarea { height: 54px; }
+  dds-dropdown { display: block; position: relative; width: 300px; }
+  .dds__dropdown__popup { position: absolute; left: 0; right: 0; top: 100%; background: #fff; border: 1px solid #777; z-index: 50; max-height: 330px; overflow: auto; animation: dds-pop 140ms ease-out; }
+  @keyframes dds-pop { from { opacity: .2; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .dds__dropdown__popup--hidden { display: none; }
+  .dds__dropdown__list { list-style: none; margin: 0; padding: 0; }
+  .dds__dropdown__item { margin: 0; }
+  .dds__dropdown__item-option { display: block; width: 100%; text-align: left; padding: 7px 10px; background: #fff; border: 0; cursor: pointer; }
+  .dds__dropdown__item-option[aria-selected=true] { background: #dbe9f9; }
+  .dds__tag { display: inline-block; background: #e1e1e1; border-radius: 10px; padding: 1px 8px; margin: 2px; font-size: 11px; }
+  .actions { position: sticky; bottom: 0; background: #f4f4f4; border-top: 1px solid #ccc; padding: 12px 16px; z-index: 900; }
+</style>
+</head>
+<body>
+<header class="app-header">Hybrid Integration Platform &nbsp;·&nbsp; Document Types</header>
+<main>
+  <h2>Create Document Type</h2>
+  <form id="create-document-type" autocomplete="off">
+    <fieldset id="details">
+      <legend>Document Type Details</legend>
+      <div class="row">
+        <div class="dds__form-group"><label class="dds__label" for="dds-form-field-100">Name</label>
+          <input type="text" id="dds-form-field-100" name="name" formcontrolname="name" placeholder="Name" required></div>
+        <div class="dds__form-group"><label class="dds__label" for="dds-form-field-101">Transaction Type</label>
+          <input type="text" id="dds-form-field-101" name="transactionType" formcontrolname="transactionType" placeholder="Transaction Type"></div>
+        <div data-dd="format"></div>
+      </div>
+      <div class="row">
+        <div class="dds__form-group"><label class="dds__label" for="dds-form-field-102">Version</label>
+          <input type="text" id="dds-form-field-102" name="version" formcontrolname="version" placeholder="1" disabled></div>
+        <div class="dds__form-group"><label class="dds__label" for="dds-form-field-103">Status</label>
+          <input type="checkbox" role="switch" id="dds-form-field-103" name="status" formcontrolname="status" checked aria-checked="true"><span>Enabled</span></div>
+        <div class="dds__form-group"><label class="dds__label" for="dds-form-field-104">Description</label>
+          <textarea id="dds-form-field-104" name="description" formcontrolname="description" placeholder="Enter description"></textarea></div>
+      </div>
+    </fieldset>
+    <div id="dynamic-sections"></div>
+    <div class="actions"><button type="button" id="cancel">Cancel</button> <button type="button" id="submit">Submit</button></div>
+  </form>
+</main>
+<script>
+(function () {
+  let seq = 200;
+  const nextId = (p) => `${p}-${++seq}${Math.floor(Math.random() * 1000)}`;
+  const OPTIONS = {
+    format: ['XML', 'JSON', 'EDIFACT', 'EDIX12', 'CSV', 'FLAT'],
+    operation: ['All conditions are satisfied', 'Any condition is satisfied'],
+    identifierDerived: ['Transaction Root Element', 'Element In Payload', 'Namespace'],
+    attributeDerived: ['Element In Payload', 'Transaction Root Element', 'Static Value', 'File Name'],
+    usage: ['Select all', 'Aggregate', 'Dedup', 'Flow Identifier Expression', 'Logging', 'Mapping', 'Routing', 'Strict Order', 'Target File Name'],
+    validation: ['Structure', 'Schema', 'None'],
+  };
+
+  function closeAll(except) {
+    document.querySelectorAll('dds-dropdown').forEach((dd) => { if (dd !== except) dd.__close && dd.__close(); });
+  }
+
+  // A DDS dropdown: <dds-dropdown selection="single|multiple"> with an input
+  // role=combobox whose aria-controls names the owned popup listbox.
+  // Optional self-repair scenario: the Operation lookup only returns its options
+  // after the rest of the form has been filled (a slow portal API).
+  let validationChosen = false;
+  const deferOperation = () => !!window.__deferOperationOptions && !validationChosen;
+
+  function dropdown({ label, options, multiple = false, onChange, showLabel = true, deferred = null }) {
+    const dd = document.createElement('dds-dropdown');
+    dd.setAttribute('selection', multiple ? 'multiple' : 'single');
+    const inputId = nextId('dds-form-field');
+    const labelId = nextId('dds-label');
+    const listId = nextId('dropdown-popup-list');
+    dd.innerHTML = `
+      <div class="dds__dropdown${multiple ? ' dds__dropdown--is-multiple' : ''}" data-dds="dropdown">
+        <div class="dds__dropdown__input-container">
+          ${showLabel ? `<label id="${labelId}" for="${inputId}" class="dds__label dds__label--required">${label}</label>` : ''}
+          <div class="dds__dropdown__input-wrapper">
+            <input type="text" required role="combobox" autocomplete="off" aria-invalid="false" aria-expanded="false"
+              placeholder="${label}" id="${inputId}" class="dds__dropdown__input-field"
+              ${showLabel ? `aria-labelledby="${labelId}"` : ''} aria-controls="${listId}">
+          </div>
+          <div class="dds__tags"></div>
+        </div>
+        <div class="dds__dropdown__popup dds__dropdown__popup--hidden" role="presentation" tabindex="-1">
+          <ul class="dds__dropdown__list" role="listbox" tabindex="-1" id="${listId}"${multiple ? ' aria-multiselectable="true"' : ''}>
+            ${options.map((o, i) => `<li class="dds__dropdown__item" role="none"><button type="button" class="dds__dropdown__item-option" role="option" tabindex="-1" aria-selected="false" aria-posinset="${i + 1}" aria-setsize="${options.length}" data-value="${o}">${o}</button></li>`).join('')}
+          </ul>
+        </div>
+      </div>`;
+    const input = dd.querySelector('input');
+    const popup = dd.querySelector('.dds__dropdown__popup');
+    const tags = dd.querySelector('.dds__tags');
+    let committed = '';
+    let selected = [];
+    const list = dd.querySelector('[role=listbox]');
+    const optionItems = Array.from(list.children);
+    const open = () => {
+      closeAll(dd);
+      if (deferred && deferred()) list.innerHTML = '<li class="dds__dropdown__loading">Loading…</li>';
+      else if (!list.contains(optionItems[0])) { list.innerHTML = ''; optionItems.forEach((li) => list.appendChild(li)); }
+      popup.classList.remove('dds__dropdown__popup--hidden');
+      input.setAttribute('aria-expanded', 'true');
+    };
+    dd.__close = () => {
+      popup.classList.add('dds__dropdown__popup--hidden');
+      input.setAttribute('aria-expanded', 'false');
+      dd.querySelectorAll('.dds__dropdown__item').forEach((li) => { li.style.display = ''; });
+      if (!multiple) input.value = committed; else input.value = '';
+    };
+    input.addEventListener('click', open);
+    input.addEventListener('input', () => {
+      if (popup.classList.contains('dds__dropdown__popup--hidden')) open();
+      const q = input.value.trim().toLowerCase();
+      dd.querySelectorAll('.dds__dropdown__item').forEach((li) => { li.style.display = !q || li.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+    });
+    input.addEventListener('blur', () => setTimeout(() => { if (!dd.contains(document.activeElement)) dd.__close(); }, 160));
+    dd.querySelectorAll('[role=option]').forEach((btn) => {
+      btn.addEventListener('mousedown', (e) => e.preventDefault());
+      btn.addEventListener('click', () => {
+        const text = btn.textContent.trim();
+        if (multiple) {
+          if (text === 'Select all') return;
+          selected = selected.includes(text) ? selected.filter((x) => x !== text) : [...selected, text];
+          btn.setAttribute('aria-selected', selected.includes(text) ? 'true' : 'false');
+          tags.innerHTML = selected.map((x) => `<span class="dds__tag">${x}</span>`).join('');
+          input.focus();
+        } else {
+          committed = text;
+          dd.querySelectorAll('[role=option]').forEach((b) => b.setAttribute('aria-selected', b === btn ? 'true' : 'false'));
+          dd.__close();
+          input.value = text;
+        }
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        onChange && onChange(multiple ? selected.slice() : committed);
+      });
+    });
+    return dd;
+  }
+
+  function textField({ label, name, placeholder, value = '' }) {
+    const id = nextId('dds-form-field');
+    const g = document.createElement('div');
+    g.className = 'dds__form-group';
+    g.innerHTML = `<label class="dds__label" for="${id}">${label}</label><input type="text" id="${id}" name="${name}" formcontrolname="${name}" placeholder="${placeholder}">`;
+    g.querySelector('input').value = value;
+    return g;
+  }
+
+  document.querySelector('[data-dd="format"]').replaceWith(dropdown({
+    label: 'Data Format Type', options: OPTIONS.format,
+    // Angular renders the rest of the form only after a format is chosen.
+    onChange: (v) => setTimeout(() => renderDynamic(v), 180),
+  }));
+
+  function renderDynamic(format) {
+    const host = document.getElementById('dynamic-sections');
+    if (host.dataset.format === format) return;
+    host.dataset.format = format;
+    host.innerHTML = '';
+
+    const identifier = document.createElement('fieldset');
+    identifier.innerHTML = '<legend>Document Identifier</legend>';
+    const opRow = document.createElement('div');
+    opRow.className = 'row';
+    opRow.appendChild(dropdown({ label: 'Operation', options: OPTIONS.operation, deferred: deferOperation }));
+    identifier.appendChild(opRow);
+    const idRow = document.createElement('div');
+    idRow.className = 'row';
+    idRow.appendChild(dropdown({
+      label: 'Derived From', options: OPTIONS.identifierDerived,
+      onChange: () => setTimeout(() => {
+        if (!idRow.querySelector('input[name=value]')) idRow.appendChild(textField({ label: 'Value', name: 'value', placeholder: 'Value' }));
+      }, 150),
+    }));
+    identifier.appendChild(idRow);
+    host.appendChild(identifier);
+
+    const attributes = document.createElement('fieldset');
+    attributes.innerHTML = '<legend>Attributes To Configure</legend>';
+    // HIP pre-renders one row per default attribute; tests may render fewer.
+    ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier', 'Alternate Business Identifier'].slice(0, window.__attributeRows || 5).forEach((name, index) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.appendChild(textField({ label: 'Attribute Name', name: 'attributeName', placeholder: 'Attribute Name', value: name }));
+      row.appendChild(dropdown({
+        label: 'Derived From', options: OPTIONS.attributeDerived,
+        onChange: (v) => setTimeout(() => {
+          const existing = row.querySelector('input[name=expression]');
+          if (v === 'Element In Payload' && !existing) row.appendChild(textField({ label: 'Expression/Value', name: 'expression', placeholder: 'Expression/Value' }));
+          if (v !== 'Element In Payload' && existing) existing.closest('.dds__form-group').remove();
+        }, 150),
+      }));
+      // Dell drops the visible Usage label on later attribute rows.
+      row.appendChild(dropdown({ label: 'Usage', options: OPTIONS.usage, multiple: true, showLabel: index === 0 }));
+      attributes.appendChild(row);
+    });
+    host.appendChild(attributes);
+
+    const validation = document.createElement('fieldset');
+    validation.innerHTML = '<legend>Validation</legend>';
+    const vRow = document.createElement('div');
+    vRow.className = 'row';
+    vRow.appendChild(dropdown({ label: 'Validation Type', options: OPTIONS.validation, onChange: () => { validationChosen = true; } }));
+    validation.appendChild(vRow);
+    host.appendChild(validation);
+    const spacer = document.createElement('div');
+    spacer.style.height = '40px';
+    host.appendChild(spacer);
+  }
+
+  document.addEventListener('mousedown', (e) => {
+    const dd = e.target.closest && e.target.closest('dds-dropdown');
+    closeAll(dd || null);
+  });
+})();
+</script>
+</body>
+</html>

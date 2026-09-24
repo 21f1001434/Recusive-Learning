@@ -43,8 +43,11 @@ from .form_interaction_policy import (
     inspect_interaction_state,
     is_parent_node,
     multiselect_exact_set_proof,
+    ordering_only_dependencies,
     policy_manifest,
     reveal_hidden_structural_parent,
+    scroll_control_into_view,
+    structural_dependencies,
     wait_for_stable_bounding_box,
 )
 
@@ -1572,6 +1575,7 @@ async def execute_document_type_state_graph(
     attempts: List[Dict[str, Any]] = []
     observed_edges: List[Dict[str, Any]] = []
     node_status: Dict[str, bool] = {}
+    ordering_predecessor_failures: Dict[str, List[str]] = {}
     root = await get_active_form_root(page, phase)
     controls_before = await capture_document_type_controls(page)
     controls_before, initial_row_binding = _apply_repeatable_row_bindings(controls_before, graph)
@@ -1597,7 +1601,14 @@ async def execute_document_type_state_graph(
         if expected is None or expected == "" or expected == []:
             node_status[str(node.get("node_id"))] = True
             continue
-        unmet = [dep for dep in node.get("depends_on", []) if node_status.get(str(dep)) is False]
+        # Only a failed structural parent (the field that reveals or enables this
+        # one) makes the node impossible.  A failed earlier section or row is an
+        # ordering predecessor only: keep filling the rest of the form so the
+        # adaptive cycle has to repair just the failed field.
+        unmet = [dep for dep in structural_dependencies(graph, node) if node_status.get(str(dep)) is False]
+        ordering_unmet = [dep for dep in ordering_only_dependencies(graph, node) if node_status.get(str(dep)) is False]
+        if ordering_unmet:
+            ordering_predecessor_failures[str(node.get("node_id"))] = [str(d) for d in ordering_unmet]
         if unmet:
             attempts.append({
                 "field": node.get("field_key"), "node_id": node.get("node_id"), "input_path": node.get("input_path"),
@@ -1656,6 +1667,10 @@ async def execute_document_type_state_graph(
                 int(interaction_profile.get("child_visibility_timeout_ms", 4000)),
                 int(node_wait.get("mount_timeout_ms", 0) or 0),
             )
+            if ordering_unmet:
+                # Best effort after a failed earlier section/row: try the field if
+                # it is already there, but do not wait out a full mount timeout.
+                child_timeout_ms = min(child_timeout_ms, int(interaction_profile.get("child_visibility_timeout_ms", 1500)), 1500)
             deadline = asyncio.get_running_loop().time() + child_timeout_ms / 1000.0
             while control is None and asyncio.get_running_loop().time() < deadline:
                 await page.wait_for_timeout(int(interaction_profile.get("poll_interval_ms", 120)))
@@ -1997,6 +2012,7 @@ async def execute_document_type_state_graph(
         "final_controls": final_controls,
         "observed_dependency_edges": observed_edges,
         "node_status": node_status,
+        "ordering_predecessor_failures": ordering_predecessor_failures,
         "initial_form_state_model": initial_form_model,
         "final_form_state_model": final_form_model,
         "initial_repeatable_row_binding": initial_row_binding,
@@ -2495,6 +2511,9 @@ async def _prepare_phase_control_for_action(
             "blockingValidation": str(control.get("aria_invalid") or "") == "true",
         }
         return dict(control), current_controls, diagnostic, mask_sensitive_data(preparation)
+    # Controls below the fold (Document Type identifier rows, attributes,
+    # validation) fail an elementFromPoint hit test until they are scrolled in.
+    preparation["scroll_into_view"] = await scroll_control_into_view(page, selector)
     bbox = await wait_for_stable_bounding_box(
         page,
         selector,
@@ -2518,6 +2537,9 @@ async def _prepare_phase_control_for_action(
                 return dict(control), current_controls, diagnostic, mask_sensitive_data(preparation)
             preparation["blocked_reason"] = "HIP_READONLY_PORTAL_VALUE_MISMATCH: target control is disabled/read-only and shows a different value"
             return None, current_controls, diagnostic, mask_sensitive_data(preparation)
+        if not state.get("hitTestPass"):
+            preparation["scroll_into_view_retry"] = await scroll_control_into_view(page, selector)
+            state = await inspect_interaction_state(page, selector)
         if not state.get("hitTestPass"):
             session = getattr(page, "_hip_browser_session", None)
             if session is not None and hasattr(session, "ensure_interactable"):
@@ -2729,6 +2751,7 @@ async def execute_phase_state_graph(
     node_status: Dict[str, bool] = {
         str(dep): True for n in selected_nodes for dep in n.get("depends_on", []) if str(dep) not in selected_ids
     }
+    ordering_predecessor_failures: Dict[str, List[str]] = {}
     completed_node_ids: List[str] = []
     initial_controls = await capture_stateful_controls(page, phase)
     initial_controls, initial_row_binding = _apply_repeatable_row_bindings(initial_controls, graph)
@@ -2868,7 +2891,12 @@ async def execute_phase_state_graph(
         if expected is None or expected == "" or expected == []:
             node_status[node_id] = True
             continue
-        unmet = [str(d) for d in node.get("depends_on", []) if node_status.get(str(d)) is False]
+        # Ordering-only predecessors (earlier section/row) never block this node;
+        # see execute_document_type_state_graph.
+        unmet = [str(d) for d in structural_dependencies(graph, node) if node_status.get(str(d)) is False]
+        ordering_unmet = [str(d) for d in ordering_only_dependencies(graph, node) if node_status.get(str(d)) is False]
+        if ordering_unmet:
+            ordering_predecessor_failures[node_id] = ordering_unmet
         if unmet:
             attempts.append({
                 "node_id": node.get("node_id"), "field": node.get("field_key"),
@@ -2955,6 +2983,10 @@ async def execute_phase_state_graph(
                 int(interaction_profile.get("child_visibility_timeout_ms", 4000)),
                 int(node_wait.get("mount_timeout_ms", 0) or 0),
             )
+            if ordering_unmet:
+                # Best effort after a failed earlier section/row: try the field if
+                # it is already there, but do not wait out a full mount timeout.
+                child_timeout_ms = min(child_timeout_ms, int(interaction_profile.get("child_visibility_timeout_ms", 1500)), 1500)
             deadline = asyncio.get_running_loop().time() + child_timeout_ms / 1000.0
             while control is None and asyncio.get_running_loop().time() < deadline:
                 await page.wait_for_timeout(int(interaction_profile.get("poll_interval_ms", 120)))
@@ -3357,6 +3389,7 @@ async def execute_phase_state_graph(
         "attempts": attempts, "failed_attempts": failed, "observed_dependency_edges": observed_edges,
         "strict_live_execution": bool(strict_live_execution), "execution_stage_audit": strict_stage_audit,
         "node_status": node_status, "final_controls": final_controls,
+        "ordering_predecessor_failures": ordering_predecessor_failures,
         "initial_form_state_model": initial_form_model, "final_form_state_model": final_form_model,
         "completed_node_ids": completed_node_ids,
         "dependency_execution_contract": dependency_contract,

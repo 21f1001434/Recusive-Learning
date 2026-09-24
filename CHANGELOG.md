@@ -1,3 +1,11 @@
+# V243R14 — Document Type fills the whole form and repairs itself (2026-09-24)
+
+- Fixed Document Type filling only its top section. The child-visibility gate after a commit now waits only for children that commit reveals and whose other structural parents are committed (`eligible_child_nodes`). Name and Data Format Type no longer wait for the identifier Value or attribute Expressions, which appear only after their own Derived From is chosen.
+- A field is skipped only when a structural parent failed (`structural_dependencies`). Section and row ordering edges no longer skip unrelated later fields, so the rest of the form is filled and the repair pass or next adaptive cycle repairs only the failed field. Both executors record `ordering_predecessor_failures`.
+- Controls are scrolled into view (instantly, overriding smooth scrolling) before the stability and click-target checks. This applies to both executors and to the BrowserSession click/fill preflight (`scroll_control_into_view`, `scroll_locator_into_view`). Below-the-fold controls were rejected as "target center intercepted".
+- `BrowserSession.fill_and_log` now reports its real error instead of an `UnboundLocalError`.
+- Added a full-length DDS Document Type replica (`tests/fixtures/document_type_full_dds.html`) and `tests/test_v243r14_document_type_full_form.py`, which cover the full form, the BrowserSession broker path, late-dropdown self-repair and preflight scrolling. Added `APPLY_V243R14_IN_PLACE.ps1` / `VERIFY_V243R14_INSTALL.ps1`.
+
 # V243R13 — All-phase completion + learning/RSI unblock (2026-09-24)
 
 - Stale reviews no longer reappear. A new review supersedes older open ones for the same phase (including stopped runs), and committing a phase closes its open reviews. Added `V243R13_FINAL_VERIFICATION_20260924.md`.

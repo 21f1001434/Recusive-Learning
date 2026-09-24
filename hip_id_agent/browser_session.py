@@ -5475,6 +5475,10 @@ class BrowserSession:
         dom_cursor = await self.mark_dom_event_cursor()
         semantic_resolution: Dict[str, Any] = {}
         semantic_revalidation: Dict[str, Any] = {"pass": True, "status": "not_required"}
+        # Initialised here so an early preflight failure reports its real reason
+        # instead of an UnboundLocalError from the exception handler.
+        autowebglm_decision: Dict[str, Any] = {}
+        autowebglm_reward_recorded = False
         try:
             universal_audit = await universal_locator_preflight(
                 self.page, locator, action=action_type or "fill", selector=selector, timeout_ms=5000

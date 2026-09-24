@@ -348,6 +348,55 @@ async def inspect_interaction_state(page: Page, selector: str) -> Dict[str, Any]
         return {"exists": False, "visible": False, "reason": mask_sensitive_string(str(exc))}
 
 
+_SCROLL_INTO_VIEW_JS = r"""
+(el) => {
+  if(!el||!el.getBoundingClientRect)return {scrolled:false,in_view:false,reason:'not-found'};
+  const host=el.closest('label,.dds__radio-button,.dds__checkbox,[role=radio],[role=checkbox]')||el;
+  const reachable=()=>{
+    const r=host.getBoundingClientRect();
+    if(!(r.width&&r.height))return false;
+    const cx=r.left+r.width/2,cy=r.top+r.height/2;
+    if(cx<0||cy<0||cx>=innerWidth||cy>=innerHeight)return false;
+    const h=document.elementFromPoint(cx,cy);
+    return !!(h&&(h===host||host.contains(h)||h.contains(host)||h===el||el.contains(h)||h.contains(el)));
+  };
+  if(reachable())return {scrolled:false,in_view:true};
+  // 'instant' overrides the portal's CSS scroll-behavior:smooth, so the target
+  // does not keep moving while its geometry is sampled.
+  try{host.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});}
+  catch(e){try{host.scrollIntoView(true);}catch(_){}}
+  return {scrolled:true,in_view:reachable()};
+}
+"""
+
+
+async def scroll_control_into_view(page: Page, selector: str) -> Dict[str, Any]:
+    """Bring a below-the-fold or sticky-covered control to the viewport centre.
+
+    The hit test below uses ``elementFromPoint``, which cannot see a control that
+    is outside the viewport.  Long forms (Document Type identifier rows,
+    attributes and validation) are mostly below the fold, so without this every
+    click on them was reported as "target center intercepted".
+    """
+    if not selector:
+        return {"scrolled": False, "in_view": False, "reason": "empty selector"}
+    try:
+        result = await page.evaluate(
+            "(args) => { const fn = " + _SCROLL_INTO_VIEW_JS + "; return fn(document.querySelector(args.selector)); }",
+            {"selector": selector},
+        )
+        return dict(result or {})
+    except Exception as exc:
+        return {"scrolled": False, "in_view": False, "reason": mask_sensitive_string(str(exc))}
+
+
+async def scroll_locator_into_view(locator: Locator) -> Dict[str, Any]:
+    try:
+        return dict(await locator.evaluate(_SCROLL_INTO_VIEW_JS) or {})
+    except Exception as exc:
+        return {"scrolled": False, "in_view": False, "reason": mask_sensitive_string(str(exc))}
+
+
 async def wait_for_stable_bounding_box(
     page: Page,
     selector: str,
@@ -515,20 +564,67 @@ def is_parent_node(graph: Dict[str, Any], node_id: str) -> bool:
     return False
 
 
+# Relations the dependency contract adds only to order execution (finish one
+# section or repeatable row before the next).  They never mean "the parent value
+# reveals or enables the child", so they must not skip a child when the
+# predecessor fails, and a parent commit must not wait for such a child to appear.
+ORDERING_ONLY_RELATIONS = frozenset({"section_sequence_gate", "repeatable_row_sequence_gate"})
+
+
+def _dependency_relations(graph: Dict[str, Any]) -> Dict[tuple, str]:
+    relations: Dict[tuple, str] = {}
+    for edge in graph.get("dependency_edges", []) if isinstance(graph.get("dependency_edges"), list) else []:
+        if isinstance(edge, dict):
+            relations.setdefault((str(edge.get("from") or ""), str(edge.get("to") or "")), str(edge.get("relation") or ""))
+    return relations
+
+
+def structural_dependencies(graph: Dict[str, Any], node: Dict[str, Any]) -> List[str]:
+    """Return the dependencies whose failure makes *node* impossible to fill.
+
+    A dependency without an edge record is treated as structural (fail closed).
+    """
+    relations = _dependency_relations(graph)
+    node_id = str(node.get("node_id") or "")
+    return [
+        str(dep) for dep in node.get("depends_on", []) or []
+        if relations.get((str(dep), node_id)) not in ORDERING_ONLY_RELATIONS
+    ]
+
+
+def ordering_only_dependencies(graph: Dict[str, Any], node: Dict[str, Any]) -> List[str]:
+    structural = set(structural_dependencies(graph, node))
+    return [str(dep) for dep in node.get("depends_on", []) or [] if str(dep) not in structural]
+
+
 def eligible_child_nodes(
     graph: Dict[str, Any],
     parent_node_id: str,
     node_status: Dict[str, bool],
 ) -> List[Dict[str, Any]]:
+    """Children that must become visible once *parent_node_id* has committed.
+
+    A child qualifies only when this parent structurally reveals or enables it
+    and every other structural parent has already committed.  A grandchild such
+    as an attribute Expression (revealed by its row's Derived From) is gated when
+    its own parent commits, not when Data Format Type or Name commits.
+    """
+    relations = _dependency_relations(graph)
     children: List[Dict[str, Any]] = []
     for node in graph.get("nodes", []) if isinstance(graph.get("nodes"), list) else []:
         if not isinstance(node, dict):
             continue
+        node_id = str(node.get("node_id") or "")
         deps = [str(x) for x in node.get("depends_on", [])]
         if parent_node_id not in deps:
             continue
-        other_deps = [d for d in deps if d != parent_node_id]
-        if any(node_status.get(d) is False for d in other_deps):
+        if relations.get((parent_node_id, node_id)) in ORDERING_ONLY_RELATIONS:
+            continue
+        other_deps = [
+            d for d in deps
+            if d != parent_node_id and relations.get((d, node_id)) not in ORDERING_ONLY_RELATIONS
+        ]
+        if any(node_status.get(d) is not True for d in other_deps):
             continue
         if node.get("expected_value") in (None, "", []):
             continue
@@ -676,6 +772,8 @@ el => {
         audit.update({"pass": False, "reason": "target remained hidden after structural-parent analysis"})
         return mask_sensitive_data(audit)
 
+    audit["scroll_into_view"] = await scroll_locator_into_view(target)
+
     try:
         stable = await target.evaluate(
             r"""
@@ -709,6 +807,18 @@ el => {const r=el.getBoundingClientRect();const cx=Math.max(0,Math.min(innerWidt
         )
     except Exception as exc:
         hit = {"pass": False, "reason": mask_sensitive_string(str(exc))}
+    if not hit.get("pass"):
+        # A sticky header/footer or a late layout shift can still cover the
+        # centre; re-centre once before declaring the target intercepted.
+        audit["scroll_into_view_retry"] = await scroll_locator_into_view(target)
+        try:
+            hit = await target.evaluate(
+                r"""
+el => {const r=el.getBoundingClientRect();const cx=Math.max(0,Math.min(innerWidth-1,r.left+r.width/2)),cy=Math.max(0,Math.min(innerHeight-1,r.top+r.height/2));const h=document.elementFromPoint(cx,cy);return {pass:!!(h&&(h===el||el.contains(h)||h.contains(el))),tag:(h&&h.tagName||'').toLowerCase(),role:h&&h.getAttribute&&h.getAttribute('role')||''};}
+"""
+            )
+        except Exception as exc:
+            hit = {"pass": False, "reason": mask_sensitive_string(str(exc))}
     audit["hit_test"] = hit
     if not hit.get("pass"):
         audit.update({"pass": False, "reason": "target center is intercepted"})
