@@ -320,12 +320,24 @@ async def inspect_interaction_state(page: Page, selector: str) -> Dict[str, Any]
   const runningAnimation=animations.some(a=>a.playState==='running'||a.playState==='pending');
   const transitionMs=(s.transitionDuration||'').split(',').reduce((m,v)=>Math.max(m,parseFloat(v)||0),0)*1000;
   const animationMs=(s.animationDuration||'').split(',').reduce((m,v)=>Math.max(m,parseFloat(v)||0),0)*1000;
+  const blockingValidation=el.getAttribute('aria-invalid')==='true'||!!el.closest('.dds__form-group--invalid,.dds__error,[class*=error]');
+  // Field-owned validation text (aria-describedby or the field's own form group)
+  // so callers can tell "object already exists" apart from a real input error.
+  const msgs=[];
+  const seeText=n=>{if(!n)return;const st=getComputedStyle(n);if(st.display==='none'||st.visibility==='hidden')return;const t=(n.innerText||n.textContent||'').replace(/\s+/g,' ').trim();if(t&&t.length<=300&&!msgs.includes(t))msgs.push(t);};
+  for(const id of (el.getAttribute('aria-describedby')||'').split(/\s+/).filter(Boolean)) seeText(document.getElementById(id));
+  if(blockingValidation){
+    const group=el.closest('.dds__form-group,.dds__input-text__container,dds-input,dds-textarea,[class*=form-field],[class*=field-container]')||el.parentElement;
+    if(group) group.querySelectorAll('.dds__invalid-feedback,.dds__error-text,.dds__form__field__error,[class*=error-text],[class*=error-message],[role=alert]').forEach(seeText);
+    if(!msgs.length&&group){const gt=(group.innerText||'').replace(/\s+/g,' ');const m=gt.match(/[^.|]{0,120}already exists?[^.|]{0,80}/i);if(m)msgs.push(m[0].trim());}
+  }
   return {
     exists:true,visible,disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,
     bbox:{x:r.x,y:r.y,width:r.width,height:r.height},pointerEvents:s.pointerEvents||'',
     hitTestPass:hitPass,hitSelector:hit?css(hit):'',runningAnimation,transitionMs,animationMs,
     ariaInvalid:el.getAttribute('aria-invalid')||'',
-    blockingValidation:el.getAttribute('aria-invalid')==='true'||!!el.closest('.dds__form-group--invalid,.dds__error,[class*=error]'),
+    blockingValidation,
+    validationMessage:msgs.join(' | ').slice(0,600),
   };
 }
 """,

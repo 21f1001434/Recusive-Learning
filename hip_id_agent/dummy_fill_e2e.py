@@ -1140,16 +1140,29 @@ def _extract_active_validation_messages(run_dir: Path) -> List[Dict[str, Any]]:
     return messages
 
 
+# Natural-key duplicate messages as rendered in the approved golden screenshots.
+# Row-level duplicates (e.g. "Attribute Name already exists") are input errors
+# and stay blocking.
+_EXISTING_OBJECT_MESSAGES = {
+    "data_map": re.compile(r"map identifier already exists"),
+    "source_document_type": re.compile(r"(?<!attribute )(?<!attribute)\bname already exists"),
+    "target_document_type": re.compile(r"(?<!attribute )(?<!attribute)\bname already exists"),
+    "rule": re.compile(r"rule name already exists"),
+    "source_transport_profile": re.compile(r"(transport profile|profile name) already exists"),
+    "target_transport_profile": re.compile(r"(transport profile|profile name) already exists"),
+    "biz_flow": re.compile(r"(business flow|biz flow|flow name|bizflow)( name)? already exists"),
+}
+
+
 def _classify_validation_messages(phase: str, messages: Sequence[Dict[str, Any]], summary: Dict[str, Any]) -> Dict[str, Any]:
     resolution = summary.get("existing_object_resolution") if isinstance(summary.get("existing_object_resolution"), dict) else {}
     accepted: List[Dict[str, Any]] = []
     blocking: List[Dict[str, Any]] = []
-    duplicate_markers = {"data_map": "map identifier already exists", "rule": "rule name already exists"}
     conflicting = resolution.get("mode") == "conflicting_existing_object"
+    marker = _EXISTING_OBJECT_MESSAGES.get(phase)
     for row in messages or []:
         text = str(row.get("message") or "").lower()
-        marker = duplicate_markers.get(phase)
-        if not marker or marker not in text or conflicting:
+        if marker is None or not marker.search(text) or conflicting:
             blocking.append(row)
         elif resolution.get("found") and resolution.get("mode") == "reuse_existing":
             accepted.append({

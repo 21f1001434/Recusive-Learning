@@ -12,6 +12,28 @@ SECRET_KEY_RE = re.compile(
     r"(password|passwd|pwd|secret|token|cookie|authorization|auth(?!or)|api[_-]?key|apikey|private[_-]?key|session|bearer|sftp[_-]?password|client[_-]?secret|certificate|as2[_-]?private[_-]?key|passphrase|set-cookie)",
     re.IGNORECASE,
 )
+# Agent-owned keys that merely contain a secret-like substring. Masking them
+# corrupted persisted learning: interactive-teaching sessions were saved with
+# ``session_id: ***MASKED***`` (Finish & learn could never capture), and learned
+# recipes/skills/replay policies lost ``task_tokens`` (no task could match them).
+NON_SECRET_KEYS = frozenset({
+    "task_tokens",
+    "structural_tokens",
+    "state_tokens",
+    "session_id",
+    "sessions",
+    "inspectiontoken",
+    "observed_api_key_matches",
+    "safety_authorization_task_id",
+    "certificate_id",
+})
+
+
+def is_secret_key(key: Any) -> bool:
+    text = str(key)
+    return text.lower() not in NON_SECRET_KEYS and bool(SECRET_KEY_RE.search(text))
+
+
 SECRET_TARGET_RE = re.compile(
     r"(password|passwd|pwd|secret|token|apikey|api_key|client_secret|authorization|auth|cookie|private_key|private-key|certificate|sftp_password|as2_private_key|bearer)",
     re.IGNORECASE,
@@ -38,7 +60,7 @@ def mask_sensitive_data(data: Any) -> Any:
         for k, v in data.items():
             # Booleans/None carry no secret material; keep flags such as
             # ``session_reused`` or ``token_present`` usable by gates.
-            if SECRET_KEY_RE.search(str(k)) and not (v is None or isinstance(v, bool)):
+            if is_secret_key(k) and not (v is None or isinstance(v, bool)):
                 out[k] = "***MASKED***"
             else:
                 out[k] = mask_sensitive_data(v)

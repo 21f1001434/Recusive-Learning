@@ -1035,7 +1035,7 @@ async def capture_document_type_controls(page: Page) -> List[Dict[str, Any]]:
     const index=containers.indexOf(row);
     return {kind:low.includes('attribute')?'attribute':'document_identifier',index:index>=0?index:null};}
   function semantic(el, sec){const n=clean(el.getAttribute('name')).toLowerCase();const ph=clean(el.getAttribute('placeholder')).toLowerCase();const lab=label(el).toLowerCase();const low=clean(sec).toLowerCase();
-    if(low.includes('document type details')){if(n==='name'||lab==='name')return 'document_type_name';if(n==='transactiontype'||lab.includes('transaction type'))return 'transaction_type';if(n==='version'||lab==='version')return 'document_type_version';if(ph.includes('data format')||lab.includes('data format'))return 'data_format_type';if(n==='description'||lab.includes('description'))return 'description';if((el.type==='radio'||el.getAttribute('role')==='radio')&&(lab.includes('enable')||lab.includes('disable')||lab.includes('status')))return 'status';}
+    if(low.includes('document type details')){if(n==='name'||lab==='name')return 'document_type_name';if(n==='transactiontype'||lab.includes('transaction type'))return 'transaction_type';if(n==='version'||lab==='version')return 'document_type_version';if(ph.includes('data format')||lab.includes('data format'))return 'data_format_type';if(n==='description'||lab.includes('description'))return 'description';if((el.type==='radio'||el.getAttribute('role')==='radio'||el.type==='checkbox'||el.getAttribute('role')==='switch')&&(lab.includes('enable')||lab.includes('disable')||lab.includes('status')))return 'status';}
     if(low.includes('document identifier')){if(ph==='operation'||lab==='operation')return 'document_identifier_operation';if(ph.includes('derived from')||lab.includes('derived from'))return 'document_identifier_derived_from';if(n==='value'||ph==='value'||lab==='value')return 'document_identifier_value';}
     if(low.includes('attribute')){if(n==='attributename'||ph.includes('attribute name'))return 'attribute_name';if(ph.includes('derived from')||lab.includes('derived from'))return 'attribute_derived_from';const dd=el.closest('dds-dropdown');const multi=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));if(n==='usage'||ph==='usage'||lab==='usage'||multi)return 'attribute_usage';if(n==='expression'||ph.includes('expression'))return 'attribute_expression';}
     if(low.includes('validation')&&(ph.includes('validation')||lab.includes('validation')))return 'validation_type';return '';}
@@ -1423,6 +1423,51 @@ def resolve_control(controls: Sequence[Dict[str, Any]], node: Dict[str, Any]) ->
     return dict(control) if isinstance(control, dict) else None
 
 
+# Each HIP object's natural key. Dell validates it asynchronously and shows
+# "... already exists" when the object is already in DEV (see every golden
+# screenshot). That message means "reuse the existing object", not "bad input".
+NATURAL_KEY_FIELDS = frozenset({
+    "map_identifier", "document_type_name", "rule_name", "profile_name", "business_flow_name",
+})
+_EXISTING_OBJECT_MESSAGE_RE = re.compile(r"already\s+exists?", re.IGNORECASE)
+
+
+def existing_object_validation(node: Dict[str, Any], interaction_state: Dict[str, Any]) -> bool:
+    """True when the only blocking validation is the natural-key duplicate message."""
+    return bool(
+        interaction_state.get("blockingValidation")
+        and str(node.get("field_key") or "").strip().lower() in NATURAL_KEY_FIELDS
+        and _EXISTING_OBJECT_MESSAGE_RE.search(str(interaction_state.get("validationMessage") or ""))
+    )
+
+
+def _portal_owned_display_values(control: Dict[str, Any], values: Sequence[str]) -> List[str]:
+    """A disabled/read-only control's placeholder is its displayed value.
+
+    Dell renders portal-generated fields (Version, Rule Type, Rule Scope) as
+    disabled inputs whose greyed text may be a placeholder. The agent cannot type
+    into them, so the displayed text is the only observable value.
+    """
+    if values or not (control.get("disabled") or control.get("readonly")):
+        return list(values)
+    placeholder = _norm_text(control.get("placeholder"))
+    return [placeholder] if placeholder else []
+
+
+def _is_boolean_switch(control: Optional[Dict[str, Any]]) -> bool:
+    control = control or {}
+    return _norm(control.get("role")) in {"switch", "checkbox"} or _norm(control.get("type")) == "checkbox"
+
+
+def _boolean_intent(value: Any) -> Optional[bool]:
+    text = _norm(value)
+    if text in {"enable", "enabled", "true", "yes", "on"}:
+        return True
+    if text in {"disable", "disabled", "false", "no", "off", "not enabled", "not enable"}:
+        return False
+    return None
+
+
 def _version_equal(expected: Any, actual: Any) -> bool:
     try:
         return float(str(expected).strip()) == float(str(actual).strip())
@@ -1445,8 +1490,14 @@ def _value_equal(node: Dict[str, Any], control: Dict[str, Any]) -> bool:
         actual = {x.lower() for x in _clean_selected_values(control.get("selected_values", []))}
         return wanted == actual
     if node.get("action") == "select_radio":
+        if _is_boolean_switch(control):
+            wanted = _boolean_intent(expected)
+            if wanted is not None:
+                return bool(control.get("checked")) == wanted
         return bool(control.get("checked")) and _norm(expected) in {_norm(control.get("label")), _norm(control.get("value"))}
     actual = control.get("value")
+    if not _norm_text(actual):
+        actual = next(iter(_portal_owned_display_values(control, [])), actual)
     if node.get("field_key") == "document_type_version":
         return _version_equal(expected, actual)
     expected_norm = _semantic_value_key(expected)
@@ -1686,6 +1737,9 @@ async def execute_document_type_state_graph(
                         await close_open_dropdown(page, phase)
                 elif action == "select_multi":
                     ok = await select_dds_multiselect(page, root, selector, split_multi_value(expected), phase=phase)
+                elif action == "select_radio" and _is_boolean_switch(actual_control):
+                    # Dell renders Document Type Status as a DDS switch, not radios.
+                    ok = await set_boolean_control(page, root, selector, expected, phase=phase)
                 elif action == "select_radio":
                     ok = await select_radio_value(page, root, str(expected), section=str(node.get("section") or ""), phase=phase)
                 else:
@@ -1780,11 +1834,14 @@ async def execute_document_type_state_graph(
                     transaction_proof["protected_state_changes"] = unintended
                     interaction_state = await inspect_interaction_state(page, str(current.get("selector") or ""))
                     transaction_proof["post_action_interaction_state"] = interaction_state
+                    existing_object = existing_object_validation(node, interaction_state)
+                    if existing_object:
+                        transaction_proof["existing_object_validation"] = interaction_state.get("validationMessage")
                     if unintended:
                         success = False
                         actual_control = current
                         last_error = "HIP_DOCTYPE_UNINTENDED_MUTATION: action changed a previously committed control"
-                    elif interaction_state.get("blockingValidation"):
+                    elif interaction_state.get("blockingValidation") and not existing_object:
                         success = False
                         actual_control = current
                         last_error = "HIP_FIELD_VALIDATION_BLOCKING"
@@ -2351,16 +2408,11 @@ def _stateful_value_equal(node: Dict[str, Any], control: Dict[str, Any]) -> bool
     field_key = _norm(node.get("field_key"))
     candidate_values = [actual] + [_norm_text(x) for x in _clean_selected_values(control.get("selected_values", []))]
     candidate_values = [x for x in candidate_values if x]
-    # A verify-only node cannot type into a portal-owned disabled/read-only
-    # control. Dell renders e.g. Map Identifier Version as a disabled input whose
-    # only visible text is the placeholder ("1"); that display is the value.
-    if (
-        action == "verify_only"
-        and not candidate_values
-        and (control.get("disabled") or control.get("readonly"))
-        and _norm_text(control.get("placeholder"))
-    ):
-        candidate_values = [_norm_text(control.get("placeholder"))]
+    # The agent cannot type into a portal-owned disabled/read-only control; Dell
+    # renders e.g. Map Identifier Version / Rule Scope with only a placeholder.
+    candidate_values = _portal_owned_display_values(control, candidate_values)
+    if not actual and candidate_values and (control.get("disabled") or control.get("readonly")):
+        actual = candidate_values[0]
     if field_key in {"version", "map_identifier_version", "document_type_version", "routing_rule_version", "current_flow_version"}:
         return any(_version_equal(exp, value) for value in candidate_values)
     if field_key in {"process_source_document_type", "process_document_type_version"} and any(_default_all_other_equal(exp, value) for value in candidate_values):
@@ -2439,7 +2491,13 @@ async def _prepare_phase_control_for_action(
         return None, current_controls, diagnostic, mask_sensitive_data(preparation)
     if str(node.get("action") or "") not in {"verify_only"}:
         if state.get("disabled") or state.get("readonly"):
-            preparation["blocked_reason"] = "target control disabled/read-only"
+            equal = _value_equal if document_type else _stateful_value_equal
+            if equal(node, dict(control, disabled=True)):
+                # Portal-owned value already shows the requested state; the
+                # caller records it as verification-only, never as a mutation.
+                preparation["portal_owned_readonly_value"] = True
+                return dict(control), current_controls, diagnostic, mask_sensitive_data(preparation)
+            preparation["blocked_reason"] = "HIP_READONLY_PORTAL_VALUE_MISMATCH: target control is disabled/read-only and shows a different value"
             return None, current_controls, diagnostic, mask_sensitive_data(preparation)
         if not state.get("hitTestPass"):
             session = getattr(page, "_hip_browser_session", None)
@@ -3039,7 +3097,10 @@ async def execute_phase_state_graph(
                     if current is not None and stability.get("stable") and _stateful_value_equal(node, current):
                         interaction_state = await inspect_interaction_state(page, str(current.get("selector") or ""))
                         transaction_proof["post_action_interaction_state"] = interaction_state
-                        if interaction_state.get("blockingValidation"):
+                        existing_object = existing_object_validation(node, interaction_state)
+                        if existing_object:
+                            transaction_proof["existing_object_validation"] = interaction_state.get("validationMessage")
+                        if interaction_state.get("blockingValidation") and not existing_object:
                             reason = "HIP_FIELD_VALIDATION_BLOCKING"
                             actual = current
                             success = False

@@ -1,11 +1,18 @@
-## V243R13 — Data Map learning phase unblock (2026-09-24)
+## V243R13 — All-phase completion + learning unblock (2026-09-24)
 
-Fixes the learning mission getting stuck at **Data Map** with `goal not proven before bounded adaptive/no-progress guard ... failed_attempts: []` and *exact checkpoint: not proven*, even when the Create Map form was filled correctly.
+Fixes missions stalling at Data Map (`goal not proven ... failed_attempts: []`, *exact checkpoint: not proven*). It also fixes the hidden blockers waiting in every later phase and in learning.
 
-- Secret masking no longer hides `authoritative_*` proof flags. It turned `True` into `"***MASKED***"`, so strict completion gates could never pass in any phase, and `Looks correct` could not unblock the phase.
-- A disabled, portal-owned *Map Identifier Version* that shows `1` only as a placeholder is accepted for verify-only nodes. A real read-only mismatch reports `HIP_READONLY_PORTAL_VALUE_MISMATCH`.
-- Autonomous failures now name the failing fields and unmet checks instead of `failed_attempts: []`.
-- A portal-reported `Map identifier already exists` (as in the golden screenshot) is existing-object evidence in no-save runs. A conflicting existing object still blocks.
+- **All 7 phases and the task box:** secret masking no longer hides `authoritative_*` proof flags. They were turned into `"***MASKED***"`, so no strict phase gate, exact checkpoint, `Looks correct` promotion or task-box form fill could ever pass.
+- **Learning:** agent-owned keys (`session_id`, `task_tokens`, …) are no longer masked when saved.
+  - Start teaching → Finish & learn now captures the demonstration.
+  - Learned recipes, skills and replay policies match new tasks after reload.
+- **"Already exists" is existing-object evidence**, not an error, on every create form, as shown in the golden screenshots:
+  - Map identifier / Name / Rule Name / Transport Profile / Business Flow Name;
+  - applies in both executors and in the validation gate;
+  - a row-level duplicate or a conflicting object still blocks.
+- **Portal-owned disabled fields** (Version, Rule Type, Rule Scope) verify against their displayed value. A mismatch reports `HIP_READONLY_PORTAL_VALUE_MISMATCH`.
+- **Document Type Status switch** is now recognised and operated as a switch. Previously Source/Target Document Type could never be proven.
+- **Failures name the field and the unmet check** for every phase.
 - `websockets==15.0.1`, so `pip install -r requirements.txt` resolves with `browser-use==0.13.8`.
 
 See `V243R13_DATAMAP_LEARNING_UNBLOCK_FIX_20260924.md`. Apply with `APPLY_V243R13_IN_PLACE.ps1`.

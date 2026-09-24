@@ -97,8 +97,10 @@ def test_verify_only_readonly_placeholder_counts_only_for_portal_owned_controls(
     assert not _stateful_value_equal(node, {"value": "", "placeholder": "1"})
     # A real value always wins over the placeholder.
     assert not _stateful_value_equal(node, {"value": "2", "placeholder": "1", "disabled": True})
-    fill = dict(node, field_key="map_name", action="fill_text", expected_value="X")
-    assert not _stateful_value_equal(fill, {"value": "", "placeholder": "X", "disabled": True})
+    # Any portal-owned (disabled) field shows its value this way, e.g. Rule Scope.
+    scope = dict(node, field_key="rule_scope", action="select_single", expected_value="GLOBAL")
+    assert _stateful_value_equal(scope, {"value": "", "placeholder": "GLOBAL", "disabled": True})
+    assert not _stateful_value_equal(scope, {"value": "", "placeholder": "GLOBAL"})
 
 
 @pytest.mark.parametrize("version_attr", ['value="1"', 'placeholder="1"'])

@@ -1,12 +1,16 @@
-# V243R13 — Data Map learning phase unblock (2026-09-24)
+# V243R13 — All-phase completion + learning unblock (2026-09-24)
 
-- Fixed `mask_sensitive_data()` masking `authoritative_*` keys (bare `auth` regex). Strict autonomous and exact-checkpoint gates received `"***MASKED***"` instead of `True` and could never pass.
-- Boolean/`None` values are never masked.
-- Verify-only nodes accept the placeholder of a disabled or read-only portal-owned control (Map Identifier Version). Read-only mismatches report `HIP_READONLY_PORTAL_VALUE_MISMATCH` without a futile repair loop.
-- Autonomous failures carry `unmet_success_checks`, `last_cycle_execution` and `failure_summary`. The new `autonomous_target_execution()` is used by all phase KB modules, so blocker messages list the real failed attempts.
-- Portal-reported "already exists" (Data Map / Rule) is non-blocking existing-object evidence in no-save runs, unless the inventory shows a conflicting object.
+- Fixed `mask_sensitive_data()` masking `authoritative_*` keys (bare `auth` regex). Strict autonomous gates, exact completion checkpoints and universal task fills received `"***MASKED***"` instead of `True` and could never pass, in any phase.
+- Boolean/`None` values are never masked. New `NON_SECRET_KEYS` (`task_tokens`, `session_id`, `sessions`, …) keeps learning memory usable after `safe_write_json`:
+  - interactive teaching capture works;
+  - recipes, skills and replay policies match after reload.
+- `inspect_interaction_state()` returns `validationMessage`. Both executors accept the natural-key "already exists" message as `existing_object_validation`.
+- Disabled/read-only portal-owned controls verify against their displayed value (value or placeholder). Mismatches report `HIP_READONLY_PORTAL_VALUE_MISMATCH`.
+- The Document Type scanner, comparator and executor support the DDS Status switch.
+- The validation gate accepts the golden duplicate messages for all 7 phases. Row-level duplicates and conflicting objects still block.
+- Autonomous failures carry `unmet_success_checks`, `last_cycle_execution` and `failure_summary`. `autonomous_target_execution()` is used by all phase KB modules.
 - `websockets` pin moved from 13.1 to 15.0.1 (required by `browser-use==0.13.8`).
-- Added `tests/test_v243r13_datamap_stuck_learning_fix.py` (real Chromium replica of the Create Map drawer).
+- Added Chromium replica tests for Data Map, Document Type, Rule, Transport Profile, BizFlow and a task-box form fill, plus learning-memory round-trip tests.
 
 # V243R12H1 — strict learning promotion + browser-action model reward (2026-09-23)
 
