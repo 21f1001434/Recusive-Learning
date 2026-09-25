@@ -42,6 +42,15 @@
     H.row(H.text({ label: 'Business Flow Name *', name: 'businessFlowName', placeholder: 'Business Flow Name', duplicateMessage: 'Business Flow Name already exists' })),
     H.row(H.text({ label: 'Flow Description *', name: 'flowDescription', placeholder: 'Flow Description', textarea: true })),
   );
+  if (window.__variant) {
+    panels[0].append(
+      H.row(H.radios({ label: 'Flow Type *', name: 'flowType', options: [['Translation', 'translation'], ['Passthrough', 'passthrough']], value: 'Translation', hiddenInput: true })),
+      H.accordion('Alert Settings', [
+        H.switchControl({ label: 'Alerts Enabled', name: 'alertsEnabled', checked: false, onText: 'Yes', offText: 'No' }),
+        H.checkboxGroup({ label: 'Alert On', name: 'alertOn', options: ['Success', 'Failure', 'Delay'] }),
+      ]),
+    );
+  }
 
   // ---- Configure Source
   const srcAppHost = document.createElement('div');

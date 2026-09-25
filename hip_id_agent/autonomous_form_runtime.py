@@ -34,6 +34,7 @@ from .stateful_form_runtime import (
     execute_phase_state_graph,
     resolve_stateful_control_diagnostics,
     phase_object,
+    split_multi_value,
 )
 from .upload_assets import attempt_upload_for_control, find_upload_asset
 
@@ -251,6 +252,29 @@ def _path_section_hint(phase: str, path: str) -> str:
     return ""
 
 
+def _is_choice_control(control: Dict[str, Any]) -> bool:
+    typ = _norm(control.get("type"))
+    role = _norm(control.get("role"))
+    return typ in {"radio", "checkbox"} or role in {"radio", "checkbox"}
+
+
+def _choice_group_key(control: Dict[str, Any]) -> str:
+    """Radios (or several checkboxes) answering one question form one group.
+
+    Their own labels are the options ("Yes", "Failure"); the group label names
+    the question.  Options of one group are one binding target, so they never
+    compete with each other for a margin.
+    """
+    if not _is_choice_control(control):
+        return ""
+    name = str(control.get("group_name") or "")
+    label = _norm(control.get("group_label"))
+    if not (name or label):
+        return ""
+    row = control.get("row_kind_ordinal", control.get("row_index"))
+    return "|".join([_norm(control.get("section")), name or label, str(row if row is not None else "")])
+
+
 def _infer_action_from_control(control: Dict[str, Any], expected: Any) -> str:
     typ = _norm(control.get("type"))
     role = _norm(control.get("role"))
@@ -258,10 +282,12 @@ def _infer_action_from_control(control: Dict[str, Any], expected: Any) -> str:
     component = _norm(control.get("component_tag"))
     if typ == "file" or "file" in component:
         return "upload_file"
-    if str(control.get("selection_mode") or "").lower() == "multiple" or isinstance(expected, list):
-        return "select_multi"
     if typ == "radio" or role == "radio":
         return "select_radio"
+    if (typ == "checkbox" or role == "checkbox") and _choice_group_key(control):
+        return "select_checkbox_group"
+    if str(control.get("selection_mode") or "").lower() == "multiple" or isinstance(expected, list):
+        return "select_multi"
     if typ in {"checkbox"} or role in {"checkbox", "switch"} or "switch" in component:
         return "toggle"
     if role in {"combobox", "listbox"} or tag == "select" or "dropdown" in component:
@@ -270,29 +296,75 @@ def _infer_action_from_control(control: Dict[str, Any], expected: Any) -> str:
 
 
 def _control_text_tokens(control: Dict[str, Any]) -> List[str]:
-    values = [
-        control.get("label"), control.get("name"), control.get("form_control_name"),
-        control.get("framework_key"), control.get("placeholder"), control.get("semantic_key"),
-    ]
-    return [_norm(v) for v in values if _norm(v)]
+    if _choice_group_key(control):
+        # An option's own label ("No") says nothing about which field it is.
+        values = [control.get("group_label"), control.get("group_name"), control.get("form_control_name")]
+    else:
+        values = [
+            control.get("label"), control.get("name"), control.get("form_control_name"),
+            control.get("framework_key"), control.get("placeholder"), control.get("semantic_key"),
+        ]
+    out: List[str] = []
+    for value in values:
+        token = _norm(value).rstrip(" *:").strip()
+        if token and token not in out:
+            out.append(token)
+    return out
+
+
+def _compact(value: str) -> str:
+    return "".join(ch for ch in str(value or "").lower() if ch.isalnum())
+
+
+def _meaningful_words(value: str) -> set:
+    return {w for w in _norm(value).replace("*", " ").replace(":", " ").split() if len(w) >= 3}
+
+
+def _path_parent_keys(path: str) -> List[str]:
+    import re
+    parts = [re.sub(r"\[\d+\]$", "", p) for p in str(path or "").split(".")]
+    # $ . objects . <phase> . [parents...] . leaf
+    return [p for p in parts[3:-1] if p]
+
+
+def _leaf_row_index_score(leaf: Dict[str, Any], control: Dict[str, Any]) -> Optional[int]:
+    row_idx = _path_row_index(str(leaf.get("input_path") or ""))
+    if row_idx is None:
+        return 0
+    for key in ("expected_row_index", "row_kind_ordinal"):
+        if control.get(key) is not None:
+            return 65 if int(control[key]) == int(row_idx) else None
+    if control.get("row_index") is not None:
+        return 65 if int(control["row_index"]) == int(row_idx) else None
+    if control.get("label_occurrence") is not None:
+        return 40 if int(control["label_occurrence"]) == int(row_idx) else None
+    return -30
 
 
 def _leaf_control_score(leaf: Dict[str, Any], control: Dict[str, Any], phase: str) -> int:
-    key = _norm(leaf.get("field_key"))
-    human = _norm(_humanize_input_key(str(leaf.get("field_key") or "")))
+    field_key = str(leaf.get("field_key") or "")
+    human = _norm(_humanize_input_key(field_key))
+    compact = _compact(field_key)
+    key_words = _meaningful_words(human)
     tokens = _control_text_tokens(control)
     score = 0
-    if key and key in tokens:
-        score += 140
-    if human and human in tokens:
-        score += 130
+    exact_hits = 0
     for token in tokens:
-        if key and (key in token or token in key):
+        if token == human or _compact(token) == compact:
+            score += 140 if exact_hits == 0 else 40
+            exact_hits += 1
+            continue
+        token_words = _meaningful_words(token)
+        if key_words and token_words and (key_words <= token_words or token_words <= key_words):
+            # "Existing Folder" vs existing_folder_path; never two-letter words
+            # such as an option "No" inside "notify_on".
             score += 45
-        if human and (human in token or token in human):
+        elif len(compact) >= 5 and len(_compact(token)) >= 5 and (compact in _compact(token) or _compact(token) in compact):
             score += 35
+    if not score:
+        return 0
     hint = _norm(_path_section_hint(phase, str(leaf.get("input_path") or "")))
-    actual_section = _norm(control.get("section"))
+    actual_section = _norm(control.get("section")).rstrip(" :")
     if hint and actual_section:
         if hint == actual_section:
             score += 70
@@ -300,15 +372,50 @@ def _leaf_control_score(leaf: Dict[str, Any], control: Dict[str, Any], phase: st
             score += 35
         else:
             score -= 25
-    row_idx = _path_row_index(str(leaf.get("input_path") or ""))
-    control_idx = control.get("row_index")
-    if row_idx is not None and control_idx is not None:
-        score += 65 if int(row_idx) == int(control_idx) else -60
+    elif actual_section:
+        # Nested input objects usually mirror a portal section:
+        # notification_settings.notify_on -> "Notification Settings".
+        for parent in reversed(_path_parent_keys(str(leaf.get("input_path") or ""))):
+            words = _meaningful_words(_humanize_input_key(parent))
+            section_words = _meaningful_words(actual_section)
+            if words and section_words and (words <= section_words or section_words <= words):
+                score += 60
+                break
+    row_score = _leaf_row_index_score(leaf, control)
+    if row_score is None:
+        return -1000
+    score += row_score
+    if _choice_group_key(control):
+        values = [_norm(v) for v in (leaf.get("value") if isinstance(leaf.get("value"), list) else [leaf.get("value")])]
+        if {_norm(control.get("label")), _norm(control.get("value"))} & set(values):
+            score += 10
     if control.get("disabled") or control.get("readonly"):
         score -= 15
     if control.get("interactable") is False:
         score -= 20
     return score
+
+
+_TRUE_WORDS = {"yes", "true", "y", "on", "enable", "enabled", "1"}
+_FALSE_WORDS = {"no", "false", "n", "off", "disable", "disabled", "0", "not enabled"}
+
+
+def _choice_option_for_value(value: Any, options: Sequence[str]) -> Optional[str]:
+    """Map an input value onto one of the group's option labels."""
+    wanted = _norm(value)
+    by_norm = {_norm(o): o for o in options if _norm(o)}
+    if wanted in by_norm:
+        return by_norm[wanted]
+    compact = {_compact(o): o for o in options if _compact(o)}
+    if _compact(value) in compact:
+        return compact[_compact(value)]
+    intent = True if (value is True or wanted in _TRUE_WORDS) else False if (value is False or wanted in _FALSE_WORDS) else None
+    if intent is not None:
+        words = _TRUE_WORDS if intent else _FALSE_WORDS
+        for o in options:
+            if _norm(o) in words:
+                return o
+    return None
 
 
 async def _visible_page_text(page: Any) -> str:
@@ -423,10 +530,15 @@ def _supplement_runtime_input_graph(
             # Nonblank runtime values are never silently excused by a generic
             # accounting record unless a concrete canonical executable exists.
 
-        ranked = sorted(
-            [(_leaf_control_score(leaf, c, phase), c) for c in controls if isinstance(c, dict)],
-            key=lambda item: item[0], reverse=True,
-        )
+        scored = [(_leaf_control_score(leaf, c, phase), c) for c in controls if isinstance(c, dict)]
+        # One candidate per radio/checkbox group (its best option), so a group's
+        # own options never tie with each other.
+        best_by_target: Dict[str, Tuple[int, Dict[str, Any]]] = {}
+        for sc, c in scored:
+            target = _choice_group_key(c) or f"control|{c.get('selector') or id(c)}"
+            if target not in best_by_target or sc > best_by_target[target][0]:
+                best_by_target[target] = (sc, c)
+        ranked = sorted(best_by_target.values(), key=lambda item: item[0], reverse=True)
         best_score, best = ranked[0] if ranked else (0, None)
         second_score = ranked[1][0] if len(ranked) > 1 else -999
         margin = best_score - second_score
@@ -436,45 +548,91 @@ def _supplement_runtime_input_graph(
                 accounted.append({"input_path": path, **display})
                 continue
             unresolved.append({
-                "input_path": path, "field_key": leaf.get("field_key"), "reason": "no unique live semantic control binding",
+                "input_path": path, "field_key": leaf.get("field_key"),
+                "reason": "no unique live semantic control binding" if best_score >= 75 or best is None else "no live control matches this input key yet",
+                "row_index": _path_row_index(path),
                 "best_score": best_score, "score_margin": margin,
-                "candidate_labels": [str(c.get("label") or c.get("name") or c.get("framework_key") or "") for _, c in ranked[:4]],
+                "candidate_labels": [str(c.get("group_label") or c.get("label") or c.get("name") or c.get("framework_key") or "") for _, c in ranked[:4]],
             })
             continue
         action = _infer_action_from_control(best, leaf.get("value"))
-        loc_labels = [x for x in [best.get("label"), _humanize_input_key(str(leaf.get("field_key") or ""))] if str(x or "").strip()]
-        loc_names = [x for x in [best.get("name"), best.get("form_control_name"), best.get("framework_key")] if str(x or "").strip()]
-        loc_placeholders = [x for x in [best.get("placeholder")] if str(x or "").strip()]
-        loc_roles = [x for x in [best.get("role")] if str(x or "").strip()]
-        row_idx = best.get("row_index") if best.get("row_index") is not None else _path_row_index(path)
+        group_key = _choice_group_key(best)
+        group_members = [c for c in controls if isinstance(c, dict) and group_key and _choice_group_key(c) == group_key]
+        group_label = str(best.get("group_label") or "")
+        human_label = _humanize_input_key(str(leaf.get("field_key") or ""))
+        row_idx = _path_row_index(path)
         row_kind = str(best.get("row_kind") or "")
         safe_id = hashlib.sha256(path.encode("utf-8")).hexdigest()[:12]
-        node = {
-            "node_id": f"{phase}.runtime_input.{safe_id}",
-            "phase": phase,
-            "section": str(best.get("section") or hint or section or ""),
-            "field_key": str(leaf.get("field_key") or path.rsplit(".", 1)[-1]),
-            "action": action,
-            "expected_value": leaf.get("value"),
-            "input_path": path,
-            "semantic_locator": {
-                "names": loc_names, "labels": loc_labels, "placeholders": loc_placeholders,
-                "roles": loc_roles, "section_aliases": [x for x in [best.get("section"), hint] if str(x or "").strip()],
-                "row_kind": row_kind, "row_index": row_idx,
-            },
-            "row_kind": row_kind, "row_index": row_idx, "required": True, "depends_on": [],
-            "verification": "exact_committed_control_value",
-            "executor": "runtime-input-ledger-semantic-binding",
-            "fallback_executor": "autowebglm-browser-session-pyautogui-mcp-primary",
-            "notes": "V237 runtime node synthesized from actual input.json + current live semantic control; selector/coordinates are intentionally not persisted",
-        }
-        nodes.append(node)
+        # A section-scoped run (a BizFlow tab) owns every field it binds, even
+        # one inside a sub-section of the tab; the live sub-section stays an alias.
+        section_name = str(section or best.get("section") or hint or "")
+
+        def runtime_node(node_suffix: str, node_action: str, expected: Any, labels: List[str], extra: Dict[str, Any]) -> Dict[str, Any]:
+            loc_names = [x for x in [best.get("group_name") if group_key else best.get("name"), best.get("form_control_name"), best.get("framework_key")] if str(x or "").strip()]
+            return {
+                "node_id": f"{phase}.runtime_input.{safe_id}{node_suffix}",
+                "phase": phase,
+                "section": section_name,
+                "field_key": str(leaf.get("field_key") or path.rsplit(".", 1)[-1]),
+                "action": node_action,
+                "expected_value": expected,
+                "input_path": path,
+                "semantic_locator": {
+                    "names": loc_names, "labels": [x for x in labels if str(x or "").strip()],
+                    "placeholders": [x for x in [best.get("placeholder")] if str(x or "").strip() and not group_key],
+                    "roles": [x for x in [best.get("role")] if str(x or "").strip()],
+                    "section_aliases": [x for x in [best.get("section"), hint] if str(x or "").strip()],
+                    "row_kind": row_kind, "row_index": row_idx,
+                },
+                "row_kind": row_kind, "row_index": row_idx, "required": True, "depends_on": [],
+                "verification": "exact_committed_control_value",
+                "executor": "runtime-input-ledger-semantic-binding",
+                "fallback_executor": "autowebglm-browser-session-pyautogui-mcp-primary",
+                "notes": "Runtime node synthesized from actual input.json + current live semantic control; selector/coordinates are intentionally not persisted",
+                **extra,
+            }
+
+        new_nodes: List[Dict[str, Any]] = []
+        if action == "select_checkbox_group":
+            # Several checkboxes answer one question: tick exactly the listed ones.
+            wanted = {_norm(v) for v in (leaf.get("value") if isinstance(leaf.get("value"), list) else split_multi_value(leaf.get("value")))}
+            options = [str(c.get("label") or c.get("value") or "") for c in group_members]
+            missing = sorted(w for w in wanted if w not in {_norm(o) for o in options})
+            if missing:
+                unresolved.append({
+                    "input_path": path, "field_key": leaf.get("field_key"),
+                    "reason": f"checkbox group '{group_label}' has no option(s) {missing}",
+                    "best_score": best_score, "score_margin": margin, "candidate_labels": options[:6],
+                })
+                continue
+            for option in options:
+                new_nodes.append(runtime_node(
+                    f".{_compact(option)[:24]}", "toggle", "true" if _norm(option) in wanted else "false",
+                    [option, group_label, human_label], {"choice_group": group_label, "choice_option": option},
+                ))
+        elif action == "select_radio" and group_members:
+            options = [str(c.get("label") or c.get("value") or "") for c in group_members]
+            option = _choice_option_for_value(leaf.get("value"), options)
+            if option is None:
+                unresolved.append({
+                    "input_path": path, "field_key": leaf.get("field_key"),
+                    "reason": f"radio group '{group_label}' has no option for the input value",
+                    "best_score": best_score, "score_margin": margin, "candidate_labels": options[:6],
+                })
+                continue
+            new_nodes.append(runtime_node("", "select_radio", option, [group_label, human_label], {"choice_group": group_label, "choice_options": options}))
+        else:
+            loc_labels = [best.get("label"), human_label]
+            new_nodes.append(runtime_node("", action, leaf.get("value"), loc_labels, {}))
+        nodes.extend(new_nodes)
         existing_paths.add(path)
-        additions.append({
-            "input_path": path, "field_key": node["field_key"], "action": action,
-            "live_label": best.get("label"), "section": node["section"], "row_index": row_idx,
-            "binding_score": best_score, "score_margin": margin,
-        })
+        for node in new_nodes:
+            additions.append({
+                "input_path": path, "node_id": node["node_id"], "field_key": node["field_key"], "action": node["action"],
+                "live_label": group_label or best.get("label"), "option": node.get("choice_option") or "",
+                "section": node["section"], "row_kind": row_kind, "row_index": row_idx,
+                "binding_score": best_score, "score_margin": margin,
+            })
 
     out["nodes"] = nodes
     ledger = {
@@ -483,6 +641,7 @@ def _supplement_runtime_input_graph(
         "runtime_nonblank_leaf_count": len(scoped),
         "compiled_or_accounted_count": len(accounted),
         "runtime_synthesized_node_count": len(additions),
+        "scoped_input_paths": [str(leaf.get("input_path") or "") for leaf in scoped],
         "unresolved_leaf_count": len(unresolved),
         "unresolved_input_leaves": unresolved,
         "synthesized_nodes": additions,
@@ -741,6 +900,60 @@ async def _observe_autowebglm(page: Page, *, phase: str, cycle: int, goal: str) 
         return {"available": False, "reason": mask_sensitive_string(str(exc))[:500]}
 
 
+async def _heal_form_structure(
+    page: Page, *, phase: str, graph: Dict[str, Any], ledger: Dict[str, Any], input_data: Dict[str, Any],
+    section: Optional[str], pending_nodes: Sequence[Dict[str, Any]], learned_rows: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Open collapsed sections and add missing rows the goal needs (V243R17)."""
+    from .form_structure_healer import ensure_repeatable_rows, plan_row_groups, reveal_collapsed_sections
+
+    unresolved = [u for u in (ledger.get("unresolved_input_leaves") or []) if isinstance(u, dict)]
+    wanted: List[str] = []
+    for leaf in unresolved:
+        wanted.extend(_humanize_input_key(k) for k in _path_parent_keys(str(leaf.get("input_path") or "")))
+        wanted.append(_humanize_input_key(str(leaf.get("field_key") or "")))
+    for node in pending_nodes:
+        wanted.append(str(node.get("section") or ""))
+        loc = node.get("semantic_locator") if isinstance(node.get("semantic_locator"), dict) else {}
+        wanted.extend(str(x) for x in (loc.get("labels") or [])[:2])
+    audit: Dict[str, Any] = {}
+    scoped = _clone_graph(graph, [
+        n for n in (graph.get("nodes") or [])
+        if isinstance(n, dict) and _section_matches_local(section, n.get("section"))
+    ])
+    groups = plan_row_groups(scoped, [u for u in unresolved if u.get("row_index") is not None], input_data, section=None)
+    # A row list's learned "+ Add ..." label is preferred next time.
+    from .form_structure_memory import path_pattern as _pattern
+    for g in groups:
+        key = str(g.get("group") or "")
+        key = key if key.startswith("kind:") else f"list:{_pattern(key[len('list:'):])}"
+        learned = (learned_rows or {}).get(key) or {}
+        if learned.get("add_label"):
+            g["aliases"] = sorted(set(g.get("aliases") or []) | {w for w in _norm(learned["add_label"]).split() if len(w) >= 3 and w != "add"})
+            g["learned_add_label"] = learned["add_label"]
+
+    async def capture() -> List[Dict[str, Any]]:
+        return await capture_stateful_controls(page, phase)
+
+    deficits: List[Dict[str, Any]] = []
+    if groups:
+        from .form_structure_healer import _live_rows
+        controls = await capture()
+        deficits = [g for g in groups if _live_rows(controls, g)[0] < int(g.get("needed") or 0)]
+    non_row_unresolved = [u for u in unresolved if u.get("row_index") is None]
+    if non_row_unresolved or pending_nodes or deficits:
+        # Rows or fields may simply be collapsed; open sections before adding rows.
+        for g in deficits:
+            wanted.extend(g.get("aliases") or [])
+        audit["reveal"] = await reveal_collapsed_sections(page, phase, wanted=wanted, expand_unmatched=True)
+    if deficits:
+        audit["rows"] = await ensure_repeatable_rows(page, phase, deficits, capture=capture)
+    audit["changed"] = bool(
+        (audit.get("reveal") or {}).get("expanded_count") or (audit.get("rows") or {}).get("rows_added")
+    )
+    return audit
+
+
 async def execute_autonomous_phase_goal(
     *,
     page: Page,
@@ -778,6 +991,35 @@ async def execute_autonomous_phase_goal(
     goal_summary = ", ".join(f"{k}={v}" for k, v in goal_values.items() if "file" not in k)[:1600]
     understanding_engine = WebsiteUnderstandingEngine(config=config)
     last_golden_visual_feedback: Dict[str, Any] = {}
+    pending_structure_nodes: List[Dict[str, Any]] = []
+    structure_heal_log: List[Dict[str, Any]] = []
+    # V243R17: start from what earlier runs learned about this form.
+    from .form_structure_memory import FormStructureMemory, path_pattern
+    structure_memory = None
+    memory_audit: Dict[str, Any] = {"enabled": False}
+    learned_rows: Dict[str, Any] = {}
+    try:
+        structure_memory = FormStructureMemory.for_run(config, page)
+        if structure_memory is not None:
+            scoped_leaves = [
+                leaf for leaf in _flatten_phase_input_leaves(input_data, phase)
+                if not section
+                or not _path_section_hint(phase, str(leaf.get("input_path") or ""))
+                or _section_matches_local(section, _path_section_hint(phase, str(leaf.get("input_path") or "")))
+            ]
+            memory_audit = {
+                "enabled": True,
+                "seeded_nodes": structure_memory.seed_graph(
+                    phase, working_graph, scoped_leaves, section=section, option_mapper=_choice_option_for_value,
+                ),
+            }
+            learned_rows = structure_memory.load(phase).get("rows") or {}
+            titles = structure_memory.section_titles(phase)
+            if titles:
+                from .form_structure_healer import reveal_collapsed_sections
+                memory_audit["reveal"] = await reveal_collapsed_sections(page, phase, wanted=titles, expand_unmatched=False)
+    except Exception as exc:
+        memory_audit = {"enabled": False, "error": mask_sensitive_string(str(exc))[:500]}
 
     async def _execute_graph(current_graph: Dict[str, Any], prior: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         if executor is None:
@@ -809,6 +1051,7 @@ async def execute_autonomous_phase_goal(
         return await executor(page, exec_graph, **kwargs)
 
     for cycle in range(1, max_cycles + 1):
+        cycle_started = asyncio.get_running_loop().time()
         gate = await assert_active_surface(page, phase)
         controls_before = await capture_stateful_controls(page, phase)
         # V237: reconcile the *actual* runtime input.json against the live form on
@@ -819,6 +1062,22 @@ async def execute_autonomous_phase_goal(
             working_graph, controls_before, input_data, phase=phase, section=section,
             page_text=await _visible_page_text(page),
         )
+        # V243R17: fields in collapsed sections and rows that do not exist yet
+        # cannot be bound; open/add them, then look again.
+        try:
+            structure_heal = await _heal_form_structure(
+                page, phase=phase, graph=working_graph, ledger=runtime_input_ledger, input_data=input_data,
+                section=section, pending_nodes=pending_structure_nodes, learned_rows=learned_rows,
+            )
+        except Exception as exc:
+            structure_heal = {"error": mask_sensitive_string(str(exc))[:500], "changed": False}
+        if structure_heal.get("changed"):
+            controls_before = await capture_stateful_controls(page, phase)
+            working_graph, runtime_input_ledger = _supplement_runtime_input_graph(
+                working_graph, controls_before, input_data, phase=phase, section=section,
+                page_text=await _visible_page_text(page),
+            )
+        structure_heal_log.append(structure_heal)
         goal_values = _graph_goal_values(working_graph, section)
         goal_summary = ", ".join(f"{k}={v}" for k, v in goal_values.items() if "file" not in k)[:1600]
         golden_refs, golden_advisor = _golden_runtime_context(page, phase)
@@ -851,6 +1110,7 @@ async def execute_autonomous_phase_goal(
                 "option_catalog_size": len(website_model.get("option_catalog") or {}) if isinstance(website_model, dict) else 0,
             },
             "dynamic_option_decisions": dynamic_option_decisions,
+            "structure_heal": structure_heal,
             "runtime_input_leaf_ledger": runtime_input_ledger,
             "golden_reference_count": len(golden_refs),
             "control_count_before": len(controls_before),
@@ -950,6 +1210,29 @@ async def execute_autonomous_phase_goal(
 
         # Re-observe because parent selections can mount/replace file controls.
         controls_after_fields = await capture_stateful_controls(page, phase)
+        # Parent commits in the pass above (a format, a Yes/No radio) reveal
+        # fields that did not exist at the start of the cycle.  Learn them now so
+        # the full pass below fills them in this same cycle.
+        working_graph, runtime_input_ledger_mid = _supplement_runtime_input_graph(
+            working_graph, controls_after_fields, input_data, phase=phase, section=section,
+            page_text=await _visible_page_text(page),
+        )
+        if runtime_input_ledger_mid.get("unresolved_input_leaves"):
+            try:
+                mid_heal = await _heal_form_structure(
+                    page, phase=phase, graph=working_graph, ledger=runtime_input_ledger_mid, input_data=input_data,
+                    section=section, pending_nodes=[], learned_rows=learned_rows,
+                )
+            except Exception as exc:
+                mid_heal = {"error": mask_sensitive_string(str(exc))[:500], "changed": False}
+            cycle_audit["structure_heal_mid"] = mid_heal
+            if mid_heal.get("changed"):
+                controls_after_fields = await capture_stateful_controls(page, phase)
+                working_graph, runtime_input_ledger_mid = _supplement_runtime_input_graph(
+                    working_graph, controls_after_fields, input_data, phase=phase, section=section,
+                    page_text=await _visible_page_text(page),
+                )
+        cycle_audit["runtime_input_leaf_ledger_mid"] = runtime_input_ledger_mid
         for node in working_graph.get("nodes") or []:
             if not isinstance(node, dict) or str(node.get("action") or "") != "upload_file":
                 continue
@@ -1043,6 +1326,25 @@ async def execute_autonomous_phase_goal(
         except Exception as exc:
             full_result = {"pass": False, "error": mask_sensitive_string(str(exc)), "attempts": []}
         cycle_audit["full_goal_execution"] = full_result
+        # A field seeded from memory that no longer binds is dropped for this
+        # run (the live page is rediscovered next cycle) and demoted in memory.
+        failed_ids = {
+            str(a.get("node_id")) for a in (full_result.get("attempts") or [])
+            if isinstance(a, dict) and a.get("success") is not True
+        }
+        stale = [
+            n for n in (working_graph.get("nodes") or [])
+            if isinstance(n, dict) and n.get("learned_from_memory") and str(n.get("node_id")) in failed_ids
+        ]
+        if stale:
+            stale_ids = {str(n.get("node_id")) for n in stale}
+            working_graph = _clone_graph(working_graph, [n for n in working_graph.get("nodes") or [] if str(n.get("node_id")) not in stale_ids])
+            cycle_audit["memory_nodes_dropped"] = sorted(stale_ids)
+            if structure_memory is not None:
+                try:
+                    structure_memory.demote(phase, sorted({path_pattern(str(n.get("input_path") or "")) for n in stale}))
+                except Exception:
+                    pass
         controls_after = await capture_stateful_controls(page, phase)
         # Reconcile once more because parent selections/repeatable-row additions
         # can reveal controls that did not exist at the beginning of the cycle.
@@ -1106,8 +1408,29 @@ async def execute_autonomous_phase_goal(
         # state executor proves every input-owned node exactly with authoritative
         # provenance, the phase goal is achieved and must not be replayed simply
         # because runtime_synthesized_node_count is non-zero.
+        # Fields that appeared only after this cycle's fill (a radio revealed
+        # them) were never executed: the goal is not met until they are.
+        new_after_execution = int(runtime_input_ledger_after.get("runtime_synthesized_node_count") or 0)
+        cycle_audit["nodes_discovered_after_execution"] = new_after_execution
+        # Every runtime-learned field of this scope must have been executed and
+        # proven by this cycle's full pass, not merely bound.
+        proven_ids = {
+            str(a.get("node_id")) for a in (full_result.get("attempts") or [])
+            if isinstance(a, dict) and a.get("success") is True
+        }
+        scoped_paths = set(runtime_input_ledger_after.get("scoped_input_paths") or [])
+        unexecuted_runtime_nodes = [
+            str(n.get("node_id")) for n in (working_graph.get("nodes") or [])
+            if isinstance(n, dict) and ".runtime_input." in str(n.get("node_id") or "")
+            and str(n.get("input_path") or "") in scoped_paths
+            and str(n.get("action") or "") != "upload_file"
+            and str(n.get("node_id")) not in proven_ids
+        ]
+        cycle_audit["unexecuted_runtime_nodes"] = unexecuted_runtime_nodes
+        new_after_execution += len(unexecuted_runtime_nodes)
         synthesized_nodes_verified = bool(
             not runtime_input_ledger_after.get("unresolved_input_leaves")
+            and not new_after_execution
             and not (stage.get("input_owned_unresolved_node_ids") or [])
             and (
                 not strict_live_execution
@@ -1131,7 +1454,13 @@ async def execute_autonomous_phase_goal(
             and (not strict_live_execution or stage.get("exact_execution_verified") is True)
             and (not strict_live_execution or stage.get("authoritative_execution_verified") is True)
         )
+        cycle_audit["duration_seconds"] = round(asyncio.get_running_loop().time() - cycle_started, 1)
         cycle_audit["status"] = "goal_achieved" if success else "retry_required"
+        unresolved_ids = set(stage.get("input_owned_unresolved_node_ids") or [])
+        pending_structure_nodes = [
+            n for n in (working_graph.get("nodes") or [])
+            if isinstance(n, dict) and str(n.get("node_id")) in unresolved_ids
+        ]
         if not success:
             cycle_audit["unmet_success_checks"] = _unmet_success_checks(
                 full_result, file_failures, uncovered_required, runtime_input_ledger_after,
@@ -1162,7 +1491,16 @@ async def execute_autonomous_phase_goal(
                 "cycles": cycles,
                 "final_execution": full_result,
                 "prior_attempts": all_prior,
+                "form_structure_memory": memory_audit,
             }
+            if structure_memory is not None:
+                try:
+                    memory_audit["learned"] = structure_memory.record_success(
+                        phase, graph=working_graph, final_execution=full_result, cycles=cycles,
+                        memory_reveal=memory_audit.get("reveal"),
+                    )
+                except Exception as exc:
+                    memory_audit["learn_error"] = mask_sensitive_string(str(exc))[:300]
             if output_dir is not None:
                 safe_write_json(output_dir / "autonomous_form_runtime.json", result)
             return mask_sensitive_data(result)
@@ -1206,6 +1544,7 @@ async def execute_autonomous_phase_goal(
         "fixed_selectors_required": False,
         "fixed_coordinates_required": False,
         "cycles": cycles,
+        "form_structure_memory": memory_audit,
         "reason": (
             "one or more nonblank input.json attributes could not be uniquely bound/verified on the live form"
             if needs_input else
@@ -1240,6 +1579,8 @@ def _unmet_success_checks(
         unmet.append("required_controls_without_input")
     if not ledger_after.get("pass"):
         unmet.append("runtime_input_leaves_bound")
+    if int(ledger_after.get("runtime_synthesized_node_count") or 0):
+        unmet.append("new_fields_found_after_fill")
     if not synthesized_nodes_verified:
         unmet.append("input_owned_nodes_verified")
     if strict_live_execution and stage.get("exact_execution_verified") is not True:

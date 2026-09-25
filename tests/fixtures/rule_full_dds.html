@@ -25,7 +25,11 @@
     return r;
   }
   const rowCount = window.__conditionRows || 2;
-  for (let i = 0; i < rowCount; i++) conditionsHost.appendChild(conditionRow(i));
+  // Variant: the portal starts with one condition and "+ Add Condition" appends more.
+  const conditionsBlock = window.__variant
+    ? H.addList({ name: 'conditions', addLabel: 'Add Condition', buildRow: (i) => conditionRow(i) })
+    : conditionsHost;
+  if (!window.__variant) for (let i = 0; i < rowCount; i++) conditionsHost.appendChild(conditionRow(i));
 
   const mappingHost = document.createElement('div');
   const form = H.form(
@@ -47,7 +51,7 @@
     ),
     H.fieldset('Conditions :',
       H.row(H.dropdown({ label: 'Execute Action(s) When *', name: 'executeActionsWhen', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] })),
-      conditionsHost,
+      conditionsBlock,
     ),
     H.fieldset('Actions :',
       H.row(
@@ -63,6 +67,9 @@
         mappingHost,
       ),
     ),
+    window.__variant && H.accordion('Advanced', [
+      H.segmented({ label: 'Priority', name: 'priority', options: ['Low', 'Normal', 'High'], value: 'Normal' }),
+    ]),
   );
   H.page('Create Rule', form);
 })();

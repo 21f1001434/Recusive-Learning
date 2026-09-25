@@ -111,7 +111,10 @@ def test_dds_driver_never_uses_raw_value_assignment_for_radio_or_dropdown_contra
     radio = inspect.getsource(driver.select_radio_value)
     combo = inspect.getsource(driver.select_dds_combobox)
     multi = inspect.getsource(driver.select_dds_multiselect)
-    assert "_broker_click" in radio
+    # V243R17: radios click through _click_choice, which uses the same broker
+    # (on the label when DDS clips the real input).
+    assert "_click_choice" in radio
+    assert "_broker_click" in inspect.getsource(driver._click_choice)
     assert "_broker_click" in combo
     assert "_click_dds_multiselect_option" in multi
     assert "el.value=value" not in radio

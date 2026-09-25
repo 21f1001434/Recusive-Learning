@@ -155,7 +155,9 @@
     return g;
   }
 
-  function radios({ label, name, options, value = '', onChange }) {
+  // hiddenInput: the DDS "visually hidden" radio -- the real input is clipped
+  // to nothing and the user clicks the styled label.
+  function radios({ label, name, options, value = '', onChange, hiddenInput = !!window.__hiddenRadioInputs }) {
     const labelId = nextId('dds-label');
     const g = el(`<div class="dds__form-group">
         <label class="dds__label" id="${labelId}">${esc(label)}</label>
@@ -164,14 +166,93 @@
     const holder = g.querySelector('[role=radiogroup]');
     options.forEach(([text, val]) => {
       const id = nextId('dds-radio');
-      const r = el(`<div class="dds__radio-button">
-          <input type="radio" class="dds__radio-button__input" id="${id}" name="${esc(name)}" value="${esc(val)}"${value === text ? ' checked' : ''}>
-          <label class="dds__radio-button__label" for="${id}">${esc(text)}</label>
+      const hide = hiddenInput ? ' style="position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);border:0;padding:0"' : '';
+      const r = el(`<div class="dds__radio-button" style="position:relative">
+          <input type="radio" class="dds__radio-button__input" id="${id}" name="${esc(name)}" value="${esc(val)}"${value === text ? ' checked' : ''}${hide}>
+          <label class="dds__radio-button__label" for="${id}" style="padding:4px 8px;cursor:pointer">${esc(text)}</label>
         </div>`);
       r.querySelector('input').addEventListener('change', () => onChange && onChange(text));
       holder.appendChild(r);
     });
     return g;
+  }
+
+  // Segmented buttons acting as a radio group: role=radio, no <input>.
+  function segmented({ label, name, options, value = '', onChange }) {
+    const labelId = nextId('dds-label');
+    const g = el(`<div class="dds__form-group">
+        <span class="dds__label" id="${labelId}">${esc(label)}</span>
+        <div class="dds__button-group" role="radiogroup" aria-labelledby="${labelId}" data-name="${esc(name)}"></div>
+      </div>`);
+    const holder = g.querySelector('[role=radiogroup]');
+    options.forEach((text) => {
+      const b = el(`<button type="button" role="radio" class="dds__button dds__button--secondary" aria-checked="${text === value}" data-value="${esc(text)}">${esc(text)}</button>`);
+      b.addEventListener('click', () => {
+        holder.querySelectorAll('[role=radio]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        onChange && onChange(text);
+      });
+      holder.appendChild(b);
+    });
+    return g;
+  }
+
+  // Several checkboxes answering one question ("Notify On": Success, Failure).
+  function checkboxGroup({ label, name, options, value = [] }) {
+    const labelId = nextId('dds-label');
+    const g = el(`<div class="dds__form-group">
+        <span class="dds__label" id="${labelId}">${esc(label)}</span>
+        <div class="dds__checkbox-group" role="group" aria-labelledby="${labelId}"></div>
+      </div>`);
+    const holder = g.querySelector('[role=group]');
+    options.forEach((text) => {
+      const id = nextId('dds-checkbox');
+      holder.appendChild(el(`<div class="dds__checkbox">
+          <input type="checkbox" class="dds__checkbox__input" id="${id}" name="${esc(name)}" value="${esc(text)}"${value.includes(text) ? ' checked' : ''}>
+          <label class="dds__checkbox__label" for="${id}">${esc(text)}</label>
+        </div>`));
+    });
+    return g;
+  }
+
+  // DDS accordion: the panel's controls are not rendered visible until the
+  // header is clicked.
+  function accordion(title, children, { expanded = false } = {}) {
+    const btnId = nextId('dds-accordion-btn');
+    const panelId = nextId('dds-accordion-panel');
+    const item = el(`<div class="dds__accordion"><div class="dds__accordion__item">
+        <h3 class="dds__accordion__heading"><button type="button" class="dds__accordion__button" id="${btnId}" aria-expanded="${expanded}" aria-controls="${panelId}">${esc(title)}</button></h3>
+        <div class="dds__accordion__content" id="${panelId}" role="region" aria-labelledby="${btnId}"${expanded ? '' : ' hidden'}></div>
+      </div></div>`);
+    const btn = item.querySelector('button');
+    const panel = item.querySelector('[role=region]');
+    (Array.isArray(children) ? children : [children]).flat().forEach((c) => c && panel.appendChild(c));
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      panel.hidden = open;
+    });
+    return item;
+  }
+
+  // Angular FormArray: one row to start, "+ Add ..." appends another.  Rows
+  // after the first carry no visible labels, as on the portal.
+  function addList({ name, addLabel = 'Add', buildRow, initial = 1, iconOnly = false }) {
+    const wrap = el('<div class="dds__form-array-host"></div>');
+    const rowsHost = el(`<div class="dds__form-array" formarrayname="${esc(name)}"></div>`);
+    const add = iconOnly
+      ? el(`<button type="button" class="dds__button dds__button--icon-only" aria-label="${esc(addLabel)}">+</button>`)
+      : el(`<button type="button" class="dds__button dds__button--tertiary">+ ${esc(addLabel)}</button>`);
+    let n = 0;
+    const addRow = () => {
+      const r = buildRow(n, n === 0);
+      r.setAttribute('formgroupname', String(n));
+      rowsHost.appendChild(r);
+      n++;
+    };
+    for (let i = 0; i < initial; i++) addRow();
+    add.addEventListener('click', () => setTimeout(addRow, 120));
+    wrap.append(rowsHost, add);
+    return wrap;
   }
 
   function file({ label, name, accept = '' }) {
@@ -254,5 +335,5 @@
     (Array.isArray(out) ? out : [out]).forEach((c) => c && host.appendChild(c));
   }
 
-  window.HIP = { dropdown, text, switchControl, checkbox, radios, file, fieldset, row, page, form, when, el, nextId, closeAll };
+  window.HIP = { dropdown, text, switchControl, checkbox, radios, segmented, checkboxGroup, accordion, addList, file, fieldset, row, page, form, when, el, nextId, closeAll };
 })();

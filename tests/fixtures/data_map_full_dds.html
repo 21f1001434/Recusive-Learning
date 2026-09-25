@@ -6,6 +6,7 @@
 /* Golden: golden_screenshots/UHAUL-POASN/Data Map.png */
 (function () {
   const H = window.HIP;
+  const xrefHost = document.createElement('div');
   const form = H.form(
     H.fieldset('Map Reference :', H.row(
       H.text({ label: 'Map Identifier *', name: 'mapIdentifier', placeholder: 'Map Identifier', duplicateMessage: 'Map identifier already exists' }),
@@ -20,11 +21,28 @@
       ),
       H.row(H.file({ label: 'Map Data *', name: 'mapData', accept: '.jar' })),
     ),
-    H.fieldset('Cross Reference Table Details :', H.switchControl({ label: 'Cross Reference Table details', name: 'crossReference', checked: false, onText: 'Yes', offText: 'No' })),
+    H.fieldset('Cross Reference Table Details :',
+      H.switchControl({ label: 'Cross Reference Table details', name: 'crossReference', checked: false, onText: 'Yes', offText: 'No',
+        // Variant: "Yes" reveals the cross reference rows (one to start, + Add Row).
+        onChange: (on) => window.__variant && setTimeout(() => H.when(xrefHost, () => (on ? H.addList({
+          name: 'crossReferenceMapList', addLabel: 'Add Row',
+          buildRow: (i, labelled) => H.row(
+            H.text({ label: 'Source Value *', name: 'sourceValue', placeholder: 'Source Value', showLabel: labelled }),
+            H.text({ label: 'Target Value *', name: 'targetValue', placeholder: 'Target Value', showLabel: labelled }),
+          ),
+        }) : [])), 150) }),
+      xrefHost,
+    ),
     H.fieldset('Map Validation Details :', H.row(
       H.file({ label: 'Input Schema Validation', name: 'inputSchema' }),
       H.file({ label: 'Output Schema Validation', name: 'outputSchema' }),
     )),
+    // Variant: a collapsed section with a hidden-input radio group and a
+    // checkbox group.
+    window.__variant && H.accordion('Advanced Options', [
+      H.radios({ label: 'Map Engine', name: 'mapEngine', options: [['Contivo', 'contivo'], ['XSLT', 'xslt']], value: 'Contivo', hiddenInput: true }),
+      H.checkboxGroup({ label: 'Notify On', name: 'notifyOn', options: ['Success', 'Failure', 'Warning'] }),
+    ]),
   );
   H.page('Create Map', form);
 })();

@@ -17,6 +17,8 @@ venv/
 runs/
 uploads/*
 !uploads/.gitkeep
+# What the agent learns about each form on a user's machine (V243R17)
+data/hip_memory/form_structure_memory/
 
 # Build output
 build/

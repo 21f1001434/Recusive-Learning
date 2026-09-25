@@ -1050,9 +1050,39 @@ async def capture_document_type_controls(page: Page) -> List[Dict[str, Any]]:
     if(low.includes('document identifier')){if(ph==='operation'||lab==='operation')return 'document_identifier_operation';if(ph.includes('derived from')||lab.includes('derived from'))return 'document_identifier_derived_from';if(n==='value'||ph==='value'||lab==='value')return 'document_identifier_value';}
     if(low.includes('attribute')){if(n==='attributename'||ph.includes('attribute name'))return 'attribute_name';if(ph.includes('derived from')||lab.includes('derived from'))return 'attribute_derived_from';const dd=el.closest('dds-dropdown');const multi=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));if(n==='usage'||ph==='usage'||lab==='usage'||multi)return 'attribute_usage';if(n==='expression'||ph.includes('expression'))return 'attribute_expression';}
     if(low.includes('validation')&&(ph.includes('validation')||lab.includes('validation')))return 'validation_type';return '';}
+  function groupInfo(el){
+    // A radio's own label is its option ("Yes"); the question it answers
+    // ("Existing Account") lives on the group.  Find the smallest container
+    // holding only this group's radios and read its label.
+    const isRadio=(el.type||'').toLowerCase()==='radio'||el.getAttribute('role')==='radio';
+    const isCheck=!isRadio&&el.getAttribute('role')!=='switch'&&((el.type||'').toLowerCase()==='checkbox'||el.getAttribute('role')==='checkbox');
+    if(!isRadio&&!isCheck)return {label:'',name:''};
+    const name=el.getAttribute('name')||'';
+    /* Checkboxes form a group only when several answer one question
+       ("Notify On": Success, Failure); a lone checkbox is its own question. */
+    const radiosIn=n=>Array.from(n.querySelectorAll(isRadio?'input[type=radio],[role=radio]':'input[type=checkbox]:not([role=switch]),[role=checkbox]'));
+    let container=el.parentElement||el;let n=el.parentElement;
+    while(n&&n!==document.body){
+      const rs=radiosIn(n);
+      if(name?!rs.every(x=>(x.getAttribute('name')||'')===name):rs.length>radiosIn(container).length&&radiosIn(container).length>=2)break;
+      container=n;
+      if(n.matches('[role=radiogroup],[role=group],fieldset'))break;
+      n=n.parentElement;
+    }
+    if(isCheck&&radiosIn(container).length<2)return {label:'',name:''};
+    const isOptionLabel=l=>{const f=l.getAttribute&&l.getAttribute('for');if(f){const t=document.getElementById(f);if(t&&(/^(radio|checkbox)$/.test((t.type||'').toLowerCase())||/^(radio|checkbox)$/.test(t.getAttribute('role')||'')))return true;}return !!(l.querySelector&&l.querySelector('input[type=radio],[role=radio],input[type=checkbox],[role=checkbox]'));};
+    let text='';
+    const lb=container.getAttribute('aria-labelledby');
+    if(lb)text=clean(lb.split(/\s+/).map(i=>{const x=document.getElementById(i);return x?(x.innerText||x.textContent):'';}).join(' '));
+    if(!text)text=clean(container.getAttribute('aria-label')||'');
+    if(!text){const lg=container.querySelector(':scope > legend');if(lg)text=clean(lg.innerText||lg.textContent);}
+    if(!text){const c=Array.from(container.querySelectorAll('label,.dds__label,legend')).find(l=>!isOptionLabel(l));if(c)text=clean(c.innerText||c.textContent);}
+    if(!text){let p=container;for(let i=0;i<3&&p&&!text;i++){let sib=p.previousElementSibling;while(sib&&!text){if(!sib.querySelector('input,select,textarea,[role=combobox]')){const t=clean(sib.innerText||sib.textContent);if(t&&t.length<80)text=t;}sib=sib.previousElementSibling;}p=p.parentElement;}}
+    return {label:text,name};
+  }
   function customHost(el){let n=el;while(n&&n!==document.body){const tag=(n.tagName||'').toLowerCase();if(tag.includes('-'))return n;n=n.parentElement;}return null;}
   function semanticPath(el){const parts=[];let n=el;while(n&&n!==document.body&&parts.length<10){const tag=(n.tagName||'').toLowerCase();if(tag){let part=tag;const fc=n.getAttribute&&n.getAttribute('formcontrolname');const role=n.getAttribute&&n.getAttribute('role');if(fc)part+=`[formcontrolname=${fc}]`;else if(role)part+=`[role=${role}]`;parts.unshift(part);}n=n.parentElement;}return parts.join(' > ');}
-  return els.filter(visible).map((el,index)=>{const sec=section(el);const row=rowMeta(el,sec);const dd=el.closest('dds-dropdown');const host=customHost(el);const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const listId=el.getAttribute('aria-controls')||el.getAttribute('aria-owns')||'';const ownedList=(listId&&document.getElementById(listId))||(dd&&dd.querySelector('[role=listbox],.dds__dropdown__list,.dds__menu'));const optionRoot=ownedList||dd;const selected=optionRoot?Array.from(optionRoot.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label],[class*=dropdown__selection]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const r=el.getBoundingClientRect();const st=getComputedStyle(el);const centerX=r.left+r.width/2;const centerY=r.top+r.height/2;const hit=(r.width&&r.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,centerX)),Math.max(0,Math.min(innerHeight-1,centerY))):null;const inView=centerX>=0&&centerY>=0&&centerX<innerWidth&&centerY<innerHeight;const interactable=!!(r.width&&r.height&&!el.disabled&&el.getAttribute('aria-disabled')!=='true'&&(!inView||hit===el||el.contains(hit)||hit&&hit.contains(el)));const frameworkKey=el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')||el.getAttribute('data-control-name')||el.getAttribute('name')||'';return {index,selector:css(el),semantic_path:semanticPath(el),id:el.id||'',tag:(el.tagName||'').toLowerCase(),component_tag:(host&&host.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||'',form_control_name:el.getAttribute('formcontrolname')||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||'',framework_key:frameworkKey,data_testid:el.getAttribute('data-testid')||el.getAttribute('data-test-id')||'',aria_controls:el.getAttribute('aria-controls')||'',aria_labelledby:el.getAttribute('aria-labelledby')||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_kind:row.kind,row_index:row.index,semantic_key:semantic(el,sec),raw_value:value,locked_value:el.getAttribute('data-hip-locked-value')||'',value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',selected_count:Array.from(new Set([...selected,...chips])).length,checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',interactable,pointer_events:st.pointerEvents||'',z_index:st.zIndex||'',bbox:{x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)}};});
+  return els.filter(visible).map((el,index)=>{const sec=section(el);const row=rowMeta(el,sec);const dd=el.closest('dds-dropdown');const host=customHost(el);const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const listId=el.getAttribute('aria-controls')||el.getAttribute('aria-owns')||'';const ownedList=(listId&&document.getElementById(listId))||(dd&&dd.querySelector('[role=listbox],.dds__dropdown__list,.dds__menu'));const optionRoot=ownedList||dd;const selected=optionRoot?Array.from(optionRoot.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label],[class*=dropdown__selection]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const r=el.getBoundingClientRect();const st=getComputedStyle(el);const centerX=r.left+r.width/2;const centerY=r.top+r.height/2;const hit=(r.width&&r.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,centerX)),Math.max(0,Math.min(innerHeight-1,centerY))):null;const inView=centerX>=0&&centerY>=0&&centerX<innerWidth&&centerY<innerHeight;const interactable=!!(r.width&&r.height&&!el.disabled&&el.getAttribute('aria-disabled')!=='true'&&(!inView||hit===el||el.contains(hit)||hit&&hit.contains(el)));const frameworkKey=el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')||el.getAttribute('data-control-name')||el.getAttribute('name')||'';const gi=groupInfo(el);return {index,selector:css(el),group_label:gi.label,group_name:gi.name,semantic_path:semanticPath(el),id:el.id||'',tag:(el.tagName||'').toLowerCase(),component_tag:(host&&host.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||'',form_control_name:el.getAttribute('formcontrolname')||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||'',framework_key:frameworkKey,data_testid:el.getAttribute('data-testid')||el.getAttribute('data-test-id')||'',aria_controls:el.getAttribute('aria-controls')||'',aria_labelledby:el.getAttribute('aria-labelledby')||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_kind:row.kind,row_index:row.index,semantic_key:semantic(el,sec),raw_value:value,locked_value:el.getAttribute('data-hip-locked-value')||'',value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',selected_count:Array.from(new Set([...selected,...chips])).length,checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',interactable,pointer_events:st.pointerEvents||'',z_index:st.zIndex||'',bbox:{x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)}};});
 }
 """
     try:
@@ -1130,8 +1160,55 @@ def _node_section_score(node: Dict[str, Any], actual: str) -> int:
     return 0
 
 
+# A control proven to sit in another repeatable row is never a candidate for
+# this row's field, however well its label matches.  Scoring it merely lower
+# let "row 2" bind to row 1 when row 2 did not exist yet, overwriting row 1
+# (and reporting an already-equal row-1 value as row 2's success).
+ROW_EXCLUDED_SCORE = -1000
+
+
+def control_row_ordinal(control: Dict[str, Any], node: Dict[str, Any]) -> Optional[int]:
+    """Best evidence of which data row ``control`` belongs to, for ``node``'s row kind."""
+    for key in ("expected_row_index",):
+        if control.get(key) is not None:
+            try:
+                return int(control[key])
+            except (TypeError, ValueError):
+                pass
+    same_kind = _norm(control.get("row_kind")) == _norm(node.get("row_kind"))
+    if same_kind and control.get("row_kind_ordinal") is not None:
+        try:
+            return int(control["row_kind_ordinal"])
+        except (TypeError, ValueError):
+            pass
+    if same_kind and control.get("row_index") is not None and control.get("row_kind_ordinal") is None:
+        try:
+            return int(control["row_index"])
+        except (TypeError, ValueError):
+            pass
+    if not control.get("row_signature") and not control.get("row_kind") and control.get("label_occurrence") is not None:
+        try:
+            return int(control["label_occurrence"])
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def control_in_other_row(control: Dict[str, Any], node: Dict[str, Any]) -> bool:
+    if node.get("row_index") is None:
+        return False
+    try:
+        wanted = int(node["row_index"])
+    except (TypeError, ValueError):
+        return False
+    actual = control_row_ordinal(control, node)
+    return actual is not None and actual != wanted
+
+
 def _control_score(control: Dict[str, Any], node: Dict[str, Any]) -> int:
     loc = node.get("semantic_locator") if isinstance(node.get("semantic_locator"), dict) else {}
+    if control_in_other_row(control, node):
+        return ROW_EXCLUDED_SCORE
     score = 0
     if _norm(control.get("semantic_key")) == _norm(node.get("field_key")):
         score += 100
@@ -1157,7 +1234,9 @@ def _control_score(control: Dict[str, Any], node: Dict[str, Any]) -> int:
     if _norm(control.get("name")) in names and names:
         score += 30
     clabel = _norm(control.get("label"))
-    if labels and any(v == clabel or v in clabel or clabel in v for v in labels if clabel):
+    # Containment only for real words: a radio option "No" is not part of
+    # "Acknowledgement Required".
+    if labels and any(v == clabel or (len(clabel) >= 4 and (v in clabel or clabel in v)) for v in labels if clabel):
         score += 20
     cph = _norm(control.get("placeholder"))
     if placeholders and cph in placeholders:
@@ -1208,6 +1287,21 @@ def _document_type_control_score(control: Dict[str, Any], node: Dict[str, Any]) 
         score -= 35
     if str(node.get("action")) == "verify_only" and (control.get("readonly") or control.get("disabled")):
         score += 30
+    # Radios/checkbox groups learned at runtime: the group label names the
+    # question, the option label must equal the wanted value.
+    group_label = _norm(control.get("group_label"))
+    node_labels = [_norm(v) for v in loc.get("labels", []) if _norm(v)]
+    if group_label and node_labels:
+        if group_label in node_labels:
+            score += 65
+        elif any(v in group_label or group_label in v for v in node_labels if len(v) >= 4):
+            score += 35
+    if str(node.get("action")) in {"select_radio", "toggle"}:
+        expected_n = _norm(node.get("expected_value"))
+        if expected_n and expected_n in {_norm(control.get("label")), _norm(control.get("value"))}:
+            score += 90
+        if str(node.get("action")) == "toggle" and (_norm(control.get("role")) in {"switch", "checkbox"} or _norm(control.get("type")) == "checkbox"):
+            score += 90
     preferred = [str(x) for x in node.get("_preferred_control_identities", []) if str(x)]
     identity = _document_type_control_identity(control)
     if identity in preferred:
@@ -1621,6 +1715,10 @@ def _value_equal(node: Dict[str, Any], control: Dict[str, Any]) -> bool:
             if wanted is not None:
                 return bool(control.get("checked")) == wanted
         return bool(control.get("checked")) and _norm(expected) in {_norm(control.get("label")), _norm(control.get("value"))}
+    if node.get("action") == "toggle":
+        wanted = _boolean_intent(expected)
+        if wanted is not None:
+            return bool(control.get("checked")) == wanted
     actual = control.get("value")
     if not _norm_text(actual):
         actual = next(iter(_portal_owned_display_values(control, [])), actual)
@@ -1630,6 +1728,10 @@ def _value_equal(node: Dict[str, Any], control: Dict[str, Any]) -> bool:
     actual_norm = _semantic_value_key(actual)
     if expected_norm and expected_norm == actual_norm:
         return True
+    if not expected_norm and _norm_text(expected):
+        # Punctuation-only values (EDI separators "~", "*", ">") have no
+        # semantic key; they must match exactly.
+        return _norm_text(expected) == _norm_text(actual)
     # DDS searchable single-selects can blank their inner search input after a
     # real option commit.  Exact selected-option/chip state is authoritative.
     # HIP input contracts also use enum-like values (ELEMENT_IN_PAYLOAD) while
@@ -1926,6 +2028,10 @@ async def execute_document_type_state_graph(
                     ok = await select_radio_option(page, selector, str(expected), phase=phase)
                     if ok is None:
                         ok = await select_radio_value(page, root, str(expected), section=str(node.get("section") or ""), phase=phase)
+                elif action == "toggle":
+                    # Switches/checkboxes learned at runtime (e.g. one option of a
+                    # checkbox group) on the Document Type form.
+                    ok = await set_boolean_control(page, root, selector, expected, phase=phase)
                 else:
                     ok = False
                     last_error = f"unsupported stateful action: {action}"
@@ -2208,27 +2314,34 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
   function clean(v){return String(v||'').replace(/\s+/g,' ').trim();}
   function visible(el){if(!el||!el.getBoundingClientRect)return false;const host=el.closest('label,.dds__radio-button,.dds__checkbox,[role=radio],[role=checkbox]')||el;const r=host.getBoundingClientRect();const s=getComputedStyle(host);return !!(r.width&&r.height&&s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0');}
   function css(el){if(el.id)return `${el.tagName.toLowerCase()}#${CSS.escape(el.id)}`;const p=[];let n=el;while(n&&n.nodeType===1&&p.length<10){let x=n.tagName.toLowerCase();const par=n.parentElement;if(par){const same=Array.from(par.children).filter(y=>y.tagName===n.tagName);if(same.length>1)x+=`:nth-of-type(${same.indexOf(n)+1})`;}p.unshift(x);n=par;}return p.join(' > ');}
-  function label(el){if(el.id){const l=document.querySelector(`label[for="${CSS.escape(el.id)}"]`);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const own=el.closest('label');if(own&&clean(own.innerText||own.textContent))return clean(own.innerText||own.textContent);const labelledBy=el.getAttribute('aria-labelledby');if(labelledBy){const l=document.getElementById(labelledBy);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const group=el.closest('.dds__form-group,.dds__input-text__container,app-generic-dropdown,dds-dropdown,dds-radio-button,.dds__radio-button,[class*=form-field],[class*=field-container]');const l=group&&group.querySelector(':scope > label,:scope > .dds__label,label,.dds__label');return clean((l&&(l.innerText||l.textContent))||el.getAttribute('aria-label')||el.getAttribute('placeholder')||el.getAttribute('name')||'');}
+  function label(el){if(/^(radio|checkbox)$/.test(el.getAttribute('role')||'')&&el.tagName!=='INPUT'){const own=clean(el.getAttribute('aria-label')||el.innerText||el.textContent);if(own)return own;}if(el.id){const l=document.querySelector(`label[for="${CSS.escape(el.id)}"]`);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const own=el.closest('label');if(own&&clean(own.innerText||own.textContent))return clean(own.innerText||own.textContent);const labelledBy=el.getAttribute('aria-labelledby');if(labelledBy){const l=document.getElementById(labelledBy);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const group=el.closest('.dds__form-group,.dds__input-text__container,app-generic-dropdown,dds-dropdown,dds-radio-button,.dds__radio-button,[class*=form-field],[class*=field-container]');const l=group&&group.querySelector(':scope > label,:scope > .dds__label,label,.dds__label');return clean((l&&(l.innerText||l.textContent))||el.getAttribute('aria-label')||el.getAttribute('placeholder')||el.getAttribute('name')||'');}
   function headingFrom(cur){while(cur&&cur!==document.body){const candidates=Array.from(cur.children||[]).filter(x=>/^(H1|H2|H3|H4)$/.test(x.tagName)||x.getAttribute('role')==='heading'||x.tagName==='LEGEND');for(const h of candidates){const t=clean(h.innerText||h.textContent);if(t)return t;}cur=cur.parentElement;}return '';}
-  function section(el){const tab=el.closest('[role=tabpanel]');if(tab){const labelled=tab.getAttribute('aria-labelledby');if(labelled){const l=document.getElementById(labelled);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const h=tab.querySelector('h1,h2,h3,h4,[role=heading],legend');if(h&&clean(h.innerText||h.textContent))return clean(h.innerText||h.textContent);}const fs=el.closest('fieldset');const lg=fs&&fs.querySelector(':scope > legend');if(lg&&clean(lg.innerText||lg.textContent))return clean(lg.innerText||lg.textContent);return headingFrom(el.parentElement);}
-  function row(el){const array=el.closest('[formarrayname=conditions]');if(array){const direct=Array.from(array.children||[]).filter(x=>x.querySelector&&x.querySelector('[formcontrolname=conditionType],dds-dropdown[name=conditionType]'));const rr=direct.find(x=>x===el||x.contains(el));if(rr)return {signature:css(rr),text:clean(rr.innerText||rr.textContent).slice(0,240),parent:css(array)};}const selectors=['tr','[role=row]','.dds__table__row','[class*=condition-row]','[class*=action-row]','[class*=attribute-row]','[class*=process-step]','[class*=filename-part]','[class*=file-name-part]','.dds__d-flex.dds__justify-content-start'];const cands=selectors.map(s=>el.closest(s)).filter(r=>r&&r.querySelectorAll('input:not([type=hidden]),textarea,select,[role=combobox],[role=radio]').length>1);/* innermost container wins: a File Name part row inside a Process Step is its own row */const inner=cands.find(c=>cands.every(o=>o===c||!c.contains(o)));if(inner){const hint=inner.matches('[class*=filename-part],[class*=file-name-part]')?'filename_part':inner.matches('[class*=process-step]')?'process_step':inner.matches('[class*=condition-row]')?'condition':inner.matches('[class*=action-row]')?'action':inner.matches('[class*=attribute-row]')?'attribute':'';return {signature:css(inner),text:clean(inner.innerText||inner.textContent).slice(0,240),parent:inner.parentElement?css(inner.parentElement):'',hint};}return {signature:'',text:'',parent:'',hint:''};}
+  function regionLabel(rg){const lb=rg.getAttribute('aria-labelledby');if(lb){const t=clean(lb.split(/\s+/).map(i=>{const x=document.getElementById(i);return x?(x.innerText||x.textContent):'';}).join(' '));if(t)return t;}return clean(rg.getAttribute('aria-label')||'');}
+  function section(el){const rg=el.closest('[role=region][aria-labelledby],[role=region][aria-label]');const nearFs=el.closest('fieldset');if(rg&&(!nearFs||nearFs.contains(rg))){const t=regionLabel(rg);if(t)return t;}const tab=el.closest('[role=tabpanel]');if(tab){const labelled=tab.getAttribute('aria-labelledby');if(labelled){const l=document.getElementById(labelled);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const h=tab.querySelector('h1,h2,h3,h4,[role=heading],legend');if(h&&clean(h.innerText||h.textContent))return clean(h.innerText||h.textContent);}const fs=el.closest('fieldset');const lg=fs&&fs.querySelector(':scope > legend');if(lg&&clean(lg.innerText||lg.textContent))return clean(lg.innerText||lg.textContent);return headingFrom(el.parentElement);}
+  function row(el){const array=el.closest('[formarrayname=conditions]');if(array){const direct=Array.from(array.children||[]).filter(x=>x.querySelector&&x.querySelector('[formcontrolname=conditionType],dds-dropdown[name=conditionType]'));const rr=direct.find(x=>x===el||x.contains(el));if(rr)return {signature:css(rr),text:clean(rr.innerText||rr.textContent).slice(0,240),parent:css(array)};}
+    /* Angular FormArray row: [formgroupname=<n>] inside [formarrayname] */
+    const fg=el.closest('[formgroupname]');if(fg&&/^\d+$/.test(fg.getAttribute('formgroupname')||'')){const arr=fg.closest('[formarrayname]');const an=(arr&&arr.getAttribute('formarrayname'))||'';return {signature:css(fg),text:clean(fg.innerText||fg.textContent).slice(0,240),parent:arr?css(arr):(fg.parentElement?css(fg.parentElement):''),hint:an?('array:'+an):''};}const selectors=['tr','[role=row]','.dds__table__row','[class*=condition-row]','[class*=action-row]','[class*=attribute-row]','[class*=process-step]','[class*=filename-part]','[class*=file-name-part]','.dds__d-flex.dds__justify-content-start'];const cands=selectors.map(s=>el.closest(s)).filter(r=>r&&r.querySelectorAll('input:not([type=hidden]),textarea,select,[role=combobox],[role=radio]').length>1);/* innermost container wins: a File Name part row inside a Process Step is its own row */const inner=cands.find(c=>cands.every(o=>o===c||!c.contains(o)));if(inner){const hint=inner.matches('[class*=filename-part],[class*=file-name-part]')?'filename_part':inner.matches('[class*=process-step]')?'process_step':inner.matches('[class*=condition-row]')?'condition':inner.matches('[class*=action-row]')?'action':inner.matches('[class*=attribute-row]')?'attribute':'';return {signature:css(inner),text:clean(inner.innerText||inner.textContent).slice(0,240),parent:inner.parentElement?css(inner.parentElement):'',hint};}return {signature:'',text:'',parent:'',hint:''};}
   function groupInfo(el){
     // A radio's own label is its option ("Yes"); the question it answers
     // ("Existing Account") lives on the group.  Find the smallest container
     // holding only this group's radios and read its label.
     const isRadio=(el.type||'').toLowerCase()==='radio'||el.getAttribute('role')==='radio';
-    if(!isRadio)return {label:'',name:''};
+    const isCheck=!isRadio&&el.getAttribute('role')!=='switch'&&((el.type||'').toLowerCase()==='checkbox'||el.getAttribute('role')==='checkbox');
+    if(!isRadio&&!isCheck)return {label:'',name:''};
     const name=el.getAttribute('name')||'';
-    const radiosIn=n=>Array.from(n.querySelectorAll('input[type=radio],[role=radio]'));
+    /* Checkboxes form a group only when several answer one question
+       ("Notify On": Success, Failure); a lone checkbox is its own question. */
+    const radiosIn=n=>Array.from(n.querySelectorAll(isRadio?'input[type=radio],[role=radio]':'input[type=checkbox]:not([role=switch]),[role=checkbox]'));
     let container=el.parentElement||el;let n=el.parentElement;
     while(n&&n!==document.body){
       const rs=radiosIn(n);
       if(name?!rs.every(x=>(x.getAttribute('name')||'')===name):rs.length>radiosIn(container).length&&radiosIn(container).length>=2)break;
       container=n;
-      if(n.matches('[role=radiogroup],fieldset'))break;
+      if(n.matches('[role=radiogroup],[role=group],fieldset'))break;
       n=n.parentElement;
     }
-    const isOptionLabel=l=>{const f=l.getAttribute&&l.getAttribute('for');if(f){const t=document.getElementById(f);if(t&&((t.type||'').toLowerCase()==='radio'||t.getAttribute('role')==='radio'))return true;}return !!(l.querySelector&&l.querySelector('input[type=radio],[role=radio]'));};
+    if(isCheck&&radiosIn(container).length<2)return {label:'',name:''};
+    const isOptionLabel=l=>{const f=l.getAttribute&&l.getAttribute('for');if(f){const t=document.getElementById(f);if(t&&(/^(radio|checkbox)$/.test((t.type||'').toLowerCase())||/^(radio|checkbox)$/.test(t.getAttribute('role')||'')))return true;}return !!(l.querySelector&&l.querySelector('input[type=radio],[role=radio],input[type=checkbox],[role=checkbox]'));};
     let text='';
     const lb=container.getAttribute('aria-labelledby');
     if(lb)text=clean(lb.split(/\s+/).map(i=>{const x=document.getElementById(i);return x?(x.innerText||x.textContent):'';}).join(' '));
@@ -2238,7 +2351,7 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
     if(!text){let p=container;for(let i=0;i<3&&p&&!text;i++){let sib=p.previousElementSibling;while(sib&&!text){if(!sib.querySelector('input,select,textarea,[role=combobox]')){const t=clean(sib.innerText||sib.textContent);if(t&&t.length<80)text=t;}sib=sib.previousElementSibling;}p=p.parentElement;}}
     return {label:text,name};
   }
-  return els.filter(visible).map((el,index)=>{const sec=section(el);const r=row(el);const dd=el.closest('dds-dropdown');const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const selected=dd?Array.from(dd.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const box=el.getBoundingClientRect();const style=getComputedStyle(el);const cx=box.left+box.width/2;const cy=box.top+box.height/2;const hit=(box.width&&box.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,cx)),Math.max(0,Math.min(innerHeight-1,cy))):null;const component=el.closest('dds-dropdown,app-generic-dropdown,dds-input,dds-textarea,dds-radio-button,dds-checkbox,dds-switch,dds-file-input,[class*=dds__]');const frameworkHost=el.closest('[formcontrolname],[ng-reflect-name],[data-control-name],dds-dropdown[name],dds-input[name],dds-textarea[name],dds-switch[name]');const inheritedFormControl=(frameworkHost&&frameworkHost.getAttribute('formcontrolname'))||'';const inheritedReflect=(frameworkHost&&frameworkHost.getAttribute('ng-reflect-name'))||'';const inheritedName=(frameworkHost&&frameworkHost.getAttribute('name'))||'';const frameworkKey=el.getAttribute('formcontrolname')||inheritedFormControl||el.getAttribute('ng-reflect-name')||inheritedReflect||el.getAttribute('data-control-name')||(frameworkHost&&frameworkHost.getAttribute('data-control-name'))||el.getAttribute('name')||inheritedName||'';const semanticPath=[sec,r.signature,frameworkKey,label(el),el.getAttribute('role')||el.getAttribute('type')||el.tagName].map(clean).filter(Boolean).join(' > ');const gi=groupInfo(el);return {index,selector:css(el),group_label:gi.label,group_name:gi.name,id:el.id||'',tag:(el.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||inheritedName||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_signature:r.signature,row_text:r.text,row_parent:r.parent||'',row_kind_hint:r.hint||'',value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',form_control_name:el.getAttribute('formcontrolname')||inheritedFormControl||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||inheritedReflect||'',framework_key:frameworkKey,component_tag:component?(component.tagName||'').toLowerCase():'',semantic_path:semanticPath,bbox:{x:box.x,y:box.y,width:box.width,height:box.height},pointer_events:style.pointerEvents||'',z_index:style.zIndex||'',hit_test_selector:hit?css(hit):'',hit_test_pass:!!(hit&&(hit===el||el.contains(hit)||hit.contains(el))),interactable:!!(!el.disabled&&!el.readOnly&&style.pointerEvents!=='none'&&box.width&&box.height&&(!(cx>=0&&cy>=0&&cx<innerWidth&&cy<innerHeight)||hit&&(hit===el||el.contains(hit)||hit.contains(el))))};});
+  return els.filter(visible).map((el,index)=>{const sec=section(el);const r=row(el);const dd=el.closest('dds-dropdown');const multiple=!!(dd&&(dd.getAttribute('selection')==='multiple'||dd.querySelector('.dds__dropdown--is-multiple')));const selected=dd?Array.from(dd.querySelectorAll('[role=option]')).filter(x=>x.getAttribute('aria-selected')==='true'||x.getAttribute('data-selected')==='true'||x.getAttribute('aria-checked')==='true'||x.classList.contains('dds__dropdown__item-selected')||x.classList.contains('dds__dropdown__item--selected')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const chips=dd?Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*=selected-value],[class*=selection__label]')).map(x=>clean(x.innerText||x.textContent)).filter(x=>x&&!/^\d+\s+selected$/i.test(x)&&x.toLowerCase()!=='select all'):[];const checked=!!(el.checked||el.getAttribute('aria-checked')==='true');let value=clean(el.value||el.getAttribute('aria-valuetext')||el.getAttribute('data-value')||'');if((el.type==='radio'||el.type==='checkbox'||el.getAttribute('role')==='radio'||el.getAttribute('role')==='checkbox')&&!checked)value='';const box=el.getBoundingClientRect();const style=getComputedStyle(el);const cx=box.left+box.width/2;const cy=box.top+box.height/2;const hit=(box.width&&box.height)?document.elementFromPoint(Math.max(0,Math.min(innerWidth-1,cx)),Math.max(0,Math.min(innerHeight-1,cy))):null;/* A visually hidden radio/checkbox (DDS clips the real input) is operated through its label. */const lp=(/^(radio|checkbox)$/.test((el.type||'').toLowerCase())&&(box.width<4||box.height<4))?((el.id&&document.querySelector(`label[for="${CSS.escape(el.id)}"]`))||el.closest('label')):null;let proxyHit=false;if(lp){const lb=lp.getBoundingClientRect();const lx=lb.left+lb.width/2,ly=lb.top+lb.height/2;if(lb.width&&lb.height){const inV=lx>=0&&ly>=0&&lx<innerWidth&&ly<innerHeight;const h2=inV?document.elementFromPoint(lx,ly):null;proxyHit=!inV||!!(h2&&(h2===lp||lp.contains(h2)));}}const component=el.closest('dds-dropdown,app-generic-dropdown,dds-input,dds-textarea,dds-radio-button,dds-checkbox,dds-switch,dds-file-input,[class*=dds__]');const frameworkHost=el.closest('[formcontrolname],[ng-reflect-name],[data-control-name],dds-dropdown[name],dds-input[name],dds-textarea[name],dds-switch[name]');const inheritedFormControl=(frameworkHost&&frameworkHost.getAttribute('formcontrolname'))||'';const inheritedReflect=(frameworkHost&&frameworkHost.getAttribute('ng-reflect-name'))||'';const inheritedName=(frameworkHost&&frameworkHost.getAttribute('name'))||'';const frameworkKey=el.getAttribute('formcontrolname')||inheritedFormControl||el.getAttribute('ng-reflect-name')||inheritedReflect||el.getAttribute('data-control-name')||(frameworkHost&&frameworkHost.getAttribute('data-control-name'))||el.getAttribute('name')||inheritedName||'';const semanticPath=[sec,r.signature,frameworkKey,label(el),el.getAttribute('role')||el.getAttribute('type')||el.tagName].map(clean).filter(Boolean).join(' > ');const gi=groupInfo(el);return {index,selector:css(el),group_label:gi.label,group_name:gi.name,id:el.id||'',tag:(el.tagName||'').toLowerCase(),type:el.getAttribute('type')||'',role:el.getAttribute('role')||'',name:el.getAttribute('name')||inheritedName||'',placeholder:el.getAttribute('placeholder')||'',label:label(el),section:sec,row_signature:r.signature,row_text:r.text,row_parent:r.parent||'',row_kind_hint:r.hint||'',value,selected_values:Array.from(new Set([...selected,...chips])),selection_mode:multiple?'multiple':'single',checked,required:!!(el.required||el.getAttribute('aria-required')==='true'),disabled:!!(el.disabled||el.getAttribute('aria-disabled')==='true'),readonly:!!el.readOnly,aria_invalid:el.getAttribute('aria-invalid')||'',expanded:el.getAttribute('aria-expanded')||'',form_control_name:el.getAttribute('formcontrolname')||inheritedFormControl||'',ng_reflect_name:el.getAttribute('ng-reflect-name')||inheritedReflect||'',framework_key:frameworkKey,component_tag:component?(component.tagName||'').toLowerCase():'',semantic_path:semanticPath,bbox:{x:box.x,y:box.y,width:box.width,height:box.height},pointer_events:style.pointerEvents||'',z_index:style.zIndex||'',hit_test_selector:hit?css(hit):'',hit_test_pass:!!(hit&&(hit===el||el.contains(hit)||hit.contains(el))),click_proxy:lp?css(lp):'',interactable:!!(!el.disabled&&!el.readOnly&&((style.pointerEvents!=='none'&&box.width&&box.height&&(!(cx>=0&&cy>=0&&cx<innerWidth&&cy<innerHeight)||hit&&(hit===el||el.contains(hit)||hit.contains(el))))||proxyHit))};});
 }
 """
     selector = "input:not([type=hidden]),textarea,select,[role='combobox'],[role='radio'],[role='checkbox'],[role='switch']"
@@ -2302,6 +2415,10 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
                 c["row_kind"] = "routing_action"
             elif "condition" in low:
                 c["row_kind"] = "condition"
+            elif hint.startswith("array:"):
+                # Any other Angular FormArray (Tags, Cross Reference rows, ...):
+                # its own name is its row kind.
+                c["row_kind"] = _norm(hint[len("array:"):])
     # DDS labels only the first row of a repeatable group, so an unlabelled row
     # has no text to classify it by.  Sibling rows under the same container are
     # the same kind: inherit it.
@@ -2318,6 +2435,16 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
             if len(bucket) == 1:
                 c["row_kind"] = next(iter(bucket))
                 c["row_kind_inferred_from_siblings"] = True
+    # Physical row indexes count every row in a section; the ordinal within one
+    # row kind is what a node's zero-based row index means.
+    kind_rows: Dict[Tuple[str, str], List[str]] = {}
+    for c in controls:
+        sig = str(c.get("row_signature") or "")
+        if sig and c.get("row_kind"):
+            ordered = kind_rows.setdefault((_canonical_section(str(c.get("section") or "")), str(c["row_kind"])), [])
+            if sig not in ordered:
+                ordered.append(sig)
+            c["row_kind_ordinal"] = ordered.index(sig)
     return mask_sensitive_data(controls)
 
 
@@ -2360,6 +2487,8 @@ def _stateful_control_state(control: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stateful_control_score(control: Dict[str, Any], node: Dict[str, Any]) -> int:
     loc = node.get("semantic_locator") if isinstance(node.get("semantic_locator"), dict) else {}
+    if control_in_other_row(control, node):
+        return ROW_EXCLUDED_SCORE
     labels = [_norm(v) for v in loc.get("labels", []) if _norm(v)]
     names = {_norm(v) for v in loc.get("names", []) if _norm(v)}
     placeholders = {_norm(v) for v in loc.get("placeholders", []) if _norm(v)}
@@ -2382,7 +2511,7 @@ def _stateful_control_score(control: Dict[str, Any], node: Dict[str, Any]) -> in
         score += 55
     if labels and any(v == cl for v in labels):
         score += 65
-    elif labels and any(v and cl and (v in cl or cl in v) for v in labels):
+    elif labels and len(cl) >= 4 and any(v and (v in cl or cl in v) for v in labels):
         score += 35
     # A radio's own label is its option ("Yes"); its group label names the
     # question ("Existing Account") and is what tells two Yes/No groups apart.
@@ -2706,6 +2835,39 @@ async def _prepare_phase_control_for_action(
             diagnostic = resolver(current_controls, node)
             control = diagnostic.get("control") if isinstance(diagnostic.get("control"), dict) else None
             preparation["rebound_after_reveal"] = control is not None
+    if control is None and node.get("row_kind") and node.get("row_index") is not None and int(node.get("row_index") or 0) > 0:
+        # Row N of a repeatable list still does not exist: click the list's own
+        # "+ Add" now (effect-verified) instead of failing and waiting a cycle.
+        try:
+            from .form_structure_healer import ensure_repeatable_rows, plan_row_groups, reveal_collapsed_sections
+            # An existing row may only be collapsed (BizFlow process step 2):
+            # open collapsed sections before counting rows, never add a duplicate.
+            preparation["row_heal_reveal"] = await reveal_collapsed_sections(
+                page, phase, wanted=[str(node.get("row_kind") or ""), str(node.get("section") or "")], expand_unmatched=True,
+            )
+            if (preparation["row_heal_reveal"] or {}).get("expanded_count"):
+                await page.wait_for_timeout(int(profile.get("poll_interval_ms", 120)))
+                current_controls = await capture(page)
+                current_controls, _ = _apply_repeatable_row_bindings(current_controls, graph)
+                diagnostic = resolver(current_controls, node)
+                control = diagnostic.get("control") if isinstance(diagnostic.get("control"), dict) else None
+            kind_nodes = [] if control is not None else [
+                n for n in graph.get("nodes") or []
+                if isinstance(n, dict) and _norm(n.get("row_kind")) == _norm(node.get("row_kind"))
+                and n.get("row_index") is not None and int(n.get("row_index") or 0) <= int(node.get("row_index") or 0)
+            ]
+            groups = plan_row_groups({"nodes": kind_nodes}, [], {})
+            heal = await ensure_repeatable_rows(page, phase, groups, capture=lambda: capture(page)) if groups else {}
+        except Exception as exc:
+            heal = {"error": mask_sensitive_string(str(exc))[:300]}
+        preparation["row_heal"] = heal
+        if heal.get("rows_added"):
+            await page.wait_for_timeout(int(profile.get("poll_interval_ms", 120)))
+            current_controls = await capture(page)
+            current_controls, heal_row_binding = _apply_repeatable_row_bindings(current_controls, graph)
+            preparation["row_binding_after_row_heal"] = heal_row_binding
+            diagnostic = resolver(current_controls, node)
+            control = diagnostic.get("control") if isinstance(diagnostic.get("control"), dict) else None
     if control is None:
         return None, current_controls, diagnostic, mask_sensitive_data(preparation)
 
@@ -2724,19 +2886,27 @@ async def _prepare_phase_control_for_action(
             "blockingValidation": str(control.get("aria_invalid") or "") == "true",
         }
         return dict(control), current_controls, diagnostic, mask_sensitive_data(preparation)
+    # A visually hidden radio/checkbox is operated through its label: probe the
+    # label's geometry and hit test, keep the input's own disabled state.
+    probe = str(control.get("click_proxy") or "") or selector
+    if probe != selector:
+        preparation["operated_through_label"] = probe
     # Controls below the fold (Document Type identifier rows, attributes,
     # validation) fail an elementFromPoint hit test until they are scrolled in.
-    preparation["scroll_into_view"] = await scroll_control_into_view(page, selector)
+    preparation["scroll_into_view"] = await scroll_control_into_view(page, probe)
     bbox = await wait_for_stable_bounding_box(
         page,
-        selector,
+        probe,
         timeout_ms=int(profile.get("transaction_timeout_ms", 5000)),
         stable_samples=int(profile.get("bbox_stable_samples", 2)),
         interval_ms=int(profile.get("poll_interval_ms", 100)),
         tolerance_px=float(profile.get("bbox_tolerance_px", 0.75)),
     )
     preparation["bbox_stability"] = bbox
-    state = bbox.get("state") if isinstance(bbox.get("state"), dict) else await inspect_interaction_state(page, selector)
+    state = bbox.get("state") if isinstance(bbox.get("state"), dict) else await inspect_interaction_state(page, probe)
+    if probe != selector:
+        own = await inspect_interaction_state(page, selector)
+        state = dict(state, disabled=bool(own.get("disabled")), readonly=bool(own.get("readonly")))
     preparation["interaction_state"] = state
     if not bbox.get("stable") or not state.get("visible"):
         return None, current_controls, diagnostic, mask_sensitive_data(preparation)
@@ -2751,14 +2921,14 @@ async def _prepare_phase_control_for_action(
             preparation["blocked_reason"] = "HIP_READONLY_PORTAL_VALUE_MISMATCH: target control is disabled/read-only and shows a different value"
             return None, current_controls, diagnostic, mask_sensitive_data(preparation)
         if not state.get("hitTestPass"):
-            preparation["scroll_into_view_retry"] = await scroll_control_into_view(page, selector)
-            state = await inspect_interaction_state(page, selector)
+            preparation["scroll_into_view_retry"] = await scroll_control_into_view(page, probe)
+            state = await inspect_interaction_state(page, probe)
         if not state.get("hitTestPass"):
             session = getattr(page, "_hip_browser_session", None)
             if session is not None and hasattr(session, "ensure_interactable"):
                 try:
-                    await session.ensure_interactable(action="prepare stateful control", selector=selector, timeout_ms=5000)
-                    state = await inspect_interaction_state(page, selector)
+                    await session.ensure_interactable(action="prepare stateful control", selector=probe, timeout_ms=5000)
+                    state = await inspect_interaction_state(page, probe)
                     preparation["interaction_state_after_guard"] = state
                 except Exception as exc:
                     preparation["interaction_guard_error"] = mask_sensitive_string(str(exc))
@@ -2807,7 +2977,10 @@ async def _wait_for_parent_children_visible(
             diag = resolver(controls, child)
             control = diag.get("control") if isinstance(diag.get("control"), dict) else None
             visible = bool(diag.get("resolved") and control)
-            required = bool(child.get("required", True))
+            # A parent reveals a repeatable section with its first row; rows 2..N
+            # come from "+ Add", so their absence does not fail the parent.
+            later_row = child.get("row_index") is not None and int(child.get("row_index") or 0) > 0
+            required = bool(child.get("required", True)) and not later_row
             if required and not visible:
                 all_required = False
             row = {

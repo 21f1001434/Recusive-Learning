@@ -180,21 +180,50 @@
     opRow.className = 'row';
     opRow.appendChild(dropdown({ label: 'Operation', options: OPTIONS.operation, deferred: deferOperation }));
     identifier.appendChild(opRow);
-    const idRow = document.createElement('div');
-    idRow.className = 'row';
-    idRow.appendChild(dropdown({
-      label: 'Derived From', options: OPTIONS.identifierDerived,
-      onChange: () => setTimeout(() => {
-        if (!idRow.querySelector('input[name=value]')) idRow.appendChild(textField({ label: 'Value', name: 'value', placeholder: 'Value' }));
-      }, 150),
-    }));
-    identifier.appendChild(idRow);
+    function identifierRow() {
+      const idRow = document.createElement('div');
+      idRow.className = 'row';
+      idRow.appendChild(dropdown({
+        label: 'Derived From', options: OPTIONS.identifierDerived,
+        onChange: () => setTimeout(() => {
+          if (!idRow.querySelector('input[name=value]')) idRow.appendChild(textField({ label: 'Value', name: 'value', placeholder: 'Value' }));
+        }, 150),
+      }));
+      return idRow;
+    }
+    identifier.appendChild(identifierRow());
+    if (window.__variant) {
+      // Variant: one identifier row to start; the icon-only "+" appends another.
+      const addId = document.createElement('button');
+      addId.type = 'button'; addId.textContent = '+'; addId.setAttribute('aria-label', 'Add Identifier');
+      addId.addEventListener('click', () => setTimeout(() => identifier.insertBefore(identifierRow(), addId), 120));
+      identifier.appendChild(addId);
+    }
     host.appendChild(identifier);
+
+    if (window.__variant && format === 'EDIX12') {
+      // Variant: EDI formats add delimiter fields and a Yes/No radio group.
+      const edi = document.createElement('fieldset');
+      edi.innerHTML = '<legend>EDI Delimiters</legend>';
+      const eRow = document.createElement('div');
+      eRow.className = 'row';
+      eRow.appendChild(textField({ label: 'Segment Separator', name: 'segmentSeparator', placeholder: 'Segment Separator' }));
+      eRow.appendChild(textField({ label: 'Data Element Separator', name: 'dataElementSeparator', placeholder: 'Data Element Separator' }));
+      eRow.appendChild(textField({ label: 'Sub Element Separator', name: 'subElementSeparator', placeholder: 'Sub Element Separator' }));
+      edi.appendChild(eRow);
+      const ack = document.createElement('div');
+      ack.className = 'dds__form-group';
+      ack.innerHTML = '<label class="dds__label" id="ack-label">Acknowledgement Required</label><div role="radiogroup" aria-labelledby="ack-label">'
+        + ['Yes', 'No'].map((t, i) => `<div class="dds__radio-button"><input type="radio" class="dds__radio-button__input" id="ack-${i}" name="acknowledgementRequired" value="${t.toLowerCase()}"${t === 'No' ? ' checked' : ''}><label class="dds__radio-button__label" for="ack-${i}">${t}</label></div>`).join('')
+        + '</div>';
+      edi.appendChild(ack);
+      host.appendChild(edi);
+    }
 
     const attributes = document.createElement('fieldset');
     attributes.innerHTML = '<legend>Attributes To Configure</legend>';
     // HIP pre-renders one row per default attribute; tests may render fewer.
-    ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier', 'Alternate Business Identifier'].slice(0, window.__attributeRows || 5).forEach((name, index) => {
+    function attributeRow(name, index) {
       const row = document.createElement('div');
       row.className = 'row';
       row.appendChild(textField({ label: 'Attribute Name', name: 'attributeName', placeholder: 'Attribute Name', value: name }));
@@ -208,8 +237,20 @@
       }));
       // Dell drops the visible Usage label on later attribute rows.
       row.appendChild(dropdown({ label: 'Usage', options: OPTIONS.usage, multiple: true, showLabel: index === 0 }));
-      attributes.appendChild(row);
-    });
+      return row;
+    }
+    const defaults = ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier', 'Alternate Business Identifier'].slice(0, window.__attributeRows || 5);
+    defaults.forEach((name, index) => attributes.appendChild(attributeRow(name, index)));
+    if (window.__variant) {
+      // Variant: "+ Add Attribute" appends a blank attribute row.
+      const addAttr = document.createElement('button');
+      addAttr.type = 'button'; addAttr.textContent = '+ Add Attribute';
+      addAttr.addEventListener('click', () => setTimeout(() => {
+        const count = attributes.querySelectorAll('input[name=attributeName]').length;
+        attributes.insertBefore(attributeRow('', count), addAttr);
+      }, 120));
+      attributes.appendChild(addAttr);
+    }
     host.appendChild(attributes);
 
     const validation = document.createElement('fieldset');

@@ -71,10 +71,20 @@
         interfaceHost,
       )),
     ),
-    H.fieldset('Tags:', H.row(H.text({ label: 'Key', name: 'key' }), H.text({ label: 'Value', name: 'tagValue', placeholder: 'Value' }))),
+    H.fieldset('Tags:', window.__variant
+      ? H.addList({ name: 'tags', addLabel: 'Add Tag', buildRow: (i, labelled) => H.row(
+          H.text({ label: 'Key', name: 'key', showLabel: labelled }), H.text({ label: 'Value', name: 'tagValue', placeholder: 'Value', showLabel: labelled })) })
+      : H.row(H.text({ label: 'Key', name: 'key' }), H.text({ label: 'Value', name: 'tagValue', placeholder: 'Value' }))),
     H.fieldset('Pre-process Step :', H.checkbox({ label: 'Splitter Required', name: 'splitterRequired' })),
     H.fieldset('Document(s) Supported:', H.row(H.dropdown({ label: 'Document Type', name: 'documentType', options: DOC_TYPES }))),
     H.fieldset('Process Steps :', H.el('<div>1 :: Step Type</div>')),
+    window.__variant && H.accordion('Notification Settings', [
+      H.row(
+        H.checkboxGroup({ label: 'Notify On', name: 'notifyOn', options: ['Success', 'Failure'] }),
+        H.segmented({ label: 'Notification Channel', name: 'notificationChannel', options: ['Email', 'Webhook'] }),
+        H.text({ label: 'Notification Email', name: 'notificationEmail', placeholder: 'Notification Email' }),
+      ),
+    ]),
   );
   H.page('Create Transport Profile', form);
 })();

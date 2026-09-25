@@ -1,3 +1,17 @@
+## V243R17 — Radio groups, extra sections and "+ Add" rows are filled in every phase; the agent learns each form (2026-09-25)
+
+- **Every phase now fills what goes beyond the golden layout, including input keys the phase code does not know:**
+  - radio groups, including DDS radios with a hidden input and button-style radios;
+  - checkbox groups, ticking exactly the listed options;
+  - switches;
+  - fields in collapsed sections, which it opens;
+  - fields that appear after another choice (EDI separators after EDIX12, Account Name after "No", Existing Folder after "Yes").
+- **It repairs the form's structure itself.** When a list needs more rows than the portal shows, it clicks that list's own "+ Add…" and checks a row appeared. A field for row 2 can never again be typed into row 1.
+- **It no longer reports success early.** A field that appears after the fill keeps the phase open until it is filled and verified.
+- **It learns.** Each phase's fields, the sections it had to open and the "+ Add" controls it used are kept, without values, in `data\hip_memory\form_structure_memory`. The next run starts from them.
+
+See `V243R17_FORM_VARIANTS_SELF_HEAL_AND_LEARNING_20260925.md`. Apply with `APPLY_V243R17_IN_PLACE.ps1`; it includes R13–R16.
+
 ## V243R16 — Document Type is no longer cancelled mid-form; finished phases show their verdict (2026-09-25)
 
 - **Document Type no longer stops at Document Identifier with "HIP_PHASE_NO_PROGRESS_WATCHDOG".**

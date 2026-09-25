@@ -1,0 +1,13 @@
+$ErrorActionPreference = "Stop"
+& .\VERIFY_V243R16_INSTALL.ps1
+if ($LASTEXITCODE -ne 0) { throw "R16 baseline verification failed" }
+python -c "from hip_id_agent.autonomous_form_runtime import _leaf_control_score as s, _choice_option_for_value as o; no={'type':'radio','label':'No','group_label':'Use Existing Folder','group_name':'useExistingFolder','section':'x'}; assert s({'input_path':chr(36)+'.objects.p.notification_settings.notify_on','field_key':'notify_on','value':['Failure']}, no, 'p') <= 0; assert o(True, ['Yes','No'])=='Yes' and o('webhook', ['Email','Webhook'])=='Webhook'; print('R17_CHOICE_GROUP_BINDING_OK')"
+if ($LASTEXITCODE -ne 0) { throw "R17 choice group binding smoke failed" }
+python -c "from hip_id_agent.stateful_form_runtime import _stateful_control_score as s, ROW_EXCLUDED_SCORE as X; n={'field_key':'condition_value','action':'fill_text','row_kind':'condition','row_index':1,'section':'Conditions','semantic_locator':{'labels':['Value']}}; c={'label':'Value','section':'Conditions','row_kind':'condition','row_kind_ordinal':0,'row_signature':'r','type':'text'}; assert s(c, n)==X; print('R17_ROW_EXACT_BINDING_OK')"
+if ($LASTEXITCODE -ne 0) { throw "R17 row-exact binding smoke failed" }
+python -c "import tempfile, pathlib; from hip_id_agent.form_structure_memory import FormStructureMemory as M; m=M(pathlib.Path(tempfile.mkdtemp())); d=m.load('data_map'); d['fields']['advanced_options.notify_on']={'field_key':'notify_on','action':'select_checkbox_group','group_label':'Notify On','options':['Success','Failure']}; m.save('data_map', d); g={'nodes':[]}; m.seed_graph('data_map', g, [{'input_path':chr(36)+'.objects.data_map.advanced_options.notify_on','value':['Failure']}]); assert [n['expected_value'] for n in g['nodes']]==['false','true']; print('R17_FORM_STRUCTURE_MEMORY_OK')"
+if ($LASTEXITCODE -ne 0) { throw "R17 form structure memory smoke failed" }
+python -c "from hip_id_agent.stateful_form_runtime import _value_equal as e; assert e({'action':'fill_text','expected_value':'~','field_key':'segment_separator'}, {'value':'~'}); import hip_id_agent.form_structure_healer as h; assert h.plan_row_groups({'nodes':[{'row_kind':'condition','row_index':2,'section':'Conditions','semantic_locator':{'labels':['Value']}}]}, [], {})[0]['needed']==3; print('R17_SEPARATORS_AND_ROW_PLAN_OK')"
+if ($LASTEXITCODE -ne 0) { throw "R17 separator/row plan smoke failed" }
+Write-Host "V243R17 install verification PASS" -ForegroundColor Green
+Write-Host "Radio groups, checkbox groups, collapsed sections and '+ Add' rows are filled in every phase; the agent keeps what it learned about each form in data\hip_memory\form_structure_memory."

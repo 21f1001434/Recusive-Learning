@@ -1502,6 +1502,49 @@ async def _wait_dds_multiselect_snapshot_stable(
     return {**last, "option_universe_stable": False, "stability_samples": samples, "consecutive_samples": stable}
 
 
+async def _choice_label_target(page: Page, selector: str) -> Dict[str, Any]:
+    """Return the label that operates a radio/checkbox, and whether the input is clipped.
+
+    DDS hides the real input (1px, clipped) and users click the styled label;
+    clicking the input itself fails the hit test.
+    """
+    try:
+        info = await page.locator(selector).first.evaluate(r"""el => {
+          function css(n){if(n.id)return `${n.tagName.toLowerCase()}#${CSS.escape(n.id)}`;const p=[];let x=n;while(x&&x.nodeType===1&&p.length<9){let t=x.tagName.toLowerCase();const par=x.parentElement;if(par){const same=Array.from(par.children).filter(y=>y.tagName===x.tagName);if(same.length>1)t+=`:nth-of-type(${same.indexOf(x)+1})`;}p.unshift(t);x=par;}return p.join(' > ');}
+          const r=el.getBoundingClientRect();
+          const lab=(el.id&&document.querySelector(`label[for="${CSS.escape(el.id)}"]`))||el.closest('label');
+          return {tiny:r.width<4||r.height<4,label:lab?css(lab):''};
+        }""")
+        return dict(info or {})
+    except Exception:
+        return {}
+
+
+async def _click_choice(page: Page, selector: str, *, label: str, phase: str = "") -> bool:
+    """Click a radio/checkbox, through its label when the input is visually hidden."""
+    async def state() -> Optional[bool]:
+        try:
+            return bool(await page.locator(selector).first.evaluate("el => !!el.checked || el.getAttribute('aria-checked')==='true'"))
+        except Exception:
+            return None
+
+    proxy = await _choice_label_target(page, selector)
+    proxy_label = str(proxy.get("label") or "")
+    first = proxy_label if proxy.get("tiny") and proxy_label else selector
+    before = await state()
+    if await _broker_click(page, first, label=label, phase=phase, mutation_risk=False):
+        return True
+    alternate = proxy_label if first == selector else selector
+    if not alternate or alternate == first:
+        return False
+    # A click that landed although the broker reported failure must not be
+    # undone by a second click on the label.
+    await page.wait_for_timeout(120)
+    if before is not None and await state() != before:
+        return True
+    return await _broker_click(page, alternate, label=label, phase=phase, mutation_risk=False)
+
+
 async def set_checkbox_value(page: Page, selector: str, desired: bool, *, label: str = "", phase: str = "") -> bool:
     """Set a checkbox/switch using the PyAutoGUI-primary broker and exact state proof."""
     if not selector:
@@ -1523,7 +1566,7 @@ async def set_checkbox_value(page: Page, selector: str, desired: bool, *, label:
     if current is None:
         return False
     if bool(current) != bool(desired):
-        if not await _broker_click(page, selector, label=f"HIP Portal checkbox {label or selector}", phase=phase, mutation_risk=False):
+        if not await _click_choice(page, selector, label=f"HIP Portal checkbox {label or selector}", phase=phase):
             return False
         await page.wait_for_timeout(180)
     return (await checked()) == bool(desired)
@@ -1772,7 +1815,7 @@ async def set_boolean_control(page: Page, root: Locator | None, selector: str, v
     current = await checked()
     if current is None: return False
     if current != desired:
-        if not await _broker_click(page, selector, label=f"HIP Portal boolean control -> {desired}", phase=phase, mutation_risk=False): return False
+        if not await _click_choice(page, selector, label=f"HIP Portal boolean control -> {desired}", phase=phase): return False
         await page.wait_for_timeout(180)
     return (await checked()) == desired
 
@@ -1810,7 +1853,7 @@ async def select_radio_option(page: Page, selector: str, value: str, *, phase: s
   const want=clean(value);
   const intent=trueWords.includes(want)?true:falseWords.includes(want)?false:null;
   function css(n){if(n.id)return `${n.tagName.toLowerCase()}#${CSS.escape(n.id)}`;const p=[];let x=n;while(x&&x.nodeType===1&&p.length<9){let t=x.tagName.toLowerCase();const par=x.parentElement;if(par){const same=Array.from(par.children).filter(y=>y.tagName===x.tagName);if(same.length>1)t+=`:nth-of-type(${same.indexOf(x)+1})`;}p.unshift(t);x=par;}return p.join(' > ');}
-  const options=group.map(r=>{const lab=r.id?document.querySelector(`label[for="${CSS.escape(r.id)}"]`):r.closest('label');return {selector:css(r),label:clean((lab&&(lab.innerText||lab.textContent))||r.getAttribute('aria-label')||''),value:clean(r.value||r.getAttribute('data-value')||'')};});
+  const options=group.map(r=>{const lab=r.id?document.querySelector(`label[for="${CSS.escape(r.id)}"]`):r.closest('label');const own=r.tagName!=='INPUT'?(r.innerText||r.textContent):'';return {selector:css(r),label:clean((lab&&(lab.innerText||lab.textContent))||r.getAttribute('aria-label')||own||''),value:clean(r.value||r.getAttribute('data-value')||'')};});
   let pick=options.find(o=>o.label===want)||options.find(o=>o.value===want);
   if(!pick&&intent!==null)pick=options.find(o=>(intent?trueWords:falseWords).includes(o.label))||options.find(o=>(intent?trueWords:falseWords).includes(o.value));
   return pick?{status:'found',selector:pick.selector,label:pick.label,options:options.map(o=>o.label)}:{status:'no_option',options:options.map(o=>o.label)};
@@ -1831,7 +1874,7 @@ async def select_radio_option(page: Page, selector: str, value: str, *, phase: s
         already = False
     if not already:
         await _autowebglm_primary_gate(page, action="click", selector=option, label=f"HIP Portal radio {target}", value=target)
-        if not await _broker_click(page, option, label=f"HIP Portal radio {target}", phase=phase, mutation_risk=False):
+        if not await _click_choice(page, option, label=f"HIP Portal radio {target}", phase=phase):
             return False
         await page.wait_for_timeout(180)
     try:
@@ -1861,7 +1904,7 @@ async def select_radio_value(page: Page, root: Locator | None, value: str, *, se
         except Exception: already = False
         if not already:
             await _autowebglm_primary_gate(page, action="click", selector=selector, label=f"HIP Portal radio {target}", value=target)
-            if not await _broker_click(page, selector, label=f"HIP Portal radio {target}", phase=phase, mutation_risk=False): return False
+            if not await _click_choice(page, selector, label=f"HIP Portal radio {target}", phase=phase): return False
             await page.wait_for_timeout(180)
         loc = page.locator(selector).first
         return bool(await loc.evaluate("el => !!el.checked || el.getAttribute('aria-checked')==='true'"))

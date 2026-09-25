@@ -1,3 +1,36 @@
+# V243R17 — Radio groups, extra sections and "+ Add" rows in every phase; form structure learning (2026-09-25)
+
+- Variant replicas for every phase (`window.__variant`). The DDS kit gains `segmented`, `checkboxGroup`, `accordion` and `addList`, and radios with a clipped input.
+- Runtime input keys (`_supplement_runtime_input_graph`):
+  - radios and checkbox groups are bound by group label, with one candidate per group;
+  - input values are mapped onto the group's own option (`_choice_option_for_value`);
+  - no containment matches on words shorter than 3 letters;
+  - checkbox groups become one toggle node per option (`select_checkbox_group`);
+  - a runtime field belongs to the run's section.
+- Rows:
+  - a control proven to be in another row is excluded (`ROW_EXCLUDED_SCORE`, `control_row_ordinal`, `row_kind_ordinal`);
+  - Angular `formgroupname` rows are detected;
+  - later rows are not required when their parent is chosen.
+- `form_structure_healer`:
+  - opens collapsed sections;
+  - adds missing rows with the list's own "+ Add" (effect-verified);
+  - runs at cycle start, between the passes, and inside the filler for a missing row N, after opening collapsed rows.
+- Goal checks:
+  - the form is re-read between the passes;
+  - `new_fields_found_after_fill` and `unexecuted_runtime_nodes` keep the goal open;
+  - `duration_seconds` is recorded per cycle.
+- Hidden radios and checkboxes are operated through their label (`click_proxy`, `_click_choice`, label-probed preparation). Button radios read their own text.
+- Document Type:
+  - toggle action and verifier;
+  - group- and option-aware scoring;
+  - `group_label` in its capture.
+- Punctuation-only values compare exactly.
+- `form_structure_memory`:
+  - learns fields, sections and "+ Add" controls per phase, value-free;
+  - seeds and reveals them on the next run;
+  - demotes learned fields that no longer bind.
+- New tests: `tests/test_v243r17_variant_forms_a.py`, `tests/test_v243r17_variant_forms_b.py`, `tests/test_v243r17_structure_learning.py`. Added `APPLY_V243R17_IN_PLACE.ps1` / `VERIFY_V243R17_INSTALL.ps1`.
+
 # V243R16 — Document Type is no longer cancelled mid-form; finished phases show their verdict (2026-09-25)
 
 - Fixed `HIP_PHASE_NO_PROGRESS_WATCHDOG` cancelling Source Document Type at Document Identifier. The watchdog counted only new DOM states as progress; retrying a DDS dropdown revisits known states, and model decisions change nothing on screen.
