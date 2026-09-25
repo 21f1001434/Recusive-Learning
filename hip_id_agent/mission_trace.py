@@ -59,6 +59,25 @@ def _safe_fill_value(target: str, value: Any, *, was_secret: bool = False) -> st
     return mask_sensitive_string(str(value if value is not None else ""))[:500]
 
 
+
+def verification_verdict(verification: Mapping[str, Any]) -> Optional[bool]:
+    """Pass/fail of a phase verification payload, or None while it is pending.
+
+    ``build_phase_verification`` reports its verdict as ``status``
+    ("pass", "pass_with_warnings", "failed") and has no ``pass`` key, so the
+    Control Center showed "Pending" for a phase that had passed and handed off.
+    """
+    if isinstance(verification.get("pass"), bool):
+        return bool(verification.get("pass"))
+    status = str(verification.get("status") or verification.get("verdict") or "").strip().lower()
+    if status in {"pass", "passed", "pass_with_warnings", "exact_pass", "complete", "completed"}:
+        return True
+    if status in {"fail", "failed", "blocked", "error"}:
+        return False
+    if verification.get("exact_completion_checkpoint_pass") is True:
+        return True
+    return None
+
 class MissionTraceLedger:
     SCHEMA = "hip.mission-trace.v1"
 
@@ -424,7 +443,7 @@ class MissionTraceLedger:
             effective_verification.setdefault("exact_completion_checkpoint_pass", bool(checkpoint.get("pass")))
         if effective_verification:
             step["verification"] = mask_sensitive_data({
-                "pass": effective_verification.get("pass"),
+                "pass": verification_verdict(effective_verification),
                 "status": effective_verification.get("status") or effective_verification.get("verdict") or "",
                 "exact_completion_checkpoint_pass": effective_verification.get("exact_completion_checkpoint_pass"),
                 "issues": (effective_verification.get("issues") or effective_verification.get("reasons") or [])[:20] if isinstance((effective_verification.get("issues") or effective_verification.get("reasons") or []), list) else [],

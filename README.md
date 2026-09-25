@@ -1,3 +1,13 @@
+## V243R16 — Document Type is no longer cancelled mid-form; finished phases show their verdict (2026-09-25)
+
+- **Document Type no longer stops at Document Identifier with "HIP_PHASE_NO_PROGRESS_WATCHDOG".**
+  - The watchdog now sees the agent's field-by-field progress, not only new screen states, so a slow dropdown or retry no longer cancels a fill that is still advancing.
+  - A field that stays stuck is left to the repair pass while the rest of the form is filled.
+  - A genuinely frozen phase is still stopped.
+- **A finished phase shows its result.** Data Map read "Pending • judge pass" after a successful handoff; it now shows "Exact pass • judge pass", or "Pass (warnings)" when there were non-fatal warnings.
+
+See `V243R16_WATCHDOG_AND_VERIFICATION_FIX_20260925.md`. Apply with `APPLY_V243R16_IN_PLACE.ps1`; it includes R13, R14 and R15.
+
 ## V243R15 — Every phase fills its whole form, and the task box uses the learned phase knowledge (2026-09-24)
 
 - **All phases are proven on full-length golden replicas**, both directly and through the real browser-session broker. Every one completes on the first cycle:

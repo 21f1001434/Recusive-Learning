@@ -3022,6 +3022,8 @@ class BrowserSession:
             "successful_fill_count": successful_fills,
             "successful_click_count": successful_clicks,
             "dom_transition_count": len(self.dom_transition_records),
+            # Form-executor heartbeat (field/retry token, no values).
+            "executor_progress": str(((getattr(page, "_hip_executor_progress", None) or {}).get("token")) or ""),
             "values_stored": False,
         }
 

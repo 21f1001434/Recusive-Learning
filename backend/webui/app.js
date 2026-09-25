@@ -516,7 +516,7 @@ function renderMissionTrace(payload) {
         <div><b>Activity</b><span>${esc(step.current_activity||"Waiting")}</span></div>
         <div><b>Attempt</b><span>${esc(step.attempt||0)}</span></div>
         <div><b>Observed / Filled / Clicked</b><span>${seen.length} / ${fills.length} / ${clicks.length}</span></div>
-        <div><b>Verification</b><span>${verify.pass===true?"Exact pass":verify.pass===false?"Failed":"Pending"}${judge.pass===true?" • judge pass":judge.pass===false?" • judge fail":""}${judge.multi_model_consensus_used?` • panel ${judge.multi_model_pass_votes||0}/${(judge.multi_model_pass_votes||0)+(judge.multi_model_fail_votes||0)} pass`:''}${judge.human_review_status?` • human ${esc(judge.human_verdict||judge.human_review_status)}`:''}</span></div>
+        <div><b>Verification</b><span>${verify.pass===true?(verify.status==="pass_with_warnings"?"Pass (warnings)":"Exact pass"):verify.pass===false?"Failed":"Pending"}${judge.pass===true?" • judge pass":judge.pass===false?" • judge fail":""}${judge.multi_model_consensus_used?` • panel ${judge.multi_model_pass_votes||0}/${(judge.multi_model_pass_votes||0)+(judge.multi_model_fail_votes||0)} pass`:''}${judge.human_review_status?` • human ${esc(judge.human_verdict||judge.human_review_status)}`:''}</span></div>
         <div><b>Phase handoff</b><span>${handoff.status?`${esc(handoff.status)} → ${esc(handoff.to_step_id||"")}`:"Pending"}</span></div>
       </div>
       ${blocker?`<div class="help" style="color:#ff9dab"><strong>Blocker:</strong> ${esc(blocker)}</div>`:""}

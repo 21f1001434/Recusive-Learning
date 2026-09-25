@@ -65,6 +65,7 @@ async def run_with_progress_watchdog(
                 "successful_fill_count": int(row.get("successful_fill_count") or 0),
                 "successful_click_count": int(row.get("successful_click_count") or 0),
                 "dom_transition_count": int(row.get("dom_transition_count") or 0),
+                "executor_progress": str(row.get("executor_progress") or ""),
             }
             samples.append(clean)
             if len(samples) > 20:
@@ -76,9 +77,29 @@ async def run_with_progress_watchdog(
                 del marker_errors[:-10]
             return {}
 
+    # Executor heartbeats: each new field/retry/completion the form executor
+    # starts is progress even when the page only revisits known states (a
+    # dropdown retried, or model decisions that change nothing on screen).
+    seen_executor_tokens: set[str] = set()
+    max_fills = -1
+
+    def executor_progressed(row: Dict[str, Any]) -> bool:
+        nonlocal max_fills
+        novel = False
+        token = str(row.get("executor_progress") or "")
+        if token and token not in seen_executor_tokens:
+            seen_executor_tokens.add(token)
+            novel = True
+        fills = int(row.get("successful_fill_count") or 0)
+        if fills > max_fills:
+            novel = novel or max_fills >= 0
+            max_fills = fills
+        return novel
+
     first = await sample()
     if first.get("signature"):
         recent.append(first["signature"])
+    executor_progressed(first)
 
     try:
         while True:
@@ -94,6 +115,8 @@ async def run_with_progress_watchdog(
                 recent.append(sig)
                 if len(recent) > limit:
                     del recent[:-limit]
+            if executor_progressed(row):
+                last_novel = now
 
             no_progress_for = now - last_novel
             if no_progress_for < threshold:
@@ -119,6 +142,8 @@ async def run_with_progress_watchdog(
                 "configured_no_progress_seconds": threshold,
                 "poll_seconds": poll,
                 "recent_unique_signature_count": len(set(recent)),
+                "executor_progress_units": len(seen_executor_tokens),
+                "last_executor_progress": (samples[-1].get("executor_progress") if samples else ""),
                 "recent_samples": samples[-8:],
                 "marker_errors": marker_errors[-5:],
                 "operation_cancelled": True,

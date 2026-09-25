@@ -1,3 +1,12 @@
+# V243R16 — Document Type is no longer cancelled mid-form; finished phases show their verdict (2026-09-25)
+
+- Fixed `HIP_PHASE_NO_PROGRESS_WATCHDOG` cancelling Source Document Type at Document Identifier. The watchdog counted only new DOM states as progress; retrying a DDS dropdown revisits known states, and model decisions change nothing on screen.
+  - Both form executors now publish a heartbeat for each field attempt (`publish_executor_progress`), carried by the progress marker. The watchdog counts a new heartbeat or a new successful fill as progress.
+  - A field that does not commit within `node_time_budget_ms` (75 s) is left to the repair pass.
+  - A real stall (no new work) still trips the watchdog.
+- Fixed a completed phase showing "Pending • judge pass". The verification payload reports `status`, not `pass`; `mission_trace.verification_verdict` now reads it. The UI shows "Exact pass" or "Pass (warnings)".
+- Added `tests/test_v243r16_watchdog_and_verification.py` (including the Document Type replica under the real watchdog with slow model decisions) and `APPLY_V243R16_IN_PLACE.ps1` / `VERIFY_V243R16_INSTALL.ps1`.
+
 # V243R15 — Every phase fills its whole form; the task box uses the learned phase knowledge (2026-09-24)
 
 - Added full-length replicas of every golden create form built from DDS behaviour (`tests/fixtures/hip_dds_kit.js`): Data Map, Rule, Transport Profile, and the BizFlow wizard with its process-step accordion and routing drawer. They run through the real autonomous goal, both directly and through the `BrowserSession` broker.

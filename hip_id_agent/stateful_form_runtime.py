@@ -1655,6 +1655,40 @@ async def _wait_for_control(page: Page, node: Dict[str, Any], *, graph: Optional
     return None, last
 
 
+def _begin_executor_run(page: Any) -> None:
+    try:
+        setattr(page, "_hip_executor_run_seq", int(getattr(page, "_hip_executor_run_seq", 0) or 0) + 1)
+    except Exception:
+        pass
+
+
+def publish_executor_progress(page: Any, *, phase: str, node: Dict[str, Any], stage: str, retry: int = 0) -> None:
+    """Heartbeat for the phase no-progress watchdog.
+
+    The watchdog counts only new DOM states as progress.  Retrying one DDS
+    dropdown (open, wait for options, close) revisits states it has already seen,
+    and the model decisions around each action change nothing on screen, so a
+    slow but advancing fill was cancelled mid-form.  Each new unit of executor
+    work (a field, a retry, a completion) now publishes a new token; the number
+    of such units is bounded by nodes x retries x cycles.
+    """
+    try:
+        run = int(getattr(page, "_hip_executor_run_seq", 0) or 0)
+        seq = int(getattr(page, "_hip_executor_progress_seq", 0) or 0) + 1
+        setattr(page, "_hip_executor_progress_seq", seq)
+        setattr(page, "_hip_executor_progress", {
+            "token": f"{run}|{node.get('node_id')}|{stage}|{retry}",
+            "seq": seq, "phase": phase, "field": node.get("field_key"),
+            "row_index": node.get("row_index"), "stage": stage, "retry": retry,
+        })
+    except Exception:
+        pass
+
+
+def _node_time_budget_seconds(profile: Dict[str, Any]) -> float:
+    return max(5.0, float(profile.get("node_time_budget_ms", 75000) or 75000) / 1000.0)
+
+
 async def execute_document_type_state_graph(
     page: Page,
     graph: Dict[str, Any],
@@ -1680,6 +1714,7 @@ async def execute_document_type_state_graph(
     observed_edges: List[Dict[str, Any]] = []
     node_status: Dict[str, bool] = {}
     ordering_predecessor_failures: Dict[str, List[str]] = {}
+    _begin_executor_run(page)
     root = await get_active_form_root(page, phase)
     controls_before = await capture_document_type_controls(page)
     controls_before, initial_row_binding = _apply_repeatable_row_bindings(controls_before, graph)
@@ -1701,6 +1736,7 @@ async def execute_document_type_state_graph(
     for order, node in enumerate(graph.get("nodes", []) if isinstance(graph.get("nodes"), list) else [], start=1):
         if not isinstance(node, dict):
             continue
+        publish_executor_progress(page, phase=phase, node=node, stage="start")
         expected = node.get("expected_value")
         if expected is None or expected == "" or expected == []:
             node_status[str(node.get("node_id"))] = True
@@ -1858,7 +1894,13 @@ async def execute_document_type_state_graph(
             "action_model_plan": action_model_plan,
         }
         dom_cursor = await _mark_dom_transition_cursor(page)
+        node_started = asyncio.get_running_loop().time()
         for retry in range(max_retries + 1):
+            if retry and asyncio.get_running_loop().time() - node_started > _node_time_budget_seconds(interaction_profile):
+                # Leave this field to the repair pass instead of holding the form.
+                last_error = "HIP_NODE_TIME_BUDGET_EXCEEDED: field did not commit within its time budget; the repair pass retries it"
+                break
+            publish_executor_progress(page, phase=phase, node=node, stage="attempt", retry=retry)
             try:
                 action = _effective_action(node, actual_control)
                 if action != str(node.get("action") or ""):
@@ -2032,6 +2074,7 @@ async def execute_document_type_state_graph(
             "transaction_proof": transaction_proof,
         }))
         node_status[str(node.get("node_id"))] = success
+        publish_executor_progress(page, phase=phase, node=node, stage="done" if success else "failed")
         if success:
             completed_node_ids.append(str(node.get("node_id")))
 
@@ -2928,6 +2971,7 @@ async def execute_phase_state_graph(
     }
     ordering_predecessor_failures: Dict[str, List[str]] = {}
     completed_node_ids: List[str] = []
+    _begin_executor_run(page)
     initial_controls = await capture_stateful_controls(page, phase)
     initial_controls, initial_row_binding = _apply_repeatable_row_bindings(initial_controls, graph)
     # Never bind a create-state graph against the listing/search surface. A reload
@@ -3061,6 +3105,7 @@ async def execute_phase_state_graph(
             current_controls = initial_controls
 
     for order, node in enumerate(selected_nodes, start=1):
+        publish_executor_progress(page, phase=phase, node=node, stage="start")
         expected = node.get("expected_value")
         node_id = str(node.get("node_id") or "")
         if expected is None or expected == "" or expected == []:
@@ -3229,7 +3274,12 @@ async def execute_phase_state_graph(
                 "different value than input.json; correct input.json or the portal object"
             )
         elif repair and control is not None and str(node.get("action")) != "upload_file":
+            node_started = asyncio.get_running_loop().time()
             for retry in range(max_retries + 1):
+                if retry and asyncio.get_running_loop().time() - node_started > _node_time_budget_seconds(interaction_profile):
+                    reason = "HIP_NODE_TIME_BUDGET_EXCEEDED: field did not commit within its time budget; the repair pass retries it"
+                    break
+                publish_executor_progress(page, phase=phase, node=node, stage="attempt", retry=retry)
                 root = await get_active_form_root(page, phase)
                 selector = str(control.get("selector") or "")
                 try:
@@ -3425,6 +3475,7 @@ async def execute_phase_state_graph(
             action_plan=action_model_plan, outcome=attempts[-1], controls_after=after, surface_gate=surface_gate
         )
         node_status[node_id] = success
+        publish_executor_progress(page, phase=phase, node=node, stage="done" if success else "failed")
         if success:
             completed_node_ids.append(node_id)
 
