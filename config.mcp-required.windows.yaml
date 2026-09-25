@@ -339,6 +339,24 @@ autonomous_form:
   transition_plan_requires_live_reproof: true
   mutation_governance_always_required: true
 
+# V243R19: what the agent learns about a form (per operation and per branch of
+# choice values) is saved only after a deterministic replay has proved it.
+# Certified skills then replay without model calls; anything new (a field, a
+# branch, an option, a changed control) sends the run back to learning.
+portal_skills:
+  enabled: true
+  deterministic_replay: true
+  save_learning_only_when_certified: true
+  in_run_replay_proof: true
+  replay_binding_identity_check: true
+# V243R19: input.json "operations" (create / edit / clone / merge / deploy ...).
+# A commit also needs --allow-portal-mutation, HIP_ALLOW_PORTAL_MUTATION=YES and
+# the phrase "ALLOW HIP MUTATION".
+portal_operations:
+  enabled: true
+  commit_requires_certified_skill: true
+  verify_after_commit: true
+  commit_effect_timeout_seconds: 20
 runtime_self_heal:
   enabled: true
   max_phase_attempts: 5

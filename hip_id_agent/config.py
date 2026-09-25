@@ -1105,6 +1105,29 @@ class LiveRuntimeCertificationConfig(BaseModel):
 
 
 
+class PortalSkillsConfig(BaseModel):
+    # V243R19: what the agent learns about a form (per operation and branch) is
+    # saved only after a deterministic replay has proved it; certified skills
+    # are then replayed fast, and anything new sends the run back to learning.
+    enabled: bool = True
+    deterministic_replay: bool = True
+    save_learning_only_when_certified: bool = True
+    # Prove a new skill in the same run when the caller can reopen the form
+    # (the operation runner can); otherwise the next run's replay proves it.
+    in_run_replay_proof: bool = True
+    replay_binding_identity_check: bool = True
+
+
+class PortalOperationsConfig(BaseModel):
+    # V243R19: create / edit / clone / merge / deploy ... from input.json.
+    enabled: bool = True
+    # A commit (Save/Deploy/Merge...) also needs the three-part mutation gate:
+    # --allow-portal-mutation, HIP_ALLOW_PORTAL_MUTATION=YES and the phrase.
+    commit_requires_certified_skill: bool = True
+    verify_after_commit: bool = True
+    commit_effect_timeout_seconds: float = 20.0
+
+
 class AppConfig(BaseModel):
     portal: PortalConfig = Field(default_factory=PortalConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
@@ -1115,6 +1138,8 @@ class AppConfig(BaseModel):
     portal_learning: PortalLearningConfig = Field(default_factory=PortalLearningConfig)
     autonomous_form: AutonomousFormConfig = Field(default_factory=AutonomousFormConfig)
     runtime_self_heal: RuntimeSelfHealConfig = Field(default_factory=RuntimeSelfHealConfig)
+    portal_skills: PortalSkillsConfig = Field(default_factory=PortalSkillsConfig)
+    portal_operations: PortalOperationsConfig = Field(default_factory=PortalOperationsConfig)
     api: APIConfig = Field(default_factory=APIConfig)
     aia: AIAConfig = Field(default_factory=AIAConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)

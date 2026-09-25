@@ -567,6 +567,14 @@ class FutureTaskRequest(BaseModel):
     force_repeat_mutation: bool = False
 
 
+class OperationsRequest(BaseModel):
+    input_json: str = "./input.json"
+    config: str = "config.yaml"
+    runs_dir: str = "./runs"
+    allow_portal_mutation: bool = False
+    confirmation: str = ""
+
+
 class ProductionE2ERequest(BaseModel):
     task: str = ""
     config: str = "config.yaml"
@@ -1443,6 +1451,31 @@ def universal_portal_task_run(req: FutureTaskRequest) -> Dict[str, Any]:
     if req.confirmation:
         command.extend(["--confirmation", req.confirmation])
     return _start_cli(command, runs_dir=req.runs_dir)
+
+
+@app.post("/api/operations/run")
+def portal_operations_run(req: OperationsRequest) -> Dict[str, Any]:
+    """V243R19: run input.json ``operations`` (create/edit/clone/merge/deploy) with certified skills."""
+    command = [
+        sys.executable, "-u", "-m", "hip_id_agent.cli", "run-operations", req.input_json,
+        "--config", req.config, "--runs-dir", req.runs_dir,
+    ]
+    if req.allow_portal_mutation:
+        command.append("--allow-portal-mutation")
+    if req.confirmation:
+        command.extend(["--confirmation", req.confirmation])
+    return _start_cli(command, runs_dir=req.runs_dir)
+
+
+@app.get("/api/portal-skills")
+def portal_skills_status(config: str = "config.yaml") -> Dict[str, Any]:
+    """V243R19: certified / candidate / stale skills per phase (value-free)."""
+    from hip_id_agent.portal_skills import PortalSkillStore
+
+    cfg = _cfg(config)
+    store = PortalSkillStore(Path(cfg.reporting.memory_dir))
+    phases = sorted(p.stem for p in store.root.glob("*.json")) if store.root.exists() else []
+    return {"phases": [store.summary(p) for p in phases], "values_stored": False}
 
 
 @app.post("/api/certified-task/plan")

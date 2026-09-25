@@ -1,3 +1,35 @@
+## V243R19 — Learning is saved only once a replay proves it; edit / clone / merge / deploy from input.json; certified forms replay fast (2026-09-25)
+
+- **Nothing learned is saved until it is proven.** A learning run fills every input.json value and reads each one back exactly, but what it learned is only a *candidate*. It becomes a saved skill (`data\hip_memory\portal_skills`) only after a **deterministic replay** on a fresh form fills the same values again:
+  - learned bindings only;
+  - no model calls;
+  - the same controls;
+  - exact read-back.
+- **Operations from input.json.** An `operations` list (create, edit, clone, merge, deploy, migrate…) is run with `python -m hip_id_agent.cli run-operations input.json` (backend: `POST /api/operations/run`). For each operation the agent:
+  - opens the listing, finds the object and clicks its action (directly or from "More actions");
+  - fills the form or dialog from the operation's `values`;
+  - saves only with `commit: true`, a certified skill and the mutation gate;
+  - verifies the result in the listing.
+- **Fast deterministic replay.** A certified skill skips website understanding, the planner, the vision checks, and the per-field model decision and MCP/vision re-proof. One pass and one read-back replace the second pass.
+- **Re-learns when something is new**, then re-certifies before saving:
+  - a new input field;
+  - a new branch, i.e. a value that opens its own section (AS2 settings, PROD approval);
+  - a revealed field;
+  - a missing option;
+  - a field that now binds to another control.
+
+  Which choice fields change the form is learned from the form shapes.
+- **Live bugs fixed:**
+  - a dropdown value such as "Delete" or "Update" was blocked as if it were a button;
+  - "None" could never be selected;
+  - Edit/Clone Transport Profile forms failed the surface check;
+  - label-clicked and button-style radios lost their first pass;
+  - a row action could open a similarly named row;
+  - Save on an Edit route was refused;
+  - after one commit, every later commit in the session was refused.
+
+See `V243R19_CERTIFIED_SKILLS_OPERATIONS_FAST_REPLAY_20260925.md`. Apply with `APPLY_V243R19_IN_PLACE.ps1`; it includes R13–R18.
+
 ## V243R18 — A stuck portal spinner is fixed automatically: refresh, then close and reopen the browser (2026-09-25)
 
 - **When the Dell portal's loading spinner does not go away**, the agent waits the allowed loading time (`portal.loading_watchdog_timeout_seconds`, 5 minutes by default), then **refreshes the page** and refills the form from input.json.

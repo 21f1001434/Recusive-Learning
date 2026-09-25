@@ -1,0 +1,91 @@
+{
+  "_comment": "V243R19 example: operations run by `python -m hip_id_agent.cli run-operations examples/operations_example_input.json`. Values default to objects.<phase>; commit=true also needs --allow-portal-mutation, HIP_ALLOW_PORTAL_MUTATION=YES and --confirmation \"ALLOW HIP MUTATION\".",
+  "objects": {
+    "source_transport_profile": {
+      "system_type": "Dell Application",
+      "partner_name": "AIC - DCE",
+      "profile_name": "SFTP_U-HAUL_ASN_PC_SRC_IB",
+      "profile_usage": "Sender",
+      "deployment_group": "da-sender-sftphaft-dce-shared",
+      "interface_type": "SFTP HAFT",
+      "interface_environment": "UAT",
+      "existing_account": "Yes",
+      "existing_account_name": "haftatap10251108",
+      "use_existing_folder": "No",
+      "post_transfer_action": "Move to Archive",
+      "is_compression_required": "FALSE",
+      "document_type": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+      "subscription_folder": "/SFTP_U-HAUL_ASN_PC_SRC_IB",
+      "file_filtering_pattern": ".*\\*."
+    }
+  },
+  "operations": [
+    {
+      "phase": "source_transport_profile",
+      "operation": "edit",
+      "target": "SFTP_U-HAUL_ASN_PC_SRC_IB",
+      "values": {
+        "system_type": "Dell Application",
+        "partner_name": "AIC - DCE",
+        "profile_name": "SFTP_U-HAUL_ASN_PC_SRC_IB",
+        "profile_usage": "Sender",
+        "deployment_group": "da-sender-sftphaft-dce-shared",
+        "interface_type": "SFTP HAFT",
+        "interface_environment": "UAT",
+        "existing_account": "Yes",
+        "existing_account_name": "haftatap10251108",
+        "use_existing_folder": "No",
+        "post_transfer_action": "Delete",
+        "is_compression_required": "FALSE",
+        "document_type": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+        "subscription_folder": "/SFTP_U-HAUL_ASN_PC_SRC_IB",
+        "file_filtering_pattern": ".*\\*."
+      },
+      "commit": false
+    },
+    {
+      "phase": "source_transport_profile",
+      "operation": "clone",
+      "target": "SFTP_U-HAUL_ASN_PC_SRC_IB",
+      "values": {
+        "system_type": "Dell Application",
+        "partner_name": "AIC - DCE",
+        "profile_name": "SFTP_U-HAUL_ASN_PC_SRC_IB_COPY",
+        "profile_usage": "Sender",
+        "deployment_group": "da-sender-sftphaft-dce-shared",
+        "interface_type": "SFTP HAFT",
+        "interface_environment": "UAT",
+        "existing_account": "Yes",
+        "existing_account_name": "haftatap10251108",
+        "use_existing_folder": "No",
+        "post_transfer_action": "Move to Archive",
+        "is_compression_required": "FALSE",
+        "document_type": "XML_DellAutoASN_10_U-HAUL_ANS_IB(1.0)",
+        "subscription_folder": "/SFTP_U-HAUL_ASN_PC_SRC_IB",
+        "file_filtering_pattern": ".*\\*."
+      },
+      "commit": false
+    },
+    {
+      "phase": "source_transport_profile",
+      "operation": "deploy",
+      "target": "SFTP_U-HAUL_ASN_PC_SRC_IB",
+      "values": {
+        "target_environment": "UAT"
+      },
+      "commit": false,
+      "expect": [
+        "Deployed"
+      ]
+    },
+    {
+      "phase": "source_transport_profile",
+      "operation": "merge",
+      "target": "SFTP_U-HAUL_ASN_PC_SRC_IB_COPY",
+      "values": {
+        "merge_into": "SFTP_U-HAUL_ASN_PC_SRC_IB"
+      },
+      "commit": false
+    }
+  ]
+}

@@ -69,6 +69,8 @@
             input.focus();
           } else {
             committed = text;
+            // DDS re-renders the selection state of every option on commit.
+            list.querySelectorAll('[role=option]').forEach((o) => o.setAttribute('aria-selected', o === btn ? 'true' : 'false'));
             dd.__close();
             input.value = text;
           }
@@ -295,7 +297,7 @@
     input[type=text], textarea { width: 280px; height: 34px; box-sizing: border-box; }
     textarea { height: 54px; }
     dds-dropdown { display: block; position: relative; width: 280px; }
-    .dds__dropdown__popup { position: absolute; left: 0; right: 0; top: 100%; background: #fff; border: 1px solid #777; z-index: 50; max-height: 300px; overflow: auto; animation: dds-pop 140ms ease-out; }
+    .dds__dropdown__popup { position: absolute; left: 0; right: 0; top: 100%; background: #fff; border: 1px solid #777; z-index: 950; max-height: 300px; overflow: auto; animation: dds-pop 140ms ease-out; }
     @keyframes dds-pop { from { opacity: .2; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
     .dds__dropdown__popup--hidden { display: none; }
     .dds__dropdown__list { list-style: none; margin: 0; padding: 0; }

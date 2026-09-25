@@ -185,8 +185,10 @@ async def assert_active_surface(page: Page, phase: str) -> Dict[str, Any]:
         if not ((creation_intent and marker_count >= 1) or marker_count >= 2):
             fatal.append("Data Map active form root is not a proven in-page map creation/edit surface.")
     elif phase in {"source_transport_profile", "target_transport_profile", "transport_profile"}:
-        if "create transport profile" not in text or not any(x in text for x in ["interface type", "sftp haft", "existing account", "document type supported"]):
-            fatal.append("Transport Profile active form root is not the expanded Create Transport Profile wizard.")
+        # V243R19: Edit / Clone / Update open the same wizard under another title.
+        titled = any(f"{verb} transport profile" in text for verb in ("create", "edit", "clone", "update", "copy"))
+        if not titled or not any(x in text for x in ["interface type", "sftp haft", "existing account", "document type supported"]):
+            fatal.append("Transport Profile active form root is not the expanded Create/Edit Transport Profile wizard.")
     elif phase == "biz_flow":
         if "b2b-flow-pubsub-template" in text and not any(x in text for x in ["flow details", "configure source", "configure target", "configure routing"]):
             fatal.append("BizFlow active surface is still the template picker, not the wizard.")
@@ -811,9 +813,12 @@ async def _read_control_value(locator: Locator) -> str:
 
 def _value_matches_variants(current: Any, variants: List[str]) -> bool:
     key = _option_semantic_key(current)
-    if not key or key in {"select", "select...", "choose", "select one", "none"}:
+    wanted = [_option_semantic_key(v) for v in variants if _option_semantic_key(v)]
+    # "None" is a placeholder unless it is exactly the option asked for (a Post
+    # Transfer Action of "None" is a real value).
+    if not key or (key in {"select", "select...", "choose", "select one", "none"} and key not in wanted):
         return False
-    return any(key == _option_semantic_key(v) for v in variants if _option_semantic_key(v))
+    return key in wanted
 
 
 async def _dds_single_select_snapshot(page: Page, selector: str) -> Dict[str, Any]:
@@ -975,6 +980,20 @@ async def _click_owned_single_option(page: Page, snapshot: Dict[str, Any], optio
     option_selector = _single_option_selector(snapshot, option)
     if not option_selector:
         return False
+    # V243R19: bring the option into view and let the popup's open animation
+    # finish, so the first click is not rejected as intercepted and retried.
+    try:
+        target = page.locator(option_selector).first
+        await target.scroll_into_view_if_needed(timeout=1500)
+        previous = None
+        for _ in range(8):
+            box = await target.bounding_box()
+            if box and previous and all(abs(box[k] - previous[k]) < 0.75 for k in ("x", "y", "width", "height")):
+                break
+            previous = box
+            await page.wait_for_timeout(60)
+    except Exception:
+        pass
     return await _broker_click(page, option_selector, label=f"HIP Portal DDS option {option.get('text') or ''}", phase=phase, mutation_risk=False)
 
 
@@ -1533,11 +1552,22 @@ async def _click_choice(page: Page, selector: str, *, label: str, phase: str = "
         except Exception:
             return None
 
+    def credit_input(clicked: str) -> None:
+        # V243R19: a click on the input's own label is the input's transaction;
+        # record it under the input selector so its value has broker provenance.
+        last = read_last_control_execution(page)
+        if clicked != selector and last.get("success") and str(last.get("selector") or "") == clicked:
+            _remember_broker_execution(
+                page, action=str(last.get("action") or "click"), selector=selector, label=str(last.get("label") or label),
+                success=True, executor=str(last.get("executor") or ""), value_present=bool(last.get("value_present")),
+            )
+
     proxy = await _choice_label_target(page, selector)
     proxy_label = str(proxy.get("label") or "")
     first = proxy_label if proxy.get("tiny") and proxy_label else selector
     before = await state()
     if await _broker_click(page, first, label=label, phase=phase, mutation_risk=False):
+        credit_input(first)
         return True
     alternate = proxy_label if first == selector else selector
     if not alternate or alternate == first:
@@ -1547,7 +1577,10 @@ async def _click_choice(page: Page, selector: str, *, label: str, phase: str = "
     await page.wait_for_timeout(120)
     if before is not None and await state() != before:
         return True
-    return await _broker_click(page, alternate, label=label, phase=phase, mutation_risk=False)
+    if await _broker_click(page, alternate, label=label, phase=phase, mutation_risk=False):
+        credit_input(alternate)
+        return True
+    return False
 
 
 async def set_checkbox_value(page: Page, selector: str, desired: bool, *, label: str = "", phase: str = "") -> bool:
@@ -1861,7 +1894,7 @@ async def select_radio_option(page: Page, selector: str, value: str, *, phase: s
   const options=group.map(r=>{const lab=r.id?document.querySelector(`label[for="${CSS.escape(r.id)}"]`):r.closest('label');const own=r.tagName!=='INPUT'?(r.innerText||r.textContent):'';return {selector:css(r),label:clean((lab&&(lab.innerText||lab.textContent))||r.getAttribute('aria-label')||own||''),value:clean(r.value||r.getAttribute('data-value')||'')};});
   let pick=options.find(o=>o.label===want)||options.find(o=>o.value===want);
   if(!pick&&intent!==null)pick=options.find(o=>(intent?trueWords:falseWords).includes(o.label))||options.find(o=>(intent?trueWords:falseWords).includes(o.value));
-  return pick?{status:'found',selector:pick.selector,label:pick.label,options:options.map(o=>o.label)}:{status:'no_option',options:options.map(o=>o.label)};
+  return pick?{status:'found',selector:pick.selector,label:pick.label,options:options.map(o=>o.label),selectors:options.map(o=>o.selector).slice(0,16)}:{status:'no_option',options:options.map(o=>o.label)};
 }
 """, {"selector": selector, "value": target, "trueWords": sorted(_RADIO_TRUE), "falseWords": sorted(_RADIO_FALSE)})
     except Exception:
@@ -1881,6 +1914,16 @@ async def select_radio_option(page: Page, selector: str, value: str, *, phase: s
         await _autowebglm_primary_gate(page, action="click", selector=option, label=f"HIP Portal radio {target}", value=target)
         if not await _click_choice(page, option, label=f"HIP Portal radio {target}", phase=phase):
             return False
+        # V243R19: choosing one option is the whole group's transaction; the
+        # executor may look the provenance up under another option of the group.
+        last = read_last_control_execution(page)
+        if last.get("success"):
+            for member in [selector, *(found.get("selectors") or [])]:
+                if member and member != str(last.get("selector") or ""):
+                    _remember_broker_execution(
+                        page, action=str(last.get("action") or "click"), selector=str(member), label=str(last.get("label") or target),
+                        success=True, executor=str(last.get("executor") or ""), value_present=bool(last.get("value_present")),
+                    )
         await page.wait_for_timeout(180)
     try:
         return bool(await page.locator(option).first.evaluate("el => !!el.checked || el.getAttribute('aria-checked')==='true'"))

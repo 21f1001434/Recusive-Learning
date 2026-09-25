@@ -20,7 +20,17 @@ from phase_replica_support import dom_checked, dom_values, run_variant_replica
 def test_second_run_starts_from_the_learned_form_structure(tmp_path: Path):
     first, _ = run_variant_replica(tmp_path, "data_map", broker=True)
     assert first["pass"] is True, first.get("failure_summary")
-    learned = first["form_structure_memory"]["learned"]
+    # V243R19: what the first run learned is only a candidate until a
+    # deterministic replay proves it; nothing is saved as knowledge yet.
+    assert first["skill"]["outcome"]["status"] == "candidate"
+    assert "learned" not in first["form_structure_memory"]
+    assert not (tmp_path / "hip_memory" / "form_structure_memory" / "data_map.json").exists()
+
+    second, dom = run_variant_replica(tmp_path, "data_map", broker=True)
+    assert second["pass"] is True, second.get("failure_summary")
+    assert second["execution_mode"] == "deterministic_replay"
+    assert second["skill"]["outcome"]["status"] == "certified"
+    learned = second["form_structure_memory"]["learned"]
     assert learned["learned_fields"] >= 4 and learned["learned_sections"] == 1 and learned["learned_rows"] == 1
     memory = json.loads(Path(learned["file"]).read_text(encoding="utf-8"))
     assert memory["fields"]["advanced_options.notify_on"]["options"] == ["Success", "Failure", "Warning"]
@@ -33,8 +43,6 @@ def test_second_run_starts_from_the_learned_form_structure(tmp_path: Path):
         assert value not in text
     assert memory["fields"]["advanced_options.map_engine"]["options"] == ["Contivo", "XSLT"]
 
-    second, dom = run_variant_replica(tmp_path, "data_map", broker=True)
-    assert second["pass"] is True, second.get("failure_summary")
     used = second["form_structure_memory"]
     assert len(used["seeded_nodes"]) >= 6
     assert [e["title"] for e in used["reveal"]["expanded"]] == ["Advanced Options"]

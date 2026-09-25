@@ -208,6 +208,8 @@ def _flatten_phase_input_leaves(input_data: Dict[str, Any], phase: str) -> List[
     def walk(value: Any, path: str) -> None:
         if isinstance(value, dict):
             for key, child in value.items():
+                if str(key).startswith("_"):
+                    continue  # metadata such as _operation / _target, not a form field
                 walk(child, f"{path}.{key}")
             return
         if isinstance(value, list):
@@ -969,8 +971,17 @@ async def execute_autonomous_phase_goal(
     strict_live_execution: bool = True,
     section: Optional[str] = None,
     executor: Optional[Callable[..., Awaitable[Dict[str, Any]]]] = None,
+    reopen: Optional[Callable[[], Awaitable[Any]]] = None,
+    skill_mode: str = "auto",
+    skill_override: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Autonomously achieve one HIP form goal with bounded adaptive cycles.
+
+    V243R19: a certified skill for this phase, operation and branch is replayed
+    deterministically first (no model calls, no exploration).  Anything new
+    sends the run back to adaptive learning, and what a learning run found is
+    saved only after a deterministic replay proves it: in this run when
+    ``reopen`` can open a fresh form, otherwise on the next run.
 
     The routine has no phase-specific selector/coordinate list.  It uses the
     canonical input graph as the goal and the *current* form as the truth.
@@ -1022,7 +1033,61 @@ async def execute_autonomous_phase_goal(
     except Exception as exc:
         memory_audit = {"enabled": False, "error": mask_sensitive_string(str(exc))[:500]}
 
+    # V243R19: certified skills -- deterministic replay first, re-learn on novelty.
+    from .portal_skills import SkillSession, surface_of
+    run_started = asyncio.get_running_loop().time()
+    scoped_input_leaves = [
+        leaf for leaf in _flatten_phase_input_leaves(input_data, phase)
+        if not section
+        or not _path_section_hint(phase, str(leaf.get("input_path") or ""))
+        or _section_matches_local(section, _path_section_hint(phase, str(leaf.get("input_path") or "")))
+    ]
+    try:
+        skills = SkillSession.begin(
+            config=config, page=page, phase=phase, section=section, graph=graph, leaves=scoped_input_leaves,
+            input_data=input_data, mode=skill_mode, override=skill_override,
+        )
+    except Exception as exc:  # the skill layer must never stop a fill
+        skills = SkillSession()
+        skills.reason = f"skill_layer_error: {mask_sensitive_string(str(exc))[:300]}"
+    fast = skills.plan == "replay" and skills.skill is not None
+    replay_skill: Dict[str, Any] = dict(skills.skill or {}) if fast else {}
+    if fast:
+        # Replay only what the skill learned: its fields, sections and rows.
+        from .form_structure_memory import seed_fields
+        from .form_structure_healer import reveal_collapsed_sections
+        working_graph = copy.deepcopy(graph)
+        structure = replay_skill.get("structure") or {}
+        memory_audit = {
+            "enabled": True, "source": "portal_skill", "skill_id": replay_skill.get("skill_id"),
+            "seeded_nodes": seed_fields(structure.get("fields") or {}, phase, working_graph, scoped_input_leaves,
+                                        section=section, option_mapper=_choice_option_for_value),
+        }
+        learned_rows = structure.get("rows") or {}
+        titles = [str(v.get("title")) for v in (structure.get("sections") or {}).values() if v.get("title")]
+        if titles:
+            try:
+                memory_audit["reveal"] = await reveal_collapsed_sections(page, phase, wanted=titles, expand_unmatched=False)
+            except Exception as exc:
+                memory_audit["reveal_error"] = mask_sensitive_string(str(exc))[:300]
+    session_for_replay = getattr(page, "_hip_browser_session", None)
+
+    def _set_replay_flag(active: bool) -> None:
+        if session_for_replay is not None:
+            try:
+                session_for_replay.deterministic_replay_active = bool(active)
+            except Exception:
+                pass
+
     async def _execute_graph(current_graph: Dict[str, Any], prior: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+        # During a certified replay the broker skips its per-action model call.
+        _set_replay_flag(fast)
+        try:
+            return await _execute_graph_inner(current_graph, prior)
+        finally:
+            _set_replay_flag(False)
+
+    async def _execute_graph_inner(current_graph: Dict[str, Any], prior: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         if executor is None:
             return await execute_phase_state_graph(
                 page, current_graph, phase=phase, section=section,
@@ -1051,8 +1116,18 @@ async def execute_autonomous_phase_goal(
                 kwargs[key] = value
         return await executor(page, exec_graph, **kwargs)
 
-    for cycle in range(1, max_cycles + 1):
+    total_cycles = 1 if skills.replay_only else max_cycles + (1 if fast else 0)
+    replay_outcome: Dict[str, Any] = {}
+    for cycle in range(1, total_cycles + 1):
         cycle_started = asyncio.get_running_loop().time()
+        stage_seconds: Dict[str, float] = {}
+        stage_clock = [cycle_started]
+
+        def _stage(name: str) -> None:
+            now = asyncio.get_running_loop().time()
+            stage_seconds[name] = round(stage_seconds.get(name, 0.0) + now - stage_clock[0], 2)
+            stage_clock[0] = now
+
         gate = await assert_active_surface(page, phase)
         controls_before = await capture_stateful_controls(page, phase)
         # V237: reconcile the *actual* runtime input.json against the live form on
@@ -1079,18 +1154,23 @@ async def execute_autonomous_phase_goal(
                 page_text=await _visible_page_text(page),
             )
         structure_heal_log.append(structure_heal)
+        _stage("observe_and_heal")
         goal_values = _graph_goal_values(working_graph, section)
         goal_summary = ", ".join(f"{k}={v}" for k, v in goal_values.items() if "file" not in k)[:1600]
-        golden_refs, golden_advisor = _golden_runtime_context(page, phase)
+        # A deterministic replay needs none of the discovery layers below.
+        golden_refs, golden_advisor = ([], None) if fast else _golden_runtime_context(page, phase)
         shape_before = _control_fingerprint(controls_before)
-        try:
-            website_model = await understanding_engine.capture(
-                page=page, phase=phase, stage=f"autonomous_cycle_{cycle}_pre_action",
-                output_dir=(output_dir / "website_understanding" if output_dir is not None else None),
-                include_registered_listeners=False,
-            )
-        except Exception as exc:
-            website_model = {"available": False, "reason": mask_sensitive_string(str(exc))[:500]}
+        if fast and not replay_skill.get("option_inference_used"):
+            website_model = {"available": False, "reason": "deterministic replay of a certified skill"}
+        else:
+            try:
+                website_model = await understanding_engine.capture(
+                    page=page, phase=phase, stage=f"autonomous_cycle_{cycle}_pre_action",
+                    output_dir=(output_dir / "website_understanding" if output_dir is not None else None),
+                    include_registered_listeners=False,
+                )
+            except Exception as exc:
+                website_model = {"available": False, "reason": mask_sensitive_string(str(exc))[:500]}
         dynamic_option_decisions: List[Dict[str, Any]] = []
         if isinstance(website_model, dict) and website_model.get("available"):
             working_graph, dynamic_option_decisions = _apply_dynamic_option_inference(
@@ -1101,6 +1181,7 @@ async def execute_autonomous_phase_goal(
             goal_summary = ", ".join(f"{k}={v}" for k, v in goal_values.items() if "file" not in k)[:1600]
         cycle_audit: Dict[str, Any] = {
             "cycle": cycle,
+            "mode": "deterministic_replay" if fast else "adaptive_learning",
             "section": section or "",
             "surface_gate": gate,
             "website_understanding": {
@@ -1119,8 +1200,9 @@ async def execute_autonomous_phase_goal(
             "bindings_before": _binding_summary(controls_before, working_graph, section),
             "autowebglm_observation": (
                 await _observe_autowebglm(page, phase=phase, cycle=cycle, goal=goal_summary)
-                if use_autowebglm_observation else
-                {"available": False, "reason": "disabled by autonomous_form.use_autowebglm_live_observation"}
+                if use_autowebglm_observation and not fast else
+                {"available": False, "reason": "deterministic replay of a certified skill" if fast
+                 else "disabled by autonomous_form.use_autowebglm_live_observation"}
             ),
             "adaptive_hints": [],
             "file_attempts": [],
@@ -1134,7 +1216,7 @@ async def execute_autonomous_phase_goal(
         # structure guidance before filling.  It never supplies customer values;
         # those still come exclusively from input.json.  The output is advisory
         # context for Dell AIA/AutoGen semantic binding on this/next cycle.
-        if golden_refs and golden_advisor is not None and output_dir is not None and (cycle == 1 or not runtime_input_ledger.get("pass")):
+        if not fast and golden_refs and golden_advisor is not None and output_dir is not None and (cycle == 1 or not runtime_input_ledger.get("pass")):
             try:
                 pre_shot = output_dir / f"cycle_{cycle:02d}_golden_prefill.png"
                 pre_shot.parent.mkdir(parents=True, exist_ok=True)
@@ -1162,7 +1244,7 @@ async def execute_autonomous_phase_goal(
         ]
         # Use Dell AIA/AutoGen semantic planning only when deterministic live
         # bindings are insufficient. This is advisory and cannot authorize actions.
-        if unresolved_required and config is not None and use_binding_advisor:
+        if unresolved_required and config is not None and use_binding_advisor and not fast:
             try:
                 planner = LLMFormPlanner.from_env(getattr(config, "aia", None))
                 if planner is not None:
@@ -1189,6 +1271,7 @@ async def execute_autonomous_phase_goal(
             except Exception as exc:
                 cycle_audit["llm_form_plan_status"] = f"unavailable: {mask_sensitive_string(str(exc))[:500]}"
 
+        _stage("understanding_and_planning")
         non_file_nodes = [
             n for n in (working_graph.get("nodes") or [])
             if isinstance(n, dict) and str(n.get("action") or "") != "upload_file"
@@ -1210,6 +1293,7 @@ async def execute_autonomous_phase_goal(
             non_file_result = {"pass": False, "error": mask_sensitive_string(str(exc))}
             cycle_audit["non_file_execution"] = non_file_result
 
+        _stage("fill_pass")
         # Re-observe because parent selections can mount/replace file controls.
         controls_after_fields = await capture_stateful_controls(page, phase)
         # Parent commits in the pass above (a format, a Yes/No radio) reveal
@@ -1235,6 +1319,7 @@ async def execute_autonomous_phase_goal(
                     page_text=await _visible_page_text(page),
                 )
         cycle_audit["runtime_input_leaf_ledger_mid"] = runtime_input_ledger_mid
+        _stage("mid_cycle_reconcile")
         for node in working_graph.get("nodes") or []:
             if not isinstance(node, dict) or str(node.get("action") or "") != "upload_file":
                 continue
@@ -1321,14 +1406,37 @@ async def execute_autonomous_phase_goal(
             cycle_audit["file_attempts"].append(attempt)
             all_prior.append(attempt)
 
+        _stage("file_uploads")
         # Full graph is the authoritative goal check. It can repair any field
         # that changed during upload/rerender and requires exact read-back.
-        try:
-            full_result = await _execute_graph(working_graph, all_prior)
-        except Exception as exc:
-            raise_if_environment_fatal(exc)
-            full_result = {"pass": False, "error": mask_sensitive_string(str(exc)), "attempts": []}
+        full_result = None
+        if (
+            fast and bool(non_file_result.get("pass"))
+            and not runtime_input_ledger_mid.get("runtime_synthesized_node_count")
+            and not runtime_input_ledger_mid.get("unresolved_input_leaves")
+            and not any(not bool(a.get("success", a.get("filled"))) for a in cycle_audit.get("file_attempts") or [])
+        ):
+            # V243R19: a replay whose single pass proved every field needs no
+            # second pass -- one read-back of the whole form is the check.
+            try:
+                state_check = await _replay_state_holds(
+                    page, phase=phase, graph=working_graph, section=section, fill_result=non_file_result,
+                    document_type=executor is not None and "document_type" in str(phase),
+                )
+            except Exception as exc:
+                raise_if_environment_fatal(exc)
+                state_check = {"holds": False, "reason": mask_sensitive_string(str(exc))[:300]}
+            cycle_audit["replay_state_check"] = state_check
+            if state_check.get("holds"):
+                full_result = dict(non_file_result, replay_single_pass=True)
+        if full_result is None:
+            try:
+                full_result = await _execute_graph(working_graph, all_prior)
+            except Exception as exc:
+                raise_if_environment_fatal(exc)
+                full_result = {"pass": False, "error": mask_sensitive_string(str(exc)), "attempts": []}
         cycle_audit["full_goal_execution"] = full_result
+        _stage("verify_pass")
         # A field seeded from memory that no longer binds is dropped for this
         # run (the live page is rediscovered next cycle) and demoted in memory.
         failed_ids = {
@@ -1343,7 +1451,7 @@ async def execute_autonomous_phase_goal(
             stale_ids = {str(n.get("node_id")) for n in stale}
             working_graph = _clone_graph(working_graph, [n for n in working_graph.get("nodes") or [] if str(n.get("node_id")) not in stale_ids])
             cycle_audit["memory_nodes_dropped"] = sorted(stale_ids)
-            if structure_memory is not None:
+            if structure_memory is not None and not fast:
                 try:
                     structure_memory.demote(phase, sorted({path_pattern(str(n.get("input_path") or "")) for n in stale}))
                 except Exception:
@@ -1386,7 +1494,7 @@ async def execute_autonomous_phase_goal(
             or not full_result.get("pass")
             or (stage.get("input_owned_unresolved_node_ids") or [])
         )
-        if needs_visual_repair and golden_refs and golden_advisor is not None and output_dir is not None:
+        if needs_visual_repair and not fast and golden_refs and golden_advisor is not None and output_dir is not None:
             try:
                 shot = output_dir / f"cycle_{cycle:02d}_golden_compare.png"
                 shot.parent.mkdir(parents=True, exist_ok=True)
@@ -1457,6 +1565,15 @@ async def execute_autonomous_phase_goal(
             and (not strict_live_execution or stage.get("exact_execution_verified") is True)
             and (not strict_live_execution or stage.get("authoritative_execution_verified") is True)
         )
+        _stage("final_reconcile_and_judge")
+        cycle_audit["stage_seconds"] = stage_seconds
+        binding_changes: List[Dict[str, Any]] = []
+        if fast and success:
+            # Deterministic means the same controls as when the skill was learned.
+            binding_changes = skills.binding_changes(full_result.get("attempts") or [])
+            cycle_audit["replay_binding_changes"] = binding_changes
+            if binding_changes:
+                success = False
         cycle_audit["duration_seconds"] = round(asyncio.get_running_loop().time() - cycle_started, 1)
         cycle_audit["status"] = "goal_achieved" if success else "retry_required"
         unresolved_ids = set(stage.get("input_owned_unresolved_node_ids") or [])
@@ -1469,6 +1586,17 @@ async def execute_autonomous_phase_goal(
                 full_result, file_failures, uncovered_required, runtime_input_ledger_after,
                 synthesized_nodes_verified, stage, strict_live_execution,
             )
+        if fast and not success:
+            novelty = SkillSession.classify_failure(cycle_audit, full_result)
+            if binding_changes:
+                novelty = [{"kind": "binding_changed", "fields": [c["field"] for c in binding_changes][:20]}]
+            cycle_audit["replay_novelty"] = novelty
+            try:
+                skills.replay_failed(novelty, controls_after=controls_after)
+            except Exception as exc:
+                cycle_audit["replay_novelty_error"] = mask_sensitive_string(str(exc))[:300]
+            replay_outcome = {"replayed_skill_id": replay_skill.get("skill_id"), "novelty": novelty,
+                              "replay_seconds": round(asyncio.get_running_loop().time() - run_started, 2)}
         cycles.append(mask_sensitive_data(cycle_audit))
 
         if output_dir is not None:
@@ -1495,15 +1623,36 @@ async def execute_autonomous_phase_goal(
                 "final_execution": full_result,
                 "prior_attempts": all_prior,
                 "form_structure_memory": memory_audit,
+                "execution_mode": "deterministic_replay" if fast else "adaptive_learning",
             }
-            if structure_memory is not None:
-                try:
-                    memory_audit["learned"] = structure_memory.record_success(
-                        phase, graph=working_graph, final_execution=full_result, cycles=cycles,
-                        memory_reveal=memory_audit.get("reveal"),
-                    )
-                except Exception as exc:
-                    memory_audit["learn_error"] = mask_sensitive_string(str(exc))[:300]
+            elapsed = round(asyncio.get_running_loop().time() - run_started, 2)
+            skill_report: Dict[str, Any] = dict(skills.audit(), seconds=elapsed, **replay_outcome)
+            if fast:
+                surface = surface_of(controls_after)
+                skill_report.update({"surface": surface, "replay_seconds": elapsed})
+                if not skills.replay_only:
+                    try:
+                        skill_report["outcome"] = skills.record_replay(seconds=elapsed, surface=surface)
+                    except Exception as exc:
+                        skill_report["outcome"] = {"status": "error", "error": mask_sensitive_string(str(exc))[:300]}
+                    if (skill_report.get("outcome") or {}).get("form_structure_memory"):
+                        memory_audit["learned"] = skill_report["outcome"]["form_structure_memory"]
+                result["skill"] = skill_report
+            else:
+                result["skill"] = skill_report
+                learned = await _complete_learning(
+                    skills=skills, result=result, working_graph=working_graph, full_result=full_result, cycles=cycles,
+                    controls_after=controls_after, memory_audit=memory_audit, structure_memory=structure_memory,
+                    elapsed=elapsed, reopen=reopen, skill_mode=skill_mode, config=config, page=page,
+                    rerun=lambda **kw: execute_autonomous_phase_goal(
+                        page=page, graph=graph, phase=phase, input_data=input_data, config=config,
+                        prior_attempts=None, repair=repair, strict_live_execution=strict_live_execution,
+                        section=section, executor=executor, **kw,
+                    ),
+                    output_dir=output_dir, max_cycles=max_cycles,
+                )
+                if learned is not None:
+                    result = learned
             if output_dir is not None:
                 safe_write_json(output_dir / "autonomous_form_runtime.json", result)
             return mask_sensitive_data(result)
@@ -1515,6 +1664,10 @@ async def execute_autonomous_phase_goal(
             if isinstance(a, dict) and a.get("success") is True
         )
         progressed = bool(shape_after != shape_before or shape_after != last_shape or successful_now)
+        if fast:
+            # The replay did not hold; the next cycles learn the form adaptively.
+            fast = False
+            progressed = True
         if progressed:
             no_progress = 0
         else:
@@ -1548,6 +1701,8 @@ async def execute_autonomous_phase_goal(
         "fixed_coordinates_required": False,
         "cycles": cycles,
         "form_structure_memory": memory_audit,
+        "skill": dict(skills.audit(), **replay_outcome),
+        "execution_mode": "deterministic_replay" if skills.replay_only else "adaptive_learning",
         "reason": (
             "one or more nonblank input.json attributes could not be uniquely bound/verified on the live form"
             if needs_input else
@@ -1565,6 +1720,146 @@ async def execute_autonomous_phase_goal(
         output_dir.mkdir(parents=True, exist_ok=True)
         safe_write_json(output_dir / "autonomous_form_runtime.json", result)
     return mask_sensitive_data(result)
+
+
+async def _replay_state_holds(
+    page: Page, *, phase: str, graph: Dict[str, Any], section: Optional[str], fill_result: Dict[str, Any],
+    document_type: bool,
+) -> Dict[str, Any]:
+    """Read the whole form back once, without acting (V243R19 replay).
+
+    Holds only when the fill pass proved every in-scope field and each field
+    still shows exactly its input.json value now, after all later actions.
+    """
+    from .stateful_form_runtime import (
+        _apply_repeatable_row_bindings,
+        _stateful_value_equal,
+        capture_document_type_controls,
+        resolve_document_type_control_diagnostics,
+    )
+
+    nodes = [
+        n for n in (graph.get("nodes") or [])
+        if isinstance(n, dict) and str(n.get("action") or "") != "upload_file" and _section_matches_local(section, n.get("section"))
+    ]
+    proven = {
+        str(a.get("node_id")) for a in (fill_result.get("attempts") or [])
+        if isinstance(a, dict) and a.get("success") is True and a.get("exact_verified") is not False
+    }
+    unproven = [str(n.get("field_key")) for n in nodes if str(n.get("node_id")) not in proven]
+    if not nodes or unproven:
+        return {"holds": False, "reason": "fill pass did not prove every field", "fields": unproven[:20]}
+    controls = await (capture_document_type_controls(page) if document_type else capture_stateful_controls(page, phase))
+    controls, _ = _apply_repeatable_row_bindings(controls, graph)
+    resolver = resolve_document_type_control_diagnostics if document_type else resolve_stateful_control_diagnostics
+    checked = 0
+    for node in nodes:
+        if str(node.get("action") or "") == "verify_only":
+            continue
+        control = resolver(controls, node).get("control")
+        if not isinstance(control, dict) or not _stateful_value_equal(node, control):
+            return {"holds": False, "reason": "value changed after it was filled", "field": node.get("field_key")}
+        checked += 1
+    return {"holds": True, "checked": checked}
+
+
+async def _complete_learning(
+    *, skills: Any, result: Dict[str, Any], working_graph: Dict[str, Any], full_result: Dict[str, Any],
+    cycles: Sequence[Dict[str, Any]], controls_after: Sequence[Dict[str, Any]], memory_audit: Dict[str, Any],
+    structure_memory: Any, elapsed: float, reopen: Optional[Callable[[], Awaitable[Any]]], skill_mode: str,
+    config: Any, page: Any, rerun: Callable[..., Awaitable[Dict[str, Any]]], output_dir: Optional[Path], max_cycles: int,
+) -> Optional[Dict[str, Any]]:
+    """Save what a learning run found -- only once a deterministic replay proves it (V243R19).
+
+    Returns a replacement result when the form was re-filled by the proof (or
+    by a fresh adaptive run after a failed proof), else ``None``.
+    """
+    from .portal_skills import skills_setting
+
+    report = result["skill"]
+    if not skills.enabled:
+        if structure_memory is not None:
+            # Skill layer switched off: the R17 form-structure memory still learns.
+            try:
+                memory_audit["learned"] = structure_memory.record_success(
+                    skills.phase or str(result.get("phase") or ""), graph=working_graph, final_execution=full_result,
+                    cycles=cycles, memory_reveal=memory_audit.get("reveal"),
+                )
+            except Exception as exc:
+                memory_audit["learn_error"] = mask_sensitive_string(str(exc))[:300]
+        return None
+    option_inference_used = any(
+        bool(d.get("pass")) and d.get("selected_option") not in (None, "")
+        and str(d.get("selected_option")) != str(d.get("previous_expected_value"))
+        for c in cycles for d in (c.get("dynamic_option_decisions") or []) if isinstance(d, dict)
+    )
+    try:
+        candidate = skills.build_candidate(
+            graph=working_graph, final_execution=full_result, cycles=cycles, controls_after=controls_after,
+            memory_reveal=memory_audit.get("reveal"), duration_seconds=elapsed, option_inference_used=option_inference_used,
+        )
+    except Exception as exc:
+        report["outcome"] = {"status": "error", "error": mask_sensitive_string(str(exc))[:300]}
+        return None
+    if not skills.save_only_when_certified and structure_memory is not None:
+        # Pre-R19 behaviour, only when explicitly configured.
+        try:
+            memory_audit["learned"] = structure_memory.record_success(
+                skills.phase, graph=working_graph, final_execution=full_result, cycles=cycles,
+                memory_reveal=memory_audit.get("reveal"),
+            )
+        except Exception as exc:
+            memory_audit["learn_error"] = mask_sensitive_string(str(exc))[:300]
+    if skill_mode == "learn_no_save":
+        report["outcome"] = {"status": "not_saved", "reason": "the deterministic replay proof failed in this run"}
+        return None
+    if reopen is None or not bool(skills_setting(config, page, "in_run_replay_proof", True)):
+        report["outcome"] = skills.stage(candidate)
+        return None
+    # Prove it now: open a fresh form and replay only what was learned.
+    try:
+        await reopen()
+    except Exception:
+        # The next run's replay can still prove it; the error is the caller's.
+        report["outcome"] = skills.stage(candidate)
+        raise
+    proof = await rerun(
+        skill_mode="replay", skill_override=candidate, max_cycles=1, reopen=None,
+        output_dir=(output_dir / "replay_proof" if output_dir is not None else None),
+    )
+    proof_skill = proof.get("skill") if isinstance(proof.get("skill"), dict) else {}
+    if proof.get("pass"):
+        exact = sum(1 for a in ((proof.get("final_execution") or {}).get("attempts") or []) if isinstance(a, dict) and a.get("success") is True)
+        outcome = skills.certify(candidate, proof={
+            "kind": "in_run_replay", "seconds": proof_skill.get("replay_seconds"), "surface": proof_skill.get("surface") or [],
+            "exact_nodes": exact, "binding_changes": 0,
+        })
+        memory_audit["learned"] = outcome.get("form_structure_memory")
+        merged = dict(proof)
+        merged["learning_cycles"] = list(result.get("cycles") or [])
+        merged["execution_mode"] = "learned_then_certified_by_replay"
+        merged["form_structure_memory"] = memory_audit
+        merged["skill"] = dict(report, outcome=outcome, learn_seconds=elapsed,
+                               replay_seconds=proof_skill.get("replay_seconds"), proof=proof_skill)
+        return merged
+    # The replay did not reproduce what was learned: save nothing and refill.
+    try:
+        skills.log_event("in_run_proof_failed", candidate, novelty=[str(x.get("kind")) for x in proof_skill.get("novelty") or []])
+    except Exception:
+        pass
+    await reopen()
+    restored = await rerun(
+        skill_mode="learn_no_save", max_cycles=max_cycles, reopen=None,
+        output_dir=(output_dir / "after_failed_proof" if output_dir is not None else None),
+    )
+    restored_skill = dict(restored.get("skill") or {})
+    restored_skill["outcome"] = {
+        "status": "not_certified", "reason": "the deterministic replay did not reproduce the learned fill; nothing was saved",
+        "proof_novelty": proof_skill.get("novelty") or [],
+    }
+    restored_skill["learning_run"] = report
+    restored["skill"] = restored_skill
+    return restored
 
 
 def _unmet_success_checks(

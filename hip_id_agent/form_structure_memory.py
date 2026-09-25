@@ -89,16 +89,20 @@ class FormStructureMemory:
         safe_write_json(self._file(phase), _mask_strings(data), mask=False)
 
     # ------------------------------------------------------------------ learn
-    def record_success(
-        self, phase: str, *, graph: Dict[str, Any], final_execution: Dict[str, Any], cycles: Sequence[Dict[str, Any]],
+    @staticmethod
+    def extract_learning(
+        *, graph: Dict[str, Any], final_execution: Dict[str, Any], cycles: Sequence[Dict[str, Any]],
         memory_reveal: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        data = self.load(phase)
+        """What one proven run teaches (value-free), without saving it (V243R19).
+
+        ``portal_skills`` keeps this with the candidate skill and merges it into
+        memory only once a deterministic replay has certified the skill.
+        """
         proven = {
             str(a.get("node_id")) for a in (final_execution.get("attempts") or [])
             if isinstance(a, dict) and a.get("success") is True
         }
-        learned_fields = 0
         groups: Dict[str, Dict[str, Any]] = {}
         for node in graph.get("nodes") or []:
             if not isinstance(node, dict) or ".runtime_input." not in str(node.get("node_id") or ""):
@@ -127,14 +131,8 @@ class FormStructureMemory:
                 "options": list(node.get("choice_options") or [])[:12],
                 "section_aliases": list(loc.get("section_aliases") or [])[:3], "row_kind": node.get("row_kind") or "",
             }
-        for pattern, entry in groups.items():
-            old = data["fields"].get(pattern) or {}
-            entry["success_count"] = int(old.get("success_count") or 0) + 1
-            entry["failure_count"] = int(old.get("failure_count") or 0)
-            data["fields"][pattern] = entry
-            learned_fields += 1
-        learned_sections = 0
-        learned_rows = 0
+        sections: Dict[str, Dict[str, Any]] = {}
+        rows: Dict[str, Dict[str, Any]] = {}
         heals: List[Any] = [{"reveal": memory_reveal}] if memory_reveal else []
         for cycle in cycles or []:
             heals.extend([cycle.get("structure_heal"), cycle.get("structure_heal_mid")])
@@ -143,26 +141,49 @@ class FormStructureMemory:
                 continue
             for step in ((heal.get("reveal") or {}).get("expanded") or []):
                 if step.get("expanded") and step.get("matched_input") and step.get("title"):
-                    key = _norm(step["title"])
-                    old = data["sections"].get(key) or {}
-                    data["sections"][key] = {"title": step["title"], "success_count": int(old.get("success_count") or 0) + 1}
-                    learned_sections += 1
+                    sections[_norm(step["title"])] = {"title": step["title"]}
             for group in ((heal.get("rows") or {}).get("groups") or []):
                 clicks = [c for c in (group.get("clicks") or []) if c.get("clicked") and int(c.get("rows_after") or 0) > int(c.get("rows_before") or 0)]
                 if not clicks:
                     continue
                 key = str(group.get("group") or "")
                 key = key if key.startswith("kind:") else f"list:{path_pattern(key[len('list:'):])}"
-                old = data["rows"].get(key) or {}
-                data["rows"][key] = {"add_label": clicks[-1].get("label"), "success_count": int(old.get("success_count") or 0) + 1}
-                learned_rows += 1
-        summary = {"learned_fields": learned_fields, "learned_sections": learned_sections, "learned_rows": learned_rows, "file": str(self._file(phase))}
-        if not (learned_fields or learned_sections or learned_rows) and not self._file(phase).exists():
+                rows[key] = {"add_label": clicks[-1].get("label")}
+        return _mask_strings({"fields": groups, "sections": sections, "rows": rows})
+
+    def merge_learning(self, phase: str, learning: Dict[str, Any]) -> Dict[str, Any]:
+        """Add one proven run's learning to the phase memory and save it."""
+        data = self.load(phase)
+        fields = dict(learning.get("fields") or {})
+        sections = dict(learning.get("sections") or {})
+        rows = dict(learning.get("rows") or {})
+        for pattern, entry in fields.items():
+            old = data["fields"].get(pattern) or {}
+            entry = dict(entry)
+            entry["success_count"] = int(old.get("success_count") or 0) + 1
+            entry["failure_count"] = int(old.get("failure_count") or 0)
+            data["fields"][pattern] = entry
+        for key, entry in sections.items():
+            old = data["sections"].get(key) or {}
+            data["sections"][key] = {"title": entry.get("title"), "success_count": int(old.get("success_count") or 0) + 1}
+        for key, entry in rows.items():
+            old = data["rows"].get(key) or {}
+            data["rows"][key] = {"add_label": entry.get("add_label"), "success_count": int(old.get("success_count") or 0) + 1}
+        summary = {"learned_fields": len(fields), "learned_sections": len(sections), "learned_rows": len(rows), "file": str(self._file(phase))}
+        if not (fields or sections or rows) and not self._file(phase).exists():
             # A form fully covered by the phase compiler teaches nothing new.
             return dict(summary, file="")
         data["runs"] = int(data.get("runs") or 0) + 1
         self.save(phase, data)
         return summary
+
+    def record_success(
+        self, phase: str, *, graph: Dict[str, Any], final_execution: Dict[str, Any], cycles: Sequence[Dict[str, Any]],
+        memory_reveal: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return self.merge_learning(phase, self.extract_learning(
+            graph=graph, final_execution=final_execution, cycles=cycles, memory_reveal=memory_reveal,
+        ))
 
     def demote(self, phase: str, patterns: Sequence[str]) -> None:
         if not patterns:
@@ -186,57 +207,64 @@ class FormStructureMemory:
         option_mapper: Optional[Callable[[Any, Sequence[str]], Optional[str]]] = None,
     ) -> List[Dict[str, Any]]:
         """Add learned nodes for input leaves the graph does not cover yet."""
-        fields = self.load(phase)["fields"]
-        if not fields:
-            return []
-        nodes = graph.setdefault("nodes", [])
-        known_paths = {str(n.get("input_path") or "") for n in nodes if isinstance(n, dict)}
-        added: List[Dict[str, Any]] = []
-        for leaf in leaves:
-            path = str(leaf.get("input_path") or "")
-            if not path or path in known_paths:
+        return seed_fields(self.load(phase)["fields"], phase, graph, leaves, section=section, option_mapper=option_mapper)
+
+
+def seed_fields(
+    fields: Dict[str, Any], phase: str, graph: Dict[str, Any], leaves: Sequence[Dict[str, Any]], *, section: Optional[str] = None,
+    option_mapper: Optional[Callable[[Any, Sequence[str]], Optional[str]]] = None,
+) -> List[Dict[str, Any]]:
+    """Add nodes for input leaves the graph does not cover, from learned ``fields``."""
+    if not fields:
+        return []
+    nodes = graph.setdefault("nodes", [])
+    known_paths = {str(n.get("input_path") or "") for n in nodes if isinstance(n, dict)}
+    added: List[Dict[str, Any]] = []
+    for leaf in leaves:
+        path = str(leaf.get("input_path") or "")
+        if not path or path in known_paths:
+            continue
+        entry = fields.get(path_pattern(path))
+        if not entry:
+            continue
+        match = re.findall(r"\[(\d+)\]", path)
+        row_index = int(match[-1]) if match else None
+        safe_id = hashlib.sha256(path.encode("utf-8")).hexdigest()[:12]
+        base = {
+            "phase": phase, "section": section or entry.get("section") or "", "field_key": entry.get("field_key"),
+            "input_path": path, "row_kind": entry.get("row_kind") or "", "row_index": row_index,
+            "required": True, "depends_on": [], "verification": "exact_committed_control_value",
+            "executor": "form-structure-memory", "learned_from_memory": True,
+            "notes": "Seeded from value-free form structure memory; bound live and proven by exact read-back.",
+        }
+        locator = {
+            "names": list(entry.get("names") or []), "placeholders": list(entry.get("placeholders") or []),
+            "roles": list(entry.get("roles") or []),
+            "section_aliases": [x for x in [entry.get("section"), *(entry.get("section_aliases") or [])] if x],
+            "row_kind": entry.get("row_kind") or "", "row_index": row_index,
+        }
+        value = leaf.get("value")
+        if entry.get("action") == "select_checkbox_group":
+            wanted = {_norm(v) for v in (value if isinstance(value, list) else re.split(r"\s*,\s*", str(value or ""))) if _norm(v)}
+            options = [str(o) for o in entry.get("options") or []]
+            if not wanted <= {_norm(o) for o in options}:
                 continue
-            entry = fields.get(path_pattern(path))
-            if not entry:
-                continue
-            match = re.findall(r"\[(\d+)\]", path)
-            row_index = int(match[-1]) if match else None
-            safe_id = hashlib.sha256(path.encode("utf-8")).hexdigest()[:12]
-            base = {
-                "phase": phase, "section": section or entry.get("section") or "", "field_key": entry.get("field_key"),
-                "input_path": path, "row_kind": entry.get("row_kind") or "", "row_index": row_index,
-                "required": True, "depends_on": [], "verification": "exact_committed_control_value",
-                "executor": "form-structure-memory", "learned_from_memory": True,
-                "notes": "Seeded from value-free form structure memory; bound live and proven by exact read-back.",
-            }
-            locator = {
-                "names": list(entry.get("names") or []), "placeholders": list(entry.get("placeholders") or []),
-                "roles": list(entry.get("roles") or []),
-                "section_aliases": [x for x in [entry.get("section"), *(entry.get("section_aliases") or [])] if x],
-                "row_kind": entry.get("row_kind") or "", "row_index": row_index,
-            }
-            value = leaf.get("value")
-            if entry.get("action") == "select_checkbox_group":
-                wanted = {_norm(v) for v in (value if isinstance(value, list) else re.split(r"\s*,\s*", str(value or ""))) if _norm(v)}
-                options = [str(o) for o in entry.get("options") or []]
-                if not wanted <= {_norm(o) for o in options}:
-                    continue
-                for option in options:
-                    node = dict(base, node_id=f"{phase}.runtime_input.{safe_id}.{''.join(ch for ch in option.lower() if ch.isalnum())[:24]}",
-                                action="toggle", expected_value="true" if _norm(option) in wanted else "false",
-                                choice_group=entry.get("group_label") or "", choice_option=option,
-                                semantic_locator=dict(locator, labels=[option, entry.get("group_label") or ""]))
-                    nodes.append(node)
-                    added.append({"input_path": path, "node_id": node["node_id"], "action": "toggle", "option": option})
-            else:
-                expected = value
-                if entry.get("action") == "select_radio" and entry.get("options") and option_mapper is not None:
-                    # true/"Y" -> the learned option label ("Yes").
-                    expected = option_mapper(value, entry.get("options") or []) or value
-                node = dict(base, node_id=f"{phase}.runtime_input.{safe_id}", action=entry.get("action") or "fill_text",
-                            expected_value=expected, choice_group=entry.get("group_label") or "",
-                            semantic_locator=dict(locator, labels=list(entry.get("labels") or [])))
+            for option in options:
+                node = dict(base, node_id=f"{phase}.runtime_input.{safe_id}.{''.join(ch for ch in option.lower() if ch.isalnum())[:24]}",
+                            action="toggle", expected_value="true" if _norm(option) in wanted else "false",
+                            choice_group=entry.get("group_label") or "", choice_option=option,
+                            semantic_locator=dict(locator, labels=[option, entry.get("group_label") or ""]))
                 nodes.append(node)
-                added.append({"input_path": path, "node_id": node["node_id"], "action": node["action"]})
-            known_paths.add(path)
-        return added
+                added.append({"input_path": path, "node_id": node["node_id"], "action": "toggle", "option": option})
+        else:
+            expected = value
+            if entry.get("action") == "select_radio" and entry.get("options") and option_mapper is not None:
+                # true/"Y" -> the learned option label ("Yes").
+                expected = option_mapper(value, entry.get("options") or []) or value
+            node = dict(base, node_id=f"{phase}.runtime_input.{safe_id}", action=entry.get("action") or "fill_text",
+                        expected_value=expected, choice_group=entry.get("group_label") or "",
+                        semantic_locator=dict(locator, labels=list(entry.get("labels") or [])))
+            nodes.append(node)
+            added.append({"input_path": path, "node_id": node["node_id"], "action": node["action"]})
+        known_paths.add(path)
+    return added

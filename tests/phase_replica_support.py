@@ -192,7 +192,8 @@ _VARIANT_DOM_JS = """() => Array.from(document.querySelectorAll('input,textarea,
               chips: e.closest('dds-dropdown') ? Array.from(e.closest('dds-dropdown').querySelectorAll('.dds__tag')).map(t => t.textContent) : []}))"""
 
 
-async def _run_variant(tmp_path: Path, phase: str, *, section: Optional[str], broker: bool, max_cycles: int) -> Tuple[Dict[str, Any], List[Any]]:
+async def _run_variant(tmp_path: Path, phase: str, *, section: Optional[str], broker: bool, max_cycles: int,
+                       observers: bool = False) -> Tuple[Dict[str, Any], List[Any]]:
     data = variant_input(phase, tmp_path)
     async with async_playwright() as pw:
         try:
@@ -203,6 +204,13 @@ async def _run_variant(tmp_path: Path, phase: str, *, section: Optional[str], br
         await page.set_content(variant_html(phase))
         if broker:
             attach_broker_session(page, tmp_path, phase)
+        if observers:
+            # The live session installs these on every page: DOM events and
+            # mutations settle a selection as soon as the portal reacts.
+            from hip_id_agent.browser_session import CLICK_LISTENER_SCRIPT, DOM_EVENT_OBSERVER_SCRIPT
+
+            for script in (CLICK_LISTENER_SCRIPT, DOM_EVENT_OBSERVER_SCRIPT):
+                await page.evaluate(script)
         try:
             kwargs: Dict[str, Any] = {"section": section} if section else {}
             if "document_type" in phase:
@@ -220,8 +228,9 @@ async def _run_variant(tmp_path: Path, phase: str, *, section: Optional[str], br
 
 def run_variant_replica(
     tmp_path: Path, phase: str, *, section: Optional[str] = None, broker: bool = False, max_cycles: int = 3,
+    observers: bool = False,
 ) -> Tuple[Dict[str, Any], List[Any]]:
-    return asyncio.run(_run_variant(tmp_path, phase, section=section, broker=broker, max_cycles=max_cycles))
+    return asyncio.run(_run_variant(tmp_path, phase, section=section, broker=broker, max_cycles=max_cycles, observers=observers))
 
 
 def dom_values(dom: List[Dict[str, Any]], key: str) -> List[Any]:

@@ -35,3 +35,4 @@ Thumbs.db
 # Built wheels (rebuilt from source; shipped in release zips, not git)
 *.whl
 release/
+data/hip_memory/portal_skills/

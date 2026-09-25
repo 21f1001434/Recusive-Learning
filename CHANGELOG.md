@@ -1,3 +1,46 @@
+# V243R19 — Certified portal skills, input.json operations, fast deterministic replay (2026-09-25)
+
+- `portal_skills` (new):
+  - skills per form × operation × branch (value-free hashes of choice values);
+  - lifecycle: candidate → certified (by a deterministic replay) → stale;
+  - branch fields learned from form-shape differences, and dropped when shapes match;
+  - binding-identity check (row fingerprints ignored);
+  - commit-label memory;
+  - `lifecycle_self_check`.
+- `execute_autonomous_phase_goal(reopen=, skill_mode=, skill_override=)`:
+  - replays a matching skill first (one fast cycle, then adaptive cycles on novelty);
+  - the fast cycle skips website understanding, AutoWebGLM observation, golden visual checks and the LLM planner;
+  - single pass plus `_replay_state_holds` read-back;
+  - novelty classification;
+  - `_complete_learning` stages a candidate, or proves it in-run via `reopen` and certifies; a failed proof saves nothing and refills;
+  - `stage_seconds` per cycle.
+- `FormStructureMemory.extract_learning` / `merge_learning` / `seed_fields`: structure is merged only on certification.
+- `BrowserSession.deterministic_replay_active`: no AutoWebGLM primary decision, no semantic MCP/vision re-proof for non-committing actions, and a 0.1 s settle.
+- `portal_operations` (new):
+  - open (listing, search, row action or More actions menu, semantic fallback);
+  - fill with in-run proof;
+  - governed commit (certified skill plus three-part gate, clicked once, reconciled via `classify_mutation_outcome`, listing fallback);
+  - listing verification, including the merge target.
+- CLI `run-operations`, `portal-skills`; backend `POST /api/operations/run`, `GET /api/portal-skills`.
+- Config `portal_skills.*` and `portal_operations.*`, with defaults.
+- Safety guards:
+  - combobox-owned listbox options and field values are not actions (Python guard and in-page listener);
+  - `resolve_mutation_dispatch_guard` accepts `opened_surface_no_write`.
+- `_value_matches_variants` accepts "None" when it is asked for.
+- `_click_choice` credits a label click to its input, and `select_radio_option` credits an option click to every option of its group.
+- `HIP_PHASE_AUTHORITATIVE_INTERACTION_NOT_VERIFIED` now names the fields and executors concerned.
+- The operation row finder and listing check prefer rows with an exact name cell.
+- The owned option is scrolled into view and settled before its click.
+- The Transport Profile surface gate accepts Edit/Clone/Update titles.
+- Input keys starting with `_` (such as `_operation`) are metadata, not form fields.
+- DDS replica kit: `aria-selected` is updated on commit; popup z-index is above the sticky footer.
+- New tests:
+  - `tests/test_v243r19_portal_skills.py`;
+  - `tests/test_v243r19_operations_real_browser.py` (with `tests/operations_portal_support.py`);
+  - `tests/test_v243r19_replay_all_phases.py` (the replica harness can now install the live DOM observers: `observers=True`);
+  - `test_v243r17_structure_learning` updated to the certification rule.
+- Added `APPLY_V243R19_IN_PLACE.ps1`, `VERIFY_V243R19_INSTALL.ps1` and `examples/operations_example_input.json`.
+
 # V243R18 — Stuck portal loader: refresh, then browser restart; learned recovery ladder (2026-09-25)
 
 - Browser restart:

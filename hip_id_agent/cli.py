@@ -1685,6 +1685,56 @@ def run_portal_task(
         raise typer.Exit(code=3)
 
 
+@app.command("run-operations")
+def run_operations_cmd(
+    input_json: str = typer.Argument("./input.json", help="input.json with an \"operations\" list (create/edit/clone/merge/deploy ...)."),
+    config: str = typer.Option("config.yaml", help="Path to config YAML."),
+    runs_dir: Optional[str] = typer.Option(None, help="Override run directory."),
+    allow_portal_mutation: bool = typer.Option(False, help="Needed (with the environment gate and phrase) before any Save/Deploy/Merge commit."),
+    confirmation: str = typer.Option("", help=f"Required for commits: {MUTATION_CONFIRMATION}"),
+):
+    """V243R19: run input.json operations with certified skills.
+
+    Each operation opens its surface, replays a certified skill deterministically
+    (or learns the form and proves it by replay before saving the skill), and
+    commits only with ``commit: true``, a certified skill and the mutation gate.
+    """
+    from .portal_operations import run_portal_operations
+    from .portal_skills import operation_specs
+    from .dummy_fill_e2e import read_json_any
+
+    load_dotenv()
+    cfg = load_config(config)
+    if runs_dir:
+        cfg.reporting.runs_dir = runs_dir
+    payload = read_json_any(input_json)
+    if not isinstance(payload, dict) or not operation_specs(payload):
+        raise typer.BadParameter("input.json has no \"operations\" list")
+    payload["_input_json_path"] = str(input_json)
+    enforce_required_mcp_profile(cfg)
+    rid = make_run_id("HIP-OPERATIONS")
+    run_dir = Path(cfg.reporting.runs_dir) / rid
+    run_dir.mkdir(parents=True, exist_ok=True)
+    result = asyncio.run(run_portal_operations(
+        cfg, payload, run_dir=run_dir, allow_portal_mutation=allow_portal_mutation, confirmation=confirmation,
+    ))
+    console.print_json(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+    console.print(f"Operations report: {run_dir / 'portal_operations.json'}")
+    if not result.get("pass"):
+        raise typer.Exit(code=3)
+
+
+@app.command("portal-skills")
+def portal_skills_cmd(config: str = typer.Option("config.yaml", help="Path to config YAML.")):
+    """V243R19: certified / candidate / stale skills per phase and the learned branch fields."""
+    from .portal_skills import PortalSkillStore
+
+    cfg = load_config(config)
+    store = PortalSkillStore(Path(cfg.reporting.memory_dir))
+    phases = sorted(p.stem for p in store.root.glob("*.json")) if store.root.exists() else []
+    console.print_json(json.dumps({"phases": [store.summary(p) for p in phases]}, indent=2, default=str))
+
+
 @app.command("operate-hip")
 def operate_hip(
     task: str = typer.Argument(..., help="Arbitrary HIP task: search, fill, edit, validate, deploy, migrate, or change a specific field."),

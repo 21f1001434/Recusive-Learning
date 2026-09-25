@@ -81,7 +81,12 @@ CLICK_LISTENER_SCRIPT = r"""
     const normalizedAction = normalize(actionText);
     const mutating = /\b(save|create|submit|delete|remove|deploy|publish|update|enable|disable|confirm)\b/.test(actionText);
     const authorized = !!(mutating && auth.enabled && allowed.has(normalizedAction));
-    const blocked = !!(actionable && mutating && !safeExact.has(actionText) && !structuralOpener && !authorized);
+    // An option of a combobox-owned listbox ("Delete" as a Post Transfer
+    // Action) chooses a form value; it is not a portal action.
+    const optionList = actionable && actionable.closest ? actionable.closest('[role="listbox"]') : null;
+    const valueChoice = !!(actionable && (actionRole === 'option' || optionList) && optionList && optionList.id
+      && document.querySelector('[role="combobox"][aria-controls="' + optionList.id + '"]'));
+    const blocked = !!(actionable && mutating && !valueChoice && !safeExact.has(actionText) && !structuralOpener && !authorized);
     if (blocked) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -4181,7 +4186,9 @@ class BrowserSession:
                     "HIP_PORTAL_LOADING_TIMEOUT_AFTER_REFRESH: portal loading remained active after "
                     "waiting five minutes, confirming the loading surface with the vision model, and refreshing Microsoft Edge"
                 )
-            await asyncio.sleep(0.25)
+            # V243R19: a certified replay re-runs proven transactions, each of
+            # which still waits for its own exact committed state.
+            await asyncio.sleep(0.1 if getattr(self, "deterministic_replay_active", False) else 0.25)
             await self._finish_action(ev, True)
         except Exception as exc:
             await self._finish_action(ev, False, str(exc))
@@ -4320,11 +4327,15 @@ class BrowserSession:
         """Block final mutations before either MCP or Python can click them."""
         details: Dict[str, Any] = {}
         try:
-            details = await locator.first.evaluate(r"""el => ({
-              text:String(el.innerText||el.value||el.getAttribute('aria-label')||el.getAttribute('title')||'').replace(/\s+/g,' ').trim(),
-              role:el.getAttribute('role')||'', type:el.getAttribute('type')||'',
-              tag:(el.tagName||'').toLowerCase(), href:el.getAttribute('href')||''
-            })""")
+            details = await locator.first.evaluate(r"""el => {
+              const list = el.closest ? el.closest('[role="listbox"]') : null;
+              return {
+                text:String(el.innerText||el.value||el.getAttribute('aria-label')||el.getAttribute('title')||'').replace(/\s+/g,' ').trim(),
+                role:el.getAttribute('role')||'', type:el.getAttribute('type')||'',
+                tag:(el.tagName||'').toLowerCase(), href:el.getAttribute('href')||'',
+                combobox_option: !!(list && list.id && document.querySelector('[role="combobox"][aria-controls="' + list.id + '"]')),
+              };
+            }""")
         except Exception:
             details = {}
         text = str(details.get("text") or action or "").strip().lower()
@@ -4335,6 +4346,13 @@ class BrowserSession:
         if text in {"add", "+ add", "continue", "next", "back", "cancel", "close"}:
             allow = True
         if text == "create biz flow" and (role == "menuitem" or "action-menu" in sel or "template" in action_l or "launch" in action_l):
+            allow = True
+        if str(details.get("tag") or "") in {"input", "textarea"} and str(details.get("type") or "text").lower() not in {"submit", "button", "image", "reset"}:
+            # A field's own value ("Delete" in a combobox) is not a button label.
+            allow = True
+        if details.get("combobox_option"):
+            # V243R19: choosing "Delete" / "Update" as a dropdown value is a form
+            # value, not a portal mutation (menus are role=menuitem, still guarded).
             allow = True
         blocked = re.search(r"\b(save|create|submit|delete|remove|deploy|publish|update|enable|disable|confirm)\b", text)
         selector_blocked = re.search(r"(save|submit|delete|deploy|publish|update)(?:[-_]|\b)", sel)
@@ -4419,6 +4437,10 @@ class BrowserSession:
         page = getattr(self, "page", None)
         if bridge is None or page is None or not bool(getattr(bridge, "primary_framework", False)):
             return {"status": "bypassed", "framework": "autowebglm"}
+        if bool(getattr(self, "deterministic_replay_active", False)):
+            # V243R19: a certified skill replays proven bindings; no per-action
+            # model call.  The safety guard and exact read-back still apply.
+            return {"status": "bypassed", "framework": "autowebglm", "reason": "certified deterministic replay"}
         history = [
             {
                 "action": getattr(ev, "action_type", ""),
@@ -4519,6 +4541,12 @@ class BrowserSession:
             intended_label,
             structural_opener=bool((self._portal_mutation_authorization or {}).get("structural_opener")),
         )
+        if bool(getattr(self, "deterministic_replay_active", False)) and not risk.get("requires_authorization"):
+            # V243R19: a certified skill replays a binding already proven by a
+            # deterministic replay; no MCP/vision re-proof per field.  The value
+            # is still read back exactly, and anything committing is still gated.
+            return {"pass": True, "status": "certified_replay_binding", "confidence": 1.0, "candidate": {},
+                    "action_risk": risk, "reason": "certified skill binding; exact read-back still required"}
         result = await gate.resolve(
             page=self.page,
             locator=locator,
@@ -5116,6 +5144,9 @@ class BrowserSession:
         resolved = classification in {
             "not_dispatched", "rejected_verified", "committed_verified",
             "committed_verified_after_transport_or_ui_error",
+            # V243R19: a guarded row action (Deploy...) that only opened its
+            # dialog -- a form appeared and no write request was sent.
+            "opened_surface_no_write",
         }
         current = dict(getattr(self, "_mutation_quarantine", {}) or {})
         if resolved:

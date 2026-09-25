@@ -3812,6 +3812,8 @@ async def execute_phase_state_graph(
         raise RuntimeError(
             f"HIP_PHASE_AUTHORITATIVE_INTERACTION_NOT_VERIFIED: phase={phase} section={section or 'all'} "
             f"has {len(non_authoritative_mutation_attempts)} exact value(s) reached without authoritative BrowserSession/PyAutoGUI-MCP-first provenance"
+            f" (fields: {', '.join(sorted({str(a.get('field') or a.get('node_id')) for a in non_authoritative_mutation_attempts})[:8])};"
+            f" executors: {', '.join(sorted({str(a.get('executor') or '') for a in non_authoritative_mutation_attempts})[:4])})"
         )
 
     agentq_phase_summary = await _agentq_finalize_phase(
