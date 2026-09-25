@@ -1757,6 +1757,9 @@ async def _wait_for_control(page: Page, node: Dict[str, Any], *, graph: Optional
     return None, last
 
 
+from .environment_faults import ENVIRONMENT_FATAL_CODES, raise_if_environment_fatal  # noqa: E402,F401
+
+
 def _begin_executor_run(page: Any) -> None:
     try:
         setattr(page, "_hip_executor_run_seq", int(getattr(page, "_hip_executor_run_seq", 0) or 0) + 1)
@@ -2161,6 +2164,7 @@ async def execute_document_type_state_graph(
                     actual_control = current
                 last_error = "control did not reach a stable exact expected value after blur/rerender"
             except Exception as exc:
+                raise_if_environment_fatal(exc)
                 last_error = mask_sensitive_string(str(exc))
             if retry < max_retries:
                 await close_open_dropdown(page, phase)
@@ -2910,6 +2914,31 @@ async def _prepare_phase_control_for_action(
     preparation["interaction_state"] = state
     if not bbox.get("stable") or not state.get("visible"):
         return None, current_controls, diagnostic, mask_sensitive_data(preparation)
+    if str(node.get("action") or "") not in {"verify_only"} and (
+        state.get("disabled") or state.get("readonly") or not state.get("hitTestPass")
+    ):
+        # A control that is disabled or covered while the portal shows its own
+        # blocking loader is waiting for the portal, not wrong: wait for the
+        # portal (bounded by the loading watchdog).  If the loader never clears
+        # the portal-level error ends the attempt for the refresh/restart ladder.
+        session = getattr(page, "_hip_browser_session", None)
+        if session is not None and hasattr(session, "_current_loading_state") and hasattr(session, "ensure_interactable"):
+            try:
+                loader = await session._current_loading_state(target_selector=selector)
+            except Exception:
+                loader = {}
+            if loader.get("active"):
+                preparation["portal_loader_wait"] = {"blocking_loader": True}
+                try:
+                    await session.ensure_interactable(action=f"wait for portal loading before {node.get('field_key')}", selector=selector, timeout_ms=5000)
+                except Exception as exc:
+                    raise_if_environment_fatal(exc)
+                    preparation["portal_loader_wait"]["error"] = mask_sensitive_string(str(exc))[:300]
+                state = await inspect_interaction_state(page, probe)
+                if probe != selector:
+                    own = await inspect_interaction_state(page, selector)
+                    state = dict(state, disabled=bool(own.get("disabled")), readonly=bool(own.get("readonly")))
+                preparation["interaction_state_after_portal_loader"] = state
     if str(node.get("action") or "") not in {"verify_only"}:
         if state.get("disabled") or state.get("readonly"):
             equal = _value_equal if document_type else _stateful_value_equal
@@ -2931,6 +2960,7 @@ async def _prepare_phase_control_for_action(
                     state = await inspect_interaction_state(page, probe)
                     preparation["interaction_state_after_guard"] = state
                 except Exception as exc:
+                    raise_if_environment_fatal(exc)
                     preparation["interaction_guard_error"] = mask_sensitive_string(str(exc))
             if not state.get("hitTestPass"):
                 preparation["blocked_reason"] = "target center intercepted"
@@ -3585,6 +3615,7 @@ async def execute_phase_state_graph(
                         actual = current
                     reason = "control did not commit exact stable value after repair"
                 except Exception as exc:
+                    raise_if_environment_fatal(exc)
                     reason = mask_sensitive_string(str(exc))
                 if retry < max_retries:
                     await close_open_dropdown(page, phase)

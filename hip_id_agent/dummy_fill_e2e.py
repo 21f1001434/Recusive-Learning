@@ -3130,13 +3130,14 @@ class FullDummyFillE2EFlow:
 
                 while runtime_self_healer.until_complete or attempt_index < max_phase_attempts:
                     elapsed = time.monotonic() - phase_loop_started
-                    if elapsed >= float(runtime_self_healer.max_phase_wall_seconds):
+                    # Each refresh / browser-restart recovery step extends the budget.
+                    if elapsed >= float(runtime_self_healer.wall_budget_seconds(phase)):
                         stall = {
                             "schema_version": "hip.phase-stall-guard.v1",
                             "phase": phase,
                             "code": "HIP_PHASE_WALLCLOCK_STALL_GUARD",
                             "elapsed_seconds": round(elapsed, 3),
-                            "max_phase_wall_seconds": runtime_self_healer.max_phase_wall_seconds,
+                            "max_phase_wall_seconds": runtime_self_healer.wall_budget_seconds(phase),
                             "message": "Autonomous repair paused at the wall-clock safety guard; browser remains open for supervised recovery.",
                         }
                         safe_write_json(phase_dir / "phase_stall_guard.json", stall)
@@ -3151,6 +3152,9 @@ class FullDummyFillE2EFlow:
                             )
                             if hold.get("resume"):
                                 phase_loop_started = time.monotonic()
+                                runtime_self_healer.reset_phase_ladder(phase)
+                                # A human Resume grants the phase a fresh attempt budget.
+                                max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
                                 continue
                         mission.mark_phase_blocked(phase, attempt=max(1, attempt_index), reason=stall["code"])
                         blocked_phase = phase
@@ -3207,7 +3211,7 @@ class FullDummyFillE2EFlow:
                             raise RuntimeError(f"HIP_PHASE_TRANSITION_DESTINATION_NOT_ACKNOWLEDGED: {transition_ack}")
                         await _learning_begin(phase, attempt_no, phase_dir, contract)
                         attempt_stage = "phase_execution"
-                        remaining_phase_seconds = max(1.0, float(runtime_self_healer.max_phase_wall_seconds) - (time.monotonic() - phase_loop_started))
+                        remaining_phase_seconds = max(1.0, float(runtime_self_healer.wall_budget_seconds(phase)) - (time.monotonic() - phase_loop_started))
                         async def _watchdog_checkpoint_provider() -> Dict[str, Any]:
                             return await _refresh_live_read_only_checkpoint(
                                 phase, phase_dir, input_path,
@@ -3225,6 +3229,9 @@ class FullDummyFillE2EFlow:
                                 no_progress_seconds=float(getattr(self.config.runtime_self_heal, "no_progress_watchdog_seconds", 90.0) or 90.0),
                                 poll_seconds=float(getattr(self.config.runtime_self_heal, "no_progress_poll_seconds", 5.0) or 5.0),
                                 recent_signature_limit=int(getattr(self.config.runtime_self_heal, "no_progress_recent_signature_limit", 12) or 12),
+                                # A blocking portal loader gets the loading budget, then
+                                # HIP_PORTAL_LOADING_STUCK -> refresh -> browser restart.
+                                blocking_wait_seconds=runtime_self_healer.watchdog_blocking_wait_seconds(),
                             ),
                             timeout=remaining_phase_seconds,
                         )
@@ -3393,17 +3400,31 @@ class FullDummyFillE2EFlow:
                                 safe_write_json(phase_dir / "phase_execution_attempts.json", phase_attempts)
                                 await _learning_finish(phase, attempt_no, success=False, error=message, phase_dir=phase_dir)
                                 if decision.retry:
+                                    if "HIP_PORTAL_LOADING_STUCK" in message or decision.action == "restart_browser_session":
+                                        try:
+                                            mission_trace.record_warning(
+                                                phase,
+                                                f"Automatic recovery: {decision.action.replace('_', ' ')} after: {decision.classification.replace('_', ' ')}",
+                                            )
+                                        except Exception:
+                                            pass
                                     continue
+                                hold_reason = message
+                                if str(decision.reason or "").startswith(("HIP_PORTAL_LOADING_STUCK_AFTER_RECOVERY", "HIP_PHASE_STALL_AFTER_RECOVERY")):
+                                    hold_reason = f"{decision.reason}\n\nLast error: {message}"
                                 if self.options.hold_browser_on_incomplete_phase:
                                     hold = await _hold_incomplete_phase_for_human(
                                         store=human_phase_reviews, browser=shared_browser, run_id=ctx.run_id,
                                         phase=phase, phase_display=PHASE_DISPLAY.get(phase, phase),
-                                        recovery_round=attempt_no, phase_dir=phase_dir, reason=message,
+                                        recovery_round=attempt_no, phase_dir=phase_dir, reason=hold_reason,
                                         exact_checkpoint=phase_exact_completion_checkpoint(phase, phase_dir),
                                         automated_judge=judge_result, verification=verification, config=self.config,
                                     )
                                     if hold.get("resume"):
                                         phase_loop_started = time.monotonic()
+                                        runtime_self_healer.reset_phase_ladder(phase)
+                                        # A human Resume grants the phase a fresh attempt budget.
+                                        max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
                                         continue
                                 runtime_self_healer.finalize_phase(phase, judge_pass=False)
                                 mission.mark_phase_blocked(phase, attempt=attempt_no, reason=message)
@@ -3466,6 +3487,9 @@ class FullDummyFillE2EFlow:
                             )
                             if hold.get("resume"):
                                 phase_loop_started = time.monotonic()
+                                runtime_self_healer.reset_phase_ladder(phase)
+                                # A human Resume grants the phase a fresh attempt budget.
+                                max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
                                 continue
                         runtime_self_healer.finalize_phase(phase, judge_pass=False)
                         mission.mark_phase_blocked(phase, attempt=attempt_no, reason="HIP_PHASE_EXACT_EXECUTION_NOT_COMPLETED")
@@ -3978,6 +4002,9 @@ class FullDummyFillE2EFlow:
                             )
                             if hold.get("resume"):
                                 phase_loop_started = time.monotonic()
+                                runtime_self_healer.reset_phase_ladder(phase)
+                                # A human Resume grants the phase a fresh attempt budget.
+                                max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
                                 continue
                         blocked_phase = phase
                         runtime_self_healer.finalize_phase(phase, judge_pass=False)
@@ -4084,6 +4111,9 @@ class FullDummyFillE2EFlow:
                             )
                             if hold.get("resume"):
                                 phase_loop_started = time.monotonic()
+                                runtime_self_healer.reset_phase_ladder(phase)
+                                # A human Resume grants the phase a fresh attempt budget.
+                                max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
                                 continue
                         blocked_phase = phase
                         runtime_self_healer.finalize_phase(phase, judge_pass=False)
@@ -4159,6 +4189,9 @@ class FullDummyFillE2EFlow:
                             )
                             if hold.get("resume"):
                                 phase_loop_started = time.monotonic()
+                                runtime_self_healer.reset_phase_ladder(phase)
+                                # A human Resume grants the phase a fresh attempt budget.
+                                max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
                                 continue
                         blocked_phase = phase
                         runtime_self_healer.finalize_phase(phase, judge_pass=False)
@@ -4259,6 +4292,9 @@ class FullDummyFillE2EFlow:
                             )
                             if hold.get("resume"):
                                 phase_loop_started = time.monotonic()
+                                runtime_self_healer.reset_phase_ladder(phase)
+                                # A human Resume grants the phase a fresh attempt budget.
+                                max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
                                 continue
                         blocked_phase = phase
                         runtime_self_healer.finalize_phase(phase, judge_pass=False)

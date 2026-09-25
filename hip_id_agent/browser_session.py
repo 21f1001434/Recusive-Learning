@@ -474,6 +474,7 @@ class BrowserSession:
         self._cdp_endpoint = ""
         self._cdp_health: Dict[str, Any] = {}
         self._selected_browser: Dict[str, Any] = {}
+        self._relaunching_selected_browser = False
         self._browser_launch_attempts: List[Dict[str, Any]] = []
         self._mission_browser_locked = False
         self._recovery_intelligence_cooldown_until = 0.0
@@ -703,10 +704,20 @@ class BrowserSession:
     async def _launch_managed_context_with_fallback(
         self, *, common_kwargs: Dict[str, Any], needs_local_cdp: bool
     ) -> BrowserContext:
+        candidates = self._managed_browser_candidates()
         if self._mission_browser_locked:
-            raise RuntimeError("HIP_BROWSER_SWITCH_PROHIBITED_AFTER_MISSION_START")
+            # The lock forbids switching to a *different* browser mid-mission.
+            # restart() relaunches exactly the browser (and profile) already
+            # selected, so the SSO cookies and the mission's browser stay the same.
+            selected = dict(getattr(self, "_selected_browser", None) or {})
+            if not getattr(self, "_relaunching_selected_browser", False) or not selected:
+                raise RuntimeError("HIP_BROWSER_SWITCH_PROHIBITED_AFTER_MISSION_START")
+            candidates = [
+                c for c in candidates
+                if str(c.get("name")) == str(selected.get("browser")) and str(c.get("profile")) == str(selected.get("profile"))
+            ] or [{"name": selected.get("browser"), "profile": selected.get("profile"), "channel": selected.get("channel") or "", "executable_path": ""}]
         attempts: List[Dict[str, Any]] = []
-        for candidate in self._managed_browser_candidates():
+        for candidate in candidates:
             kwargs = dict(common_kwargs)
             profile = Path(str(candidate.get("profile") or self.config.portal.browser_user_data_dir))
             safe_mkdir(profile, parents=True, exist_ok=True)
@@ -1859,6 +1870,7 @@ class BrowserSession:
             "reason": mask_sensitive_string(str(reason))[:500],
             "previous_start_count": self._start_count,
         }
+        external = not bool(getattr(self, "_owns_browser_context", True))
         try:
             await self.close()
         except Exception as exc:
@@ -1876,10 +1888,48 @@ class BrowserSession:
         self.pyautogui_tool.set_mcp_backend(None)
         self.browser_use_bridge: Optional[BrowserUseStateBridge] = None
         self.browser_use_capabilities: Dict[str, Any] = {}
-        await self.start()
+        # Relaunch the same selected browser + profile (never a different one).
+        self._relaunching_selected_browser = True
+        try:
+            try:
+                await self.start()
+            except Exception as first_exc:
+                # The old Chrome can hold the remote-debugging port for a moment
+                # after it closes; wait once and relaunch the same browser again.
+                info["first_relaunch_error"] = mask_sensitive_string(str(first_exc))[:300]
+                try:
+                    if self._playwright is not None:
+                        await asyncio.wait_for(self._playwright.stop(), timeout=10)
+                except Exception:
+                    pass
+                self._playwright = None
+                self.context = None
+                self.page = None
+                await asyncio.sleep(2.0)
+                await self.start()
+        finally:
+            self._relaunching_selected_browser = False
+        mode = "relaunched_same_browser_and_profile"
+        if external and self.context is not None:
+            # An attached (own) Edge/Chrome is not ours to close: the closest
+            # equivalent is a brand-new tab with the stuck tab closed.
+            try:
+                fresh = await self.context.new_page()
+                for old_page in list(self.context.pages):
+                    if old_page is not fresh:
+                        try:
+                            await old_page.close()
+                        except Exception:
+                            pass
+                self.page = fresh
+                await self._observe_new_page(fresh)
+                mode = "fresh_tab_in_attached_browser"
+            except Exception as exc:
+                info["fresh_tab_error"] = mask_sensitive_string(str(exc))[:300]
         self._page_recovery_count += 1
         info.update({
             "status": "restarted",
+            "mode": mode,
             "start_count": self._start_count,
             "single_persistent_user_data_dir": True,
             "sso_cookies_reused_from_persistent_profile": True,
@@ -3024,8 +3074,30 @@ class BrowserSession:
             "dom_transition_count": len(self.dom_transition_records),
             # Form-executor heartbeat (field/retry token, no values).
             "executor_progress": str(((getattr(page, "_hip_executor_progress", None) or {}).get("token")) or ""),
+            # A blocking portal loader means the portal, not the agent, is busy;
+            # the no-progress watchdog waits for the loading budget before it
+            # hands over to the refresh / browser-restart ladder.
+            **(await self._progress_marker_loader_state()),
             "values_stored": False,
         }
+
+    async def _progress_marker_loader_state(self) -> Dict[str, Any]:
+        try:
+            state = await asyncio.wait_for(self._current_loading_state(), timeout=4.0)
+        except Exception:
+            return {"blocking_loader": False}
+        return {
+            "blocking_loader": bool(state.get("active")),
+            "loader_fingerprint": hashlib.sha256(
+                str(state.get("blocking_fingerprint") or state.get("fingerprint") or "").encode("utf-8", errors="ignore")
+            ).hexdigest()[:16] if state.get("active") else "",
+        }
+
+    def loading_recovery_counts(self, phase: str = "") -> Dict[str, int]:
+        """How often the loading watchdog already refreshed the page in ``phase``."""
+        prefix = f"{phase or self._active_phase_name or 'standalone'}::"
+        refreshes = sum(int(v or 0) for k, v in (self._loading_watchdog_refresh_counts or {}).items() if str(k).startswith(prefix))
+        return {"refreshes": refreshes}
 
     async def handoff_to_next_phase(
         self,
@@ -3779,7 +3851,8 @@ class BrowserSession:
             self.run_dir / "mcp_runtime" / "loading_watchdog" / f"page_refresh_{self._loading_watchdog_sequence:04d}.json",
             audit,
         )
-        await self._finish_action(ev, True, error=f"safe page refresh: {reason}")
+        # A successful recovery is not an error; the reason stays in the audit.
+        await self._finish_action(ev, True)
         return audit
 
     async def _confirm_loading_with_vision(
@@ -4064,10 +4137,14 @@ class BrowserSession:
                     "but the active unsaved HIP form was preserved and was not refreshed while preparing "
                     f"{action or selector or 'the requested control'}"
                 )
+            refreshed = int(self._loading_watchdog_refresh_counts.get(key, 0) or 0)
+            budget = float(getattr(self.config.portal, "loading_watchdog_timeout_seconds", 300) or 300)
+            vision = (self._loading_watchdog_last_vision.get(key) or {}) if hasattr(self, "_loading_watchdog_last_vision") else {}
             raise RuntimeError(
-                "HIP_PORTAL_LOADING_TIMEOUT_AFTER_REFRESH: confirmed blocking portal loading remained active after the "
-                "five-minute vision-confirmed watchdog refresh while preparing "
-                f"{action or selector or 'the requested control'}"
+                "HIP_PORTAL_LOADING_TIMEOUT_AFTER_REFRESH: the portal's blocking loading indicator stayed up for the "
+                f"loading budget ({budget:.0f}s); page refreshes so far: {refreshed}; vision check: "
+                f"{'confirmed' if vision.get('confirmed_blocking_loading') else ('unavailable' if not vision.get('available') else 'not confirmed')}; "
+                f"while preparing {action or selector or 'the requested control'}"
             )
         ok = await self.wait_for_blocking_overlays_gone(
             timeout_ms=min(timeout_ms, 3000),

@@ -325,6 +325,12 @@ class RuntimeSelfHealConfig(BaseModel):
     no_progress_watchdog_seconds: float = 90.0
     no_progress_poll_seconds: float = 5.0
     no_progress_recent_signature_limit: int = 12
+    # V243R18: when the portal itself keeps a blocking loader up, first refresh
+    # the page, then close and reopen the browser (same profile, SSO kept), and
+    # resume the phase from input.json.  Human review only after these steps.
+    loader_grace_seconds: float = 60.0
+    max_browser_restarts_per_phase: int = 1
+    learn_recovery_ladder: bool = True
     use_aia_advisor: bool = True
     aia_advisor_timeout_seconds: int = 20
     aia_advisor_context_max_chars: int = 96000

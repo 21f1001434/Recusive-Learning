@@ -1,3 +1,28 @@
+# V243R18 — Stuck portal loader: refresh, then browser restart; learned recovery ladder (2026-09-25)
+
+- Browser restart:
+  - `BrowserSession.restart()` relaunches the selected browser and profile despite the mission browser lock (`_relaunching_selected_browser`), and retries once if the debugging port is still held;
+  - an attached own browser gets a fresh tab.
+- The progress marker reports `blocking_loader`. `run_with_progress_watchdog(..., blocking_wait_seconds=)`:
+  - allows the loading budget while a blocking loader is up;
+  - counts only newly filled fields as progress behind it;
+  - raises `HIP_PORTAL_LOADING_STUCK`.
+- `environment_faults`: portal-level errors (refreshed page, loader timeout, stale overlay, expired login) end the attempt. They are re-raised by the broker click/fill, both executors and the autonomous goal.
+- Disabled or covered controls wait for a present blocking loader via `ensure_interactable`.
+- `RuntimeSelfHealController`:
+  - classes `portal_loading_stuck` (refresh → restart) and `phase_no_progress` (reopen → refresh → restart);
+  - a loader still blocking at failure time reclassifies the failure;
+  - ladder-bounded retries, and a failed step falls through to the next one;
+  - wall-budget extension per step;
+  - the review reason lists the steps tried;
+  - `reset_phase_ladder` on human Resume, with a fresh attempt budget;
+  - learned step order in `runtime_recovery_ladder.json` (rows, value-free).
+- `runtime_self_heal.loader_grace_seconds`, `max_browser_restarts_per_phase`, `learn_recovery_ladder` (defaults 60, 1, true).
+- `aia_client.strip_harmony_analysis`: gpt-oss final channel only.
+- The form structure memory masks string values, not keys.
+- A successful page refresh is no longer recorded as an error.
+- New tests: `tests/test_v243r18_loader_recovery_ladder.py`, `tests/test_v243r18_real_browser_loader_ladder.py` (real Chromium, `tests/loader_portal_support.py`). Added `APPLY_V243R18_IN_PLACE.ps1` / `VERIFY_V243R18_INSTALL.ps1`.
+
 # V243R17 — Radio groups, extra sections and "+ Add" rows in every phase; form structure learning (2026-09-25)
 
 - Variant replicas for every phase (`window.__variant`). The DDS kit gains `segmented`, `checkboxGroup`, `accordion` and `addList`, and radios with a clipped input.

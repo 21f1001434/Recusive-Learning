@@ -1,3 +1,19 @@
+## V243R18 — A stuck portal spinner is fixed automatically: refresh, then close and reopen the browser (2026-09-25)
+
+- **When the Dell portal's loading spinner does not go away**, the agent waits the allowed loading time (`portal.loading_watchdog_timeout_seconds`, 5 minutes by default), then **refreshes the page** and refills the form from input.json.
+- **If the spinner is still there**, it **closes the browser and opens it again**, using the same profile so the Dell sign-in is kept, and continues the phase.
+- **Only if that also fails** does the phase stop for review. The message then says what was already tried.
+- **Browser restart now works during a mission.** Before this release, a restart always failed on the mission's browser lock.
+- **Other fixes:**
+  - a stall without a spinner is repaired too: reopen the form, then refresh, then restart;
+  - spinner errors are no longer swallowed field by field;
+  - disabled fields wait for the portal instead of failing;
+  - pressing Resume gives the phase a fresh set of recovery steps.
+- **It learns** which step fixes each phase (`data\hip_memory\runtime_recovery_ladder.json`). A step that never helps is tried last next time.
+- **gpt-oss-120b:** only its final answer is parsed, never its reasoning channel. Recovery needs no vision model.
+
+See `V243R18_STUCK_LOADER_REFRESH_RESTART_SELF_HEAL_20260925.md`. Apply with `APPLY_V243R18_IN_PLACE.ps1`; it includes R13–R17.
+
 ## V243R17 — Radio groups, extra sections and "+ Add" rows are filled in every phase; the agent learns each form (2026-09-25)
 
 - **Every phase now fills what goes beyond the golden layout, including input keys the phase code does not know:**

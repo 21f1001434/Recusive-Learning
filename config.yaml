@@ -500,6 +500,13 @@ runtime_self_heal:
   no_progress_watchdog_seconds: 90
   no_progress_poll_seconds: 5
   no_progress_recent_signature_limit: 12
+  # V243R18: if the portal's own loading indicator stays up past the loading
+  # budget (portal.loading_watchdog_timeout_seconds + this grace), refresh the
+  # page; if it is still loading, close and reopen the browser (same profile,
+  # SSO kept) and resume the phase. Human review only after these steps.
+  loader_grace_seconds: 60
+  max_browser_restarts_per_phase: 1
+  learn_recovery_ladder: true
   use_aia_advisor: true
   aia_advisor_timeout_seconds: 20
   aia_advisor_context_max_chars: 96000

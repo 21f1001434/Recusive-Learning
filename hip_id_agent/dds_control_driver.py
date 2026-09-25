@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from playwright.async_api import Locator, Page
 
 from .security import mask_sensitive_string
+from .environment_faults import raise_if_environment_fatal
 from .semantic_affordance import selector_looks_generation_volatile
 from .autonomous_transition_runtime import choose_dynamic_portal_option
 
@@ -325,11 +326,14 @@ async def _broker_click(page: Page, selector: str, *, label: str, phase: str = "
                     executor=_last_session_executor(session) or "browser-session",
                 )
                 return True
-            except Exception:
+            except Exception as exc:
                 _remember_broker_execution(
                     page, action="click", selector=selector, label=label, success=False,
                     executor=_last_session_executor(session) or "browser-session",
                 )
+                # A stuck portal loader / refreshed page / expired login is not a
+                # field failure: let it end the attempt for the recovery ladder.
+                raise_if_environment_fatal(exc)
                 return False
         # Standalone/offline compatibility: when a Playwright MCP backend is
         # attached directly to the page, keep the same broker semantics instead
@@ -372,11 +376,12 @@ async def _broker_fill(page: Page, selector: str, value: str, *, label: str, pha
                     executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)),
                 )
                 return True
-            except Exception:
+            except Exception as exc:
                 _remember_broker_execution(
                     page, action=action_type, selector=selector, label=label, success=False,
                     executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)),
                 )
+                raise_if_environment_fatal(exc)
                 return False
         backend = getattr(page, "_hip_playwright_mcp_backend", None)
         if backend is not None and hasattr(backend, "fill"):

@@ -29,6 +29,31 @@ def _first_env(*names: str, default: str = "") -> str:
 
 
 
+_HARMONY_FINAL_MARKERS = ("<|channel|>final<|message|>", "assistantfinal")
+
+
+def strip_harmony_analysis(text: str) -> str:
+    """Keep only gpt-oss's final answer when its channels arrive unsplit.
+
+    gpt-oss (e.g. gpt-oss-120b) writes an ``analysis`` channel before the
+    ``final`` one.  A gateway without a reasoning parser returns both in one
+    string ("analysis...assistantfinal{...}"); the reasoning often contains
+    JSON-like fragments that must not be mistaken for the answer.
+    """
+    raw = str(text or "")
+    cut = -1
+    for marker in _HARMONY_FINAL_MARKERS:
+        index = raw.rfind(marker)
+        if index >= 0:
+            cut = max(cut, index + len(marker))
+    if cut < 0:
+        return raw
+    final = raw[cut:]
+    for end in ("<|return|>", "<|end|>"):
+        final = final.split(end, 1)[0]
+    return final.strip()
+
+
 def extract_aia_response_text(data: Any) -> str:
     """Extract the usable assistant answer from Dell AIA response variants.
 
@@ -89,7 +114,7 @@ def extract_aia_response_text(data: Any) -> str:
         if item not in seen:
             seen.add(item)
             out.append(item)
-    return "\n".join(out).strip()
+    return strip_harmony_analysis("\n".join(out).strip())
 
 
 def resolve_output_token_limit(explicit: Optional[int] = None, *, vision: bool = False, probe: bool = False) -> Optional[int]:
@@ -134,7 +159,7 @@ def build_chat_payload_variants(base: Dict[str, Any], *, output_token_limit: Opt
 
 def extract_json_object(text: str) -> Dict[str, Any]:
     """Extract the first valid JSON object from model output."""
-    raw = str(text or "").strip()
+    raw = strip_harmony_analysis(str(text or "")).strip()
     if raw.startswith("```"):
         raw = raw.strip("`").strip()
         if raw.lower().startswith("json"):

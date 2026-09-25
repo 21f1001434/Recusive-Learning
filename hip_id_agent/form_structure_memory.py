@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from .safe_io import safe_write_json
-from .security import mask_sensitive_data
+from .security import mask_sensitive_string
 
 SCHEMA = "hip.form-structure-memory.v1"
 
@@ -38,6 +38,16 @@ def path_pattern(input_path: str) -> str:
     parts = str(input_path or "").split(".")
     rel = ".".join(parts[3:]) if len(parts) > 3 and parts[0] == "$" else str(input_path or "")
     return re.sub(r"\[\d+\]", "[*]", rel)
+
+
+def _mask_strings(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _mask_strings(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_mask_strings(v) for v in value]
+    if isinstance(value, str):
+        return mask_sensitive_string(value)
+    return value
 
 
 def resolve_memory_dir(config: Any = None, page: Any = None) -> Optional[Path]:
@@ -74,7 +84,9 @@ class FormStructureMemory:
 
     def save(self, phase: str, data: Dict[str, Any]) -> None:
         data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        safe_write_json(self._file(phase), mask_sensitive_data(data))
+        # Mask secret-looking *strings* only: key-based masking would blank a
+        # learned field whose input key merely contains "token" or "session".
+        safe_write_json(self._file(phase), _mask_strings(data), mask=False)
 
     # ------------------------------------------------------------------ learn
     def record_success(

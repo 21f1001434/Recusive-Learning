@@ -34,6 +34,7 @@ from .stateful_form_runtime import (
     execute_phase_state_graph,
     resolve_stateful_control_diagnostics,
     phase_object,
+    raise_if_environment_fatal,
     split_multi_value,
 )
 from .upload_assets import attempt_upload_for_control, find_upload_asset
@@ -1205,6 +1206,7 @@ async def execute_autonomous_phase_goal(
                 for a in (non_file_result.get("attempts") or []) if isinstance(a, dict)
             )
         except Exception as exc:
+            raise_if_environment_fatal(exc)
             non_file_result = {"pass": False, "error": mask_sensitive_string(str(exc))}
             cycle_audit["non_file_execution"] = non_file_result
 
@@ -1324,6 +1326,7 @@ async def execute_autonomous_phase_goal(
         try:
             full_result = await _execute_graph(working_graph, all_prior)
         except Exception as exc:
+            raise_if_environment_fatal(exc)
             full_result = {"pass": False, "error": mask_sensitive_string(str(exc)), "attempts": []}
         cycle_audit["full_goal_execution"] = full_result
         # A field seeded from memory that no longer binds is dropped for this

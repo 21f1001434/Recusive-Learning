@@ -19,6 +19,8 @@ uploads/*
 !uploads/.gitkeep
 # What the agent learns about each form on a user's machine (V243R17)
 data/hip_memory/form_structure_memory/
+# Which recovery step (refresh / browser restart) fixed each phase (V243R18)
+data/hip_memory/runtime_recovery_ladder.json
 
 # Build output
 build/

@@ -70,7 +70,12 @@ class RuntimeSelfHealController:
         "route_not_committed": ("route_target", "recover_page_and_route"),
         "mcp_surface_drift": ("resync_mcp", "recover_page_and_route"),
         "false_loading_marker": ("reassess_page_health", "recover_page_and_route"),
-        "blocking_overlay": ("refresh_page_and_reopen", "clear_transient_ui_and_reopen", "recover_page_and_route"),
+        # V243R18 escalation ladders (see _ladder_action): a stuck portal loader
+        # is refreshed first, then the browser is restarted; a stalled phase is
+        # reopened, then refreshed, then the browser is restarted.
+        "blocking_overlay": ("refresh_page_and_reopen", "restart_browser_session"),
+        "portal_loading_stuck": ("refresh_page_and_reopen", "restart_browser_session"),
+        "phase_no_progress": ("reopen_phase_from_input", "refresh_page_and_reopen", "restart_browser_session"),
         "vision_loading_refresh_replay": ("reopen_phase_from_input", "recover_page_and_route"),
         "active_surface_lost": ("reopen_phase_from_input", "recover_page_and_route"),
         "control_not_found": ("refresh_evidence_and_reopen", "reopen_phase_from_input"),
@@ -137,6 +142,14 @@ class RuntimeSelfHealController:
         self._phase_recovery_ids: Dict[str, List[str]] = {}
         self._total_repairs = 0
         self._phase_started_monotonic: Dict[str, float] = {}
+        self.loader_grace_seconds = max(0.0, float(getattr(policy, "loader_grace_seconds", 60.0) or 0.0))
+        self.max_browser_restarts_per_phase = max(0, int(getattr(policy, "max_browser_restarts_per_phase", 1)))
+        self.learn_recovery_ladder = bool(getattr(policy, "learn_recovery_ladder", True))
+        self._ladder_steps: Dict[str, List[str]] = {}
+        self._ladder_pending: Dict[str, Dict[str, str]] = {}
+        self._wall_extension: Dict[str, float] = {}
+        self._attempt_offset: Dict[str, int] = {}
+        self._last_attempt: Dict[str, int] = {}
         self.golden_references_by_phase = golden_references_by_phase or {}
         self.expected_inputs_by_phase = expected_inputs_by_phase or {}
         self.visual_feedback_agent = visual_feedback_agent
@@ -213,6 +226,10 @@ class RuntimeSelfHealController:
             "loading marker did not intercept", "aria-busy marker was visible"
         )):
             return "false_loading_marker"
+        if "hip_portal_loading_stuck" in joined:
+            return "portal_loading_stuck"
+        if "hip_phase_no_progress_watchdog" in joined:
+            return "phase_no_progress"
         if "hip_vision_loading_refresh_replay_required" in joined:
             return "vision_loading_refresh_replay"
         if any(x in joined for x in (
@@ -674,6 +691,162 @@ class RuntimeSelfHealController:
         safe_write_json(attempt_dir / "failure_evidence.json", observation)
         return attempt_dir, observation
 
+    # ------------------------------------------------------------------
+    # V243R18 escalation ladders.  A stuck portal loader is refreshed first,
+    # then the browser is closed and reopened (same profile, SSO kept); a
+    # stalled phase is reopened, then refreshed, then the browser restarted.
+    # Which step actually resolved a phase is remembered across runs, and a
+    # step that has never helped is skipped next time.
+    LADDER_FAMILIES: Dict[str, str] = {
+        "blocking_overlay": "loader",
+        "portal_loading_stuck": "loader",
+        "vision_loading_refresh_replay": "loader",
+        "phase_no_progress": "stall",
+    }
+    STALL_LADDER: Sequence[str] = ("reopen_phase_from_input", "refresh_page_and_reopen", "restart_browser_session")
+
+    def _loading_budget_seconds(self) -> float:
+        portal = getattr(self.config, "portal", None)
+        vision = getattr(self.config, "vision_runtime", None)
+        budget = float(getattr(portal, "loading_watchdog_timeout_seconds", 300) or 300)
+        if vision is not None and bool(getattr(vision, "use_for_loading_watchdog", True)):
+            budget = max(budget, float(getattr(vision, "loading_refresh_after_seconds", 300) or 300))
+        return budget
+
+    def watchdog_blocking_wait_seconds(self) -> float:
+        """How long the no-progress watchdog lets a blocking portal loader run."""
+        return self._loading_budget_seconds() + self.loader_grace_seconds
+
+    def wall_budget_seconds(self, phase: str) -> float:
+        """Phase wall-clock budget, extended by each recovery step taken."""
+        return float(self.max_phase_wall_seconds) + float(self._wall_extension.get(str(phase), 0.0))
+
+    def _ladder_memory_path(self) -> Optional[Path]:
+        if not self.learn_recovery_ladder:
+            return None
+        memory_dir = getattr(getattr(self.config, "reporting", None), "memory_dir", None)
+        return Path(memory_dir) / "runtime_recovery_ladder.json" if memory_dir else None
+
+    def _ladder_memory(self) -> Dict[str, Any]:
+        path = self._ladder_memory_path()
+        if path is None or not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _ladder_record(self, phase: str, family: str, action: str, outcome: str) -> None:
+        path = self._ladder_memory_path()
+        if path is None:
+            return
+        data = self._ladder_memory()
+        # Rows, not action-name keys: key-based secret masking would blank
+        # "restart_browser_session" (it contains "session").
+        rows = data.setdefault("ladders", {}).setdefault(f"{phase}|{family}", [])
+        if not isinstance(rows, list):
+            rows = data["ladders"][f"{phase}|{family}"] = []
+        row = next((r for r in rows if isinstance(r, dict) and r.get("action") == action), None)
+        if row is None:
+            row = {"action": action, "resolved": 0, "not_resolved": 0}
+            rows.append(row)
+        row[outcome] = int(row.get(outcome) or 0) + 1
+        data["schema_version"] = "hip.runtime-recovery-ladder-memory.v2"
+        data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        try:
+            safe_write_json(path, data, mask=False)
+        except Exception:
+            pass
+
+    def _ladder_rows(self, phase: str, family: str) -> Dict[str, Dict[str, Any]]:
+        rows = ((self._ladder_memory().get("ladders") or {}).get(f"{phase}|{family}") or [])
+        return {str(r.get("action")): r for r in rows if isinstance(r, dict)} if isinstance(rows, list) else {}
+
+    def _ladder_never_helps(self, phase: str, family: str, action: str, later: Sequence[str]) -> bool:
+        """True when ``action`` never resolved this phase but a later step did."""
+        entries = self._ladder_rows(phase, family)
+        mine = entries.get(action) or {}
+        if int(mine.get("resolved") or 0) or int(mine.get("not_resolved") or 0) < 2:
+            return False
+        return any(int((entries.get(x) or {}).get("resolved") or 0) for x in later)
+
+    def _ladder_action(self, phase: str, classification: str) -> str:
+        """Next unused step of the phase's ladder (learned order, never fewer steps)."""
+        family = self.LADDER_FAMILIES[classification]
+        steps = list(self._ladder_steps.setdefault(f"{phase}|{family}", []))
+        if family == "loader":
+            if classification == "vision_loading_refresh_replay":
+                # The browser session already refreshed the stuck page itself;
+                # reopen the form and replay it from input.json.
+                return "reopen_phase_from_input"
+            try:
+                if int((self.browser.loading_recovery_counts(phase) or {}).get("refreshes") or 0):
+                    steps.append("refresh_page_and_reopen")  # the loading watchdog's own refresh
+            except Exception:
+                pass
+            ladder = ["refresh_page_and_reopen"] + ["restart_browser_session"] * self.max_browser_restarts_per_phase
+            if self._ladder_never_helps(phase, family, "refresh_page_and_reopen", ["restart_browser_session"]):
+                # Learned: a refresh never cleared this portal's loader but a
+                # browser restart did -- restart first, keep refresh as last resort.
+                ladder = ["restart_browser_session"] * self.max_browser_restarts_per_phase + ["refresh_page_and_reopen"]
+        else:
+            ladder = list(self.STALL_LADDER[:-1]) + ["restart_browser_session"] * self.max_browser_restarts_per_phase
+            for action in list(self.STALL_LADDER[:-1]):
+                if self._ladder_never_helps(phase, family, action, [x for x in ladder if x != action]):
+                    ladder.remove(action)
+                    ladder.append(action)
+        remaining = list(ladder)
+        for used in steps:
+            if used in remaining:
+                remaining.remove(used)
+        return remaining[0] if remaining else "stop_fail_closed"
+
+    def reset_phase_ladder(self, phase: str) -> None:
+        """After a human Resume, the phase may again refresh / restart the browser."""
+        for key in [k for k in self._ladder_steps if k.startswith(f"{phase}|")]:
+            self._ladder_steps.pop(key, None)
+        self._ladder_pending.pop(str(phase), None)
+        self._wall_extension.pop(str(phase), None)
+        self._phase_started_monotonic[str(phase)] = time.monotonic()
+        # Attempts are counted afresh from the resume on.
+        self._attempt_offset[str(phase)] = int(self._last_attempt.get(str(phase), 0))
+
+    def ladder_summary(self, phase: str) -> str:
+        names = {
+            "refresh_page_and_reopen": "refreshed the page",
+            "restart_browser_session": "closed and reopened the browser",
+            "reopen_phase_from_input": "reopened the form",
+        }
+        done: List[str] = []
+        try:
+            if int((self.browser.loading_recovery_counts(phase) or {}).get("refreshes") or 0):
+                done.append("refreshed the page (loading watchdog)")
+        except Exception:
+            pass
+        for key, steps in self._ladder_steps.items():
+            if key.startswith(f"{phase}|"):
+                done.extend(names.get(step, step) for step in steps)
+        return ", ".join(done) if done else "no recovery step"
+
+    async def _blocking_loader_persists(self, samples: int = 3, interval_seconds: float = 0.75) -> Dict[str, Any]:
+        """True only when a blocking portal loader is seen on every sample."""
+        probe = getattr(self.browser, "_current_loading_state", None)
+        if not callable(probe):
+            return {"persistent": False, "available": False}
+        seen = 0
+        for index in range(max(1, samples)):
+            try:
+                state = await asyncio.wait_for(probe(), timeout=5.0)
+            except Exception:
+                return {"persistent": False, "available": False}
+            if not (isinstance(state, dict) and state.get("active")):
+                return {"persistent": False, "available": True, "samples_active": seen}
+            seen += 1
+            if index + 1 < samples:
+                await asyncio.sleep(interval_seconds)
+        return {"persistent": True, "available": True, "samples_active": seen}
+
     def _deterministic_action(self, classification: str, occurrence: int) -> str:
         ladder = list(self.CLASS_ACTIONS.get(classification) or ("stop_fail_closed",))
         if self.until_complete and self.exploration_exploitation and len(ladder) > 1:
@@ -809,7 +982,7 @@ class RuntimeSelfHealController:
                 restart = getattr(self.browser, "restart", None)
                 if not callable(restart):
                     raise RuntimeError("browser session does not support restart")
-                restart_info = await restart(reason=f"runtime self-heal for {phase}: browser disconnected")
+                restart_info = await restart(reason=f"runtime self-heal for {phase}: close and reopen the browser")
                 result["browser_restart"] = mask_sensitive_data(restart_info)
                 await self.browser.goto_base_and_complete_sso(target_url)
             elif action == "recover_page_and_route":
@@ -1006,6 +1179,17 @@ class RuntimeSelfHealController:
             failure_kind=failure_kind,
             diagnosis=diagnosis,
         )
+        # Whatever error surfaced, a portal loading indicator that still blocks
+        # the page when the attempt failed is the real cause: use the loader
+        # ladder (refresh, then browser restart) instead of replaying the form
+        # into the same blocked page.
+        loader_probe = await self._blocking_loader_persists()
+        if loader_probe.get("persistent") and classification not in {
+            "authentication_expired", "unsafe_or_mutating", "dependency_contract_invalid",
+            "portal_loading_stuck", "blocking_overlay", "vision_loading_refresh_replay", "reporting_only_failure",
+        }:
+            classification = "portal_loading_stuck"
+            message = f"HIP_PORTAL_LOADING_STUCK (loader still blocking when the attempt failed): {message}"
         signature = self._signature(phase, classification, message, diagnosis)
         occurrence = self._signature_counts.get(signature, 0) + 1
         self._signature_counts[signature] = occurrence
@@ -1037,13 +1221,29 @@ class RuntimeSelfHealController:
         repeat_limit = self.max_no_progress_repeats if self.until_complete else self.max_repeated_signature
         repeat_available = occurrence <= repeat_limit
         unknown_allowed = classification != "unknown_recoverable" or (self.retry_unknown_once and occurrence <= 1)
-        attempt_available = self.until_complete or attempt < self.max_phase_attempts
-        deterministic_action = self._deterministic_action(classification, occurrence)
+        self._last_attempt[str(phase)] = int(attempt)
+        effective_attempt = int(attempt) - int(self._attempt_offset.get(str(phase), 0))
+        attempt_available = self.until_complete or effective_attempt < self.max_phase_attempts
+        family = self.LADDER_FAMILIES.get(classification)
+        if family:
+            # An earlier step of this ladder did not resolve the phase.
+            pending = self._ladder_pending.pop(str(phase), None)
+            if pending and pending.get("family") == family:
+                self._ladder_record(str(phase), family, str(pending.get("action")), "not_resolved")
+            deterministic_action = self._ladder_action(str(phase), classification)
+            # The ladder is itself bounded; it replaces the repeated-signature cap.
+            repeat_available = deterministic_action != "stop_fail_closed"
+            unknown_allowed = True
+            wall_available = phase_elapsed_seconds < self.wall_budget_seconds(str(phase))
+        else:
+            deterministic_action = self._deterministic_action(classification, occurrence)
         if not (budget_available and repeat_available and unknown_allowed and attempt_available and wall_available):
             deterministic_action = "stop_fail_closed"
 
         advisor = None
-        if deterministic_action != "stop_fail_closed":
+        # Environment recovery (refresh / browser restart) is deterministic; the
+        # model is consulted only for form-level classes.
+        if deterministic_action != "stop_fail_closed" and not family:
             advisor = await self._aia_advice(
                 classification=classification,
                 deterministic_action=deterministic_action,
@@ -1057,6 +1257,29 @@ class RuntimeSelfHealController:
 
         action_result = await self._execute_action(action, phase=phase, target_url=target_url)
         action_success = bool(action_result.get("success"))
+        if family and action != "stop_fail_closed" and not action_success:
+            # The step itself failed (e.g. the refresh errored): count it as used
+            # and go straight to the next step of the ladder.
+            self._ladder_steps.setdefault(f"{phase}|{family}", []).append(action)
+            fallback_action = self._ladder_action(str(phase), classification)
+            if fallback_action not in {"stop_fail_closed", action}:
+                first_result = action_result
+                action = fallback_action
+                action_result = await self._execute_action(action, phase=phase, target_url=target_url)
+                action_result["failed_first_step"] = mask_sensitive_data(first_result)
+                action_success = bool(action_result.get("success"))
+                if not action_success:
+                    self._ladder_steps[f"{phase}|{family}"].append(action)
+        if family and action != "stop_fail_closed":
+            if action_success and classification != "vision_loading_refresh_replay":
+                self._ladder_steps.setdefault(f"{phase}|{family}", []).append(action)
+            # What this step is credited with if the phase now completes.
+            credited = "refresh_page_and_reopen" if classification == "vision_loading_refresh_replay" else action
+            self._ladder_pending[str(phase)] = {"family": family, "action": credited}
+            # Each recovery step earns the time it needs: a loader step waits a
+            # full loading budget again before it can be judged.
+            extra = (self.watchdog_blocking_wait_seconds() + 180.0) if family == "loader" else 240.0
+            self._wall_extension[str(phase)] = self._wall_extension.get(str(phase), 0.0) + extra
         retry = bool(
             action != "stop_fail_closed"
             and classification != "unsafe_or_mutating"
@@ -1064,7 +1287,7 @@ class RuntimeSelfHealController:
             and repeat_available
             and unknown_allowed
             and (
-                (action_success and (self.until_complete or attempt < self.max_phase_attempts))
+                (action_success and (self.until_complete or effective_attempt < self.max_phase_attempts))
                 or (self.until_complete and action_success)
             )
         )
@@ -1084,6 +1307,16 @@ class RuntimeSelfHealController:
 
         if retry:
             reason = f"safe {recovery_mode} repair executed; rerun the interrupted phase from its exact input branch"
+        elif family == "loader":
+            reason = (
+                "HIP_PORTAL_LOADING_STUCK_AFTER_RECOVERY: the Dell portal kept showing its loading indicator; "
+                f"automatic recovery already {self.ladder_summary(phase)}. Check the portal/network, then press Resume."
+            )
+        elif family == "stall":
+            reason = (
+                "HIP_PHASE_STALL_AFTER_RECOVERY: the phase made no progress; "
+                f"automatic recovery already {self.ladder_summary(phase)}."
+            )
         elif not wall_available:
             reason = "HIP_PHASE_WALLCLOCK_STALL_GUARD: phase exceeded the configured wall-clock limit; preserved evidence and stopped fail-closed"
         elif not repeat_available:
@@ -1178,6 +1411,10 @@ class RuntimeSelfHealController:
         self.write_summary()
 
     def finalize_phase(self, phase: str, *, judge_pass: bool) -> None:
+        pending = self._ladder_pending.pop(str(phase), None)
+        if pending:
+            self._ladder_record(str(phase), str(pending.get("family")), str(pending.get("action")),
+                                "resolved" if judge_pass else "not_resolved")
         ids = list(dict.fromkeys(self._phase_recovery_ids.get(phase, [])))
         if self.brain is not None:
             for recovery_id in ids:

@@ -349,6 +349,10 @@ runtime_self_heal:
   capture_evidence: true
   retry_unknown_once: true
   fail_closed: true
+  # V243R18: stuck portal loader -> refresh -> close/reopen browser -> resume.
+  loader_grace_seconds: 60
+  max_browser_restarts_per_phase: 1
+  learn_recovery_ladder: true
 
 
 reporting:
