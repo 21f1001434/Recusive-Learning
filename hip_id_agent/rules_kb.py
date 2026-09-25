@@ -3539,7 +3539,9 @@ async def _click_rule_condition_add_exact(
             await loc.scroll_into_view_if_needed(timeout=2000)
             if semantic_runtime_enabled(page):
                 if not await open_control_for_discovery(
-                    page, selector, label="Create Condition row", phase="rule"
+                    # The plus is named only by its "Create Condition" tooltip; the
+                    # broker label must not read as a final mutation (V243R20).
+                    page, selector, label="structural_opener add row Conditions", phase="rule"
                 ):
                     raise RuntimeError("semantic Create Condition dispatch failed closed")
             else:

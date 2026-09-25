@@ -55,15 +55,19 @@
   // ---- Configure Source
   const srcAppHost = document.createElement('div');
   const identifierRows = document.createElement('div');
-  for (let i = 0; i < 2; i++) {
+  function identifierRow(i) {
     const labelled = i === 0;
-    identifierRows.appendChild(repeatRow([
+    return repeatRow([
       H.dropdown({ label: 'Document Type Name (Version) *', name: 'documentTypeName', options: DOCS, showLabel: labelled }),
       H.dropdown({ label: 'Attribute Name *', name: 'attributeName', options: ATTRS, showLabel: labelled }),
       H.dropdown({ label: 'Operator *', name: 'operator', options: OPS, showLabel: labelled }),
       H.text({ label: 'Value *', name: 'value', placeholder: 'Value', showLabel: labelled }),
-    ], 'dds__d-flex dds__justify-content-start'));
+    ], 'dds__d-flex dds__justify-content-start');
   }
+  if (!window.__livePlus) for (let i = 0; i < 2; i++) identifierRows.appendChild(identifierRow(i));
+  // Live portal (window.__livePlus): lists start with one row (or none) and only
+  // grow through the icon "+" in their legend.
+  const LIVE = !!window.__livePlus;
   panels[1].append(
     H.fieldset('Source System Details :',
       H.row(
@@ -78,9 +82,12 @@
     ),
     H.fieldset('Flow Identifiers :',
       H.row(H.dropdown({ label: 'Flow Identifier Operator *', name: 'flowIdentifierOperator', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] })),
-      H.fieldset('Attributes:', identifierRows),
+      LIVE ? H.liveList({ legend: 'Attributes:', tooltip: 'Create Attribute', name: 'attributes', buildRow: (i) => identifierRow(i) })
+        : H.fieldset('Attributes:', identifierRows),
     ),
-    H.fieldset('Process Steps :', H.el('<div>No Process Steps Added</div>')),
+    // Source-side process steps: the input's steps belong to the target tab.
+    LIVE ? H.liveList({ legend: 'Process Steps :', tooltip: 'Create Process Step', name: 'sourceProcessSteps', buildRow: (i) => step(i, true), initial: 0, empty: 'No Process Steps Added' })
+      : H.fieldset('Process Steps :', H.el('<div>No Process Steps Added</div>')),
   );
 
   // ---- Configure Target(s)
@@ -138,7 +145,8 @@
       H.switchControl({ label: 'Target File Name Config', name: 'targetFileNameConfig', checked: false, onText: 'Yes', offText: 'No',
         onChange: (on) => setTimeout(() => H.when(fileNameHost, () => (on ? [
           H.row(H.text({ label: 'File Separator *', name: 'fileSeparator', placeholder: 'File Separator' }), H.text({ label: 'File Extension *', name: 'fileExtension', placeholder: 'File Extension' })),
-          H.fieldset('File Name Section :', part(0), part(1)),
+          LIVE ? H.liveList({ legend: 'File Name Section :', tooltip: 'Create File Name Part', name: 'fileNameParts', buildRow: (i) => part(i) })
+            : H.fieldset('File Name Section :', part(0), part(1)),
         ] : [])), 150) }),
       fileNameHost,
     ));
@@ -157,7 +165,8 @@
       ),
     ),
     // Two steps as created by Process Steps (+); step 2 starts collapsed (golden CT-1).
-    H.fieldset('Process Steps :', step(0, true), step(1, false)),
+    LIVE ? H.liveList({ legend: 'Process Steps :', tooltip: 'Create Process Step', name: 'processSteps', buildRow: (i) => step(i, true), initial: 0, empty: 'No Process Steps Added' })
+      : H.fieldset('Process Steps :', step(0, true), step(1, false)),
   );
 
   // ---- Configure Routing: table + Add opens the Create Rule drawer
@@ -173,15 +182,17 @@
     const targetHost = document.createElement('div');
     const conditions = document.createElement('div');
     conditions.setAttribute('formarrayname', 'conditions');
-    for (let i = 0; i < 2; i++) {
+    function routingRow(i) {
       const labelled = i === 0;
-      conditions.appendChild(repeatRow([
+      return repeatRow([
         H.dropdown({ label: 'Condition Type', name: 'conditionType', options: ['Attributes', 'Document Type'], showLabel: labelled }),
         H.dropdown({ label: 'Operator', name: 'operator', options: OPS, showLabel: labelled }),
         H.text({ label: 'Value', name: 'value', placeholder: 'Value', showLabel: labelled }),
         H.dropdown({ label: 'Attribute Name', name: 'attributeName', options: ATTRS, showLabel: labelled }),
-      ], 'dds__row'));
+      ], 'dds__row');
     }
+    if (!LIVE) for (let i = 0; i < 2; i++) conditions.appendChild(routingRow(i));
+    const executeWhen = H.row(H.dropdown({ label: 'Execute Actions When *', name: 'executeActionsWhen', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] }));
     const drawer = H.el('<div class="dds__drawer" role="dialog" style="position:fixed;top:64px;right:0;bottom:0;width:760px;overflow:auto;background:#fff;border-left:1px solid #999;z-index:950;padding:12px"><h3>Create Rule</h3></div>');
     drawer.append(
       H.fieldset('Rule :',
@@ -199,7 +210,8 @@
           H.switchControl({ label: 'Execute Always', name: 'executeAlways', checked: false, onText: 'Yes', offText: 'No' }),
         ),
       ),
-      H.fieldset('Conditions :', H.row(H.dropdown({ label: 'Execute Actions When *', name: 'executeActionsWhen', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] })), conditions),
+      LIVE ? H.liveList({ legend: 'Conditions :', tooltip: 'Create Condition', name: 'conditions', buildRow: (i) => routingRow(i), before: [executeWhen] })
+        : H.fieldset('Conditions :', executeWhen, conditions),
       H.fieldset('Actions :', H.row(
         H.text({ label: 'Name *', name: 'name', placeholder: 'Name' }),
         H.dropdown({ label: 'Type *', name: 'type', options: ['Route Document', 'Transform Document'],

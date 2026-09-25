@@ -257,6 +257,63 @@
     return wrap;
   }
 
+  // ---- Live DDS "+" (window.__livePlus): recorded from live runs. The plus is
+  // an icon-only dds-button inside the fieldset legend whose visible content is
+  // span.dds__icon--add-cir; its name exists only in a tooltip inside the button
+  // that shows on hover ("Create Condition").  A click while a dropdown popup is
+  // still open is swallowed: it only finishes that dropdown.
+  function anyPopupOpen() {
+    return Array.from(document.querySelectorAll('.dds__dropdown__popup')).some((p) => !p.classList.contains('dds__dropdown__popup--hidden'));
+  }
+  function plusButton({ tooltip, onAdd }) {
+    const host = el(`<dds-button class="dds__legend-action"><button type="button" class="dds__button dds__button--icon-only dds__button--tertiary dds__button--sm"><span class="dds__icon dds__icon--add-cir" aria-hidden="true"></span><dds-tooltip class="dds__tooltip" role="tooltip" hidden>${esc(tooltip)}</dds-tooltip></button></dds-button>`);
+    const btn = host.querySelector('button');
+    const tip = host.querySelector('dds-tooltip');
+    btn.addEventListener('mouseenter', () => { tip.hidden = false; });
+    btn.addEventListener('mouseleave', () => { tip.hidden = true; });
+    btn.addEventListener('mousedown', () => { btn.__swallow = anyPopupOpen(); });
+    btn.addEventListener('click', () => {
+      window.__hipPlusClicks = (window.__hipPlusClicks || 0) + 1;
+      // window.__plusSwallowFirst: every plus ignores its first click (tests).
+      if (btn.__swallow || (window.__plusSwallowFirst && !btn.__swallowedOnce)) {
+        btn.__swallow = false; btn.__swallowedOnce = true; return;
+      }
+      setTimeout(onAdd, 150);
+    });
+    return host;
+  }
+  // The row's own remove icon: a trap that must never be clicked by the agent.
+  function minusButton(row) {
+    const b = el('<button type="button" class="dds__button dds__button--icon-only dds__button--tertiary dds__row-remove"><span class="dds__icon dds__icon--remove-cir" aria-hidden="true"></span><dds-tooltip class="dds__tooltip" role="tooltip" hidden>Remove</dds-tooltip></button>');
+    b.addEventListener('click', () => { window.__hipRowsRemoved = (window.__hipRowsRemoved || 0) + 1; row.remove(); });
+    return b;
+  }
+  // A repeatable list as the portal renders it: legend + icon "+", one row (or
+  // an empty-state line) to start, and a remove icon on every row.
+  function liveList({ legend, tooltip, name, buildRow, initial = 1, empty = '', before = [] }) {
+    const fs = document.createElement('fieldset');
+    const lg = document.createElement('legend');
+    lg.textContent = `${legend} `;
+    fs.appendChild(lg);
+    before.flat().forEach((c) => c && fs.appendChild(c));
+    const placeholder = empty ? el(`<div class="dds__empty-state">${esc(empty)}</div>`) : null;
+    const rows = el(`<div class="dds__form-array" formarrayname="${esc(name)}"></div>`);
+    let n = 0;
+    const add = () => {
+      if (placeholder && placeholder.parentElement) placeholder.remove();
+      const r = buildRow(n, n === 0);
+      r.setAttribute('formgroupname', String(n));
+      r.appendChild(minusButton(r));
+      rows.appendChild(r);
+      n++;
+    };
+    lg.appendChild(plusButton({ tooltip, onAdd: add }));
+    if (placeholder) fs.appendChild(placeholder);
+    fs.appendChild(rows);
+    for (let i = 0; i < initial; i++) add();
+    return fs;
+  }
+
   function file({ label, name, accept = '' }) {
     const id = nextId('dds-file');
     const g = el(`<div class="dds__form-group dds__file-input">
@@ -337,5 +394,5 @@
     (Array.isArray(out) ? out : [out]).forEach((c) => c && host.appendChild(c));
   }
 
-  window.HIP = { dropdown, text, switchControl, checkbox, radios, segmented, checkboxGroup, accordion, addList, file, fieldset, row, page, form, when, el, nextId, closeAll };
+  window.HIP = { dropdown, text, switchControl, checkbox, radios, segmented, checkboxGroup, accordion, addList, file, fieldset, row, page, form, when, el, nextId, closeAll, plusButton, minusButton, liveList };
 })();

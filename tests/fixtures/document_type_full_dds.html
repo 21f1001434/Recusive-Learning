@@ -18,7 +18,7 @@
   input[type=text], textarea { width: 300px; height: 34px; box-sizing: border-box; }
   textarea { height: 54px; }
   dds-dropdown { display: block; position: relative; width: 300px; }
-  .dds__dropdown__popup { position: absolute; left: 0; right: 0; top: 100%; background: #fff; border: 1px solid #777; z-index: 50; max-height: 330px; overflow: auto; animation: dds-pop 140ms ease-out; }
+  .dds__dropdown__popup { position: absolute; left: 0; right: 0; top: 100%; background: #fff; border: 1px solid #777; z-index: 950; max-height: 330px; overflow: auto; animation: dds-pop 140ms ease-out; }
   @keyframes dds-pop { from { opacity: .2; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   .dds__dropdown__popup--hidden { display: none; }
   .dds__dropdown__list { list-style: none; margin: 0; padding: 0; }
@@ -153,6 +153,36 @@
     return dd;
   }
 
+  // Live portal "+" (window.__livePlus), as recorded on the live Document Type
+  // form: an icon-only dds-button in the legend (span.dds__icon--add-cir) named
+  // only by a hover tooltip; a click while a dropdown is open is swallowed.
+  function popupOpen() {
+    return Array.from(document.querySelectorAll('.dds__dropdown__popup')).some((p) => !p.classList.contains('dds__dropdown__popup--hidden'));
+  }
+  function plusButton(tooltip, onAdd) {
+    const host = document.createElement('dds-button');
+    host.innerHTML = `<button type="button" class="dds__button dds__button--icon-only dds__button--tertiary dds__button--sm"><span class="dds__icon dds__icon--add-cir" aria-hidden="true"></span><dds-tooltip class="dds__tooltip" role="tooltip" hidden>${tooltip}</dds-tooltip></button>`;
+    const btn = host.querySelector('button');
+    const tip = host.querySelector('dds-tooltip');
+    btn.addEventListener('mouseenter', () => { tip.hidden = false; });
+    btn.addEventListener('mouseleave', () => { tip.hidden = true; });
+    btn.addEventListener('mousedown', () => { btn.__swallow = popupOpen(); });
+    btn.addEventListener('click', () => {
+      window.__hipPlusClicks = (window.__hipPlusClicks || 0) + 1;
+      if (btn.__swallow) { btn.__swallow = false; return; }
+      setTimeout(onAdd, 150);
+    });
+    return host;
+  }
+  function minusButton(row) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dds__button dds__button--icon-only dds__row-remove';
+    b.innerHTML = '<span class="dds__icon dds__icon--remove-cir" aria-hidden="true"></span><dds-tooltip class="dds__tooltip" role="tooltip" hidden>Remove</dds-tooltip>';
+    b.addEventListener('click', () => { window.__hipRowsRemoved = (window.__hipRowsRemoved || 0) + 1; row.remove(); });
+    return b;
+  }
+
   function textField({ label, name, placeholder, value = '' }) {
     const id = nextId('dds-form-field');
     const g = document.createElement('div');
@@ -191,8 +221,14 @@
       }));
       return idRow;
     }
-    identifier.appendChild(identifierRow());
-    if (window.__variant) {
+    const firstId = identifierRow();
+    identifier.appendChild(firstId);
+    if (window.__livePlus) {
+      firstId.appendChild(minusButton(firstId));
+      identifier.querySelector('legend').appendChild(plusButton('Create Identifier', () => {
+        const r = identifierRow(); r.appendChild(minusButton(r)); identifier.appendChild(r);
+      }));
+    } else if (window.__variant) {
       // Variant: one identifier row to start; the icon-only "+" appends another.
       const addId = document.createElement('button');
       addId.type = 'button'; addId.textContent = '+'; addId.setAttribute('aria-label', 'Add Identifier');
@@ -239,9 +275,20 @@
       row.appendChild(dropdown({ label: 'Usage', options: OPTIONS.usage, multiple: true, showLabel: index === 0 }));
       return row;
     }
-    const defaults = ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier', 'Alternate Business Identifier'].slice(0, window.__attributeRows || 5);
-    defaults.forEach((name, index) => attributes.appendChild(attributeRow(name, index)));
-    if (window.__variant) {
+    const defaults = window.__livePlus
+      ? ['']  // live: one blank attribute row; every other row comes from the legend "+"
+      : ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier', 'Alternate Business Identifier'].slice(0, window.__attributeRows || 5);
+    defaults.forEach((name, index) => {
+      const r = attributeRow(name, index);
+      if (window.__livePlus) r.appendChild(minusButton(r));
+      attributes.appendChild(r);
+    });
+    if (window.__livePlus) {
+      attributes.querySelector('legend').appendChild(plusButton('Create Attribute', () => {
+        const count = attributes.querySelectorAll('input[name=attributeName]').length;
+        const r = attributeRow('', count); r.appendChild(minusButton(r)); attributes.appendChild(r);
+      }));
+    } else if (window.__variant) {
       // Variant: "+ Add Attribute" appends a blank attribute row.
       const addAttr = document.createElement('button');
       addAttr.type = 'button'; addAttr.textContent = '+ Add Attribute';

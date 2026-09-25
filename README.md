@@ -1,3 +1,21 @@
+## V243R20 — Rows that input.json needs are added with the portal's own "+" in every phase, then filled (2026-09-25)
+
+- **The live "+" is now found and used.** On the portal it is an icon-only button in the list's heading (legend), named only by a hover tooltip such as "Create Condition". The agent missed it, so lists stayed at one row (or none) while the fields were highlighted.
+- The agent now:
+  - finds that "+" in every phase, even when the list is still empty ("No Process Steps Added");
+  - clicks it only as often as input.json needs;
+  - never clicks a row's remove icon or a Create/Save button;
+  - recognises the new, unlabelled rows as part of the same list, and fills them.
+- **Covered:**
+  - Document Type attributes and identifier rows;
+  - Rule conditions;
+  - BizFlow flow identifiers, process steps, the File Name parts inside a step, and routing conditions.
+- **Also fixed:**
+  - an open dropdown is closed before the "+" is clicked, and a swallowed click is retried once;
+  - the "+" is never blocked as if "Create Condition" were a Save.
+
+See `V243R20_PLUS_ROWS_EVERY_PHASE_20260925.md`. Apply with `APPLY_V243R20_IN_PLACE.ps1`; it includes R13–R19.
+
 ## V243R19 — Learning is saved only once a replay proves it; edit / clone / merge / deploy from input.json; certified forms replay fast (2026-09-25)
 
 - **Nothing learned is saved until it is proven.** A learning run fills every input.json value and reads each one back exactly, but what it learned is only a *candidate*. It becomes a saved skill (`data\hip_memory\portal_skills`) only after a **deterministic replay** on a fresh form fills the same values again:

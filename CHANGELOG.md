@@ -1,3 +1,25 @@
+# V243R20 — Live legend "+" rows for every phase (2026-09-25)
+
+- `form_structure_healer._ADD_BUTTON_JS`: icon-only add controls are recognised by:
+  - icon class (`add-cir`, `add`, `plus`…);
+  - tooltip, `title`, `aria-label` or `aria-describedby`;
+  - legend/heading title.
+
+  Visible Create/Save/Submit buttons and remove icons are excluded. A `dds-button` host and its button are one control. Candidates that name the list rank first; a plus inside an existing row needs a name match; an empty list needs its own legend/heading match.
+- `ensure_repeatable_rows`:
+  - settles open popups before each click;
+  - retries one ineffective click;
+  - dispatches with `add_row_action_label` (`structural_opener add row …`).
+- `capture_stateful_controls`: every row of an Angular FormArray takes the kind read from its first, labelled row (`row_kind_source=formarray_first_row`); `formarrayname=conditions` rows carry their FormArray hint.
+- `BrowserSession._assert_safe_click`: a structural-opener click on an element with an add icon is allowed.
+- `rules_kb`: the Conditions plus is dispatched as `structural_opener add row Conditions`.
+- Replica kit live mode (`window.__livePlus`):
+  - `liveList`, `plusButton` (legend `dds-button`, `add-cir` icon, hover tooltip, swallowed click while a popup is open, `window.__plusSwallowFirst`);
+  - `minusButton` (remove trap).
+- Document Type, Rule and BizFlow replicas render their lists in live mode.
+- `phase_replica_support`: `live_plus_html`, `install_observers`, `run_phase_replica(live_plus=, observers=, data=)`.
+- New tests: `tests/test_v243r20_live_plus_rows.py`. Added `APPLY_V243R20_IN_PLACE.ps1` / `VERIFY_V243R20_INSTALL.ps1`.
+
 # V243R19 — Certified portal skills, input.json operations, fast deterministic replay (2026-09-25)
 
 - `portal_skills` (new):

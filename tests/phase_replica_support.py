@@ -69,9 +69,23 @@ def attach_broker_session(page: Any, tmp_path: Path, phase: str) -> None:
     page._hip_browser_session = session
 
 
+async def install_observers(page: Any) -> None:
+    """Install the DOM event/mutation observers every live session page has."""
+    from hip_id_agent.browser_session import CLICK_LISTENER_SCRIPT, DOM_EVENT_OBSERVER_SCRIPT
+
+    for script in (CLICK_LISTENER_SCRIPT, DOM_EVENT_OBSERVER_SCRIPT):
+        await page.evaluate(script)
+
+
+def live_plus_html(fixture: str) -> str:
+    """The replica with the live portal's legend "+" (V243R20): lists start with
+    one row (or none) and grow only through the icon-only plus in their legend."""
+    return replica_html(fixture).replace("<body>", "<body><script>window.__livePlus = true;</script>", 1)
+
+
 async def _run(
     tmp_path: Path, *, phase: str, fixture: str, data: Dict[str, Any], section: Optional[str], prepare_js: str,
-    max_cycles: int, broker: bool,
+    max_cycles: int, broker: bool, live_plus: bool = False, observers: bool = False,
 ) -> Tuple[Dict[str, Any], List[Any]]:
     async with async_playwright() as pw:
         try:
@@ -79,12 +93,14 @@ async def _run(
         except Exception as exc:  # pragma: no cover - environment without Chromium
             pytest.skip(f"Chromium unavailable: {exc}")
         page = await browser.new_page(viewport={"width": 1280, "height": 720})
-        await page.set_content(replica_html(fixture))
+        await page.set_content(live_plus_html(fixture) if live_plus else replica_html(fixture))
         if prepare_js:
             await page.evaluate(prepare_js)
             await page.wait_for_timeout(300)
         if broker:
             attach_broker_session(page, tmp_path, phase)
+        if observers:
+            await install_observers(page)
         try:
             kwargs: Dict[str, Any] = {"section": section} if section else {}
             if "document_type" in phase:
@@ -97,6 +113,9 @@ async def _run(
             # the search box (not committed) disappears here.
             await page.mouse.click(5, 700)
             await page.wait_for_timeout(400)
+            if live_plus:
+                page_stats = await page.evaluate("() => ({plus_clicks: window.__hipPlusClicks || 0, rows_removed: window.__hipRowsRemoved || 0})")
+                result = dict(result, live_plus_stats=page_stats)
             dom = await page.evaluate(
                 """() => Array.from(document.querySelectorAll('input,textarea')).filter(e => e.offsetParent || e.type === 'file').map(e => ({
                     key: e.placeholder || e.name, name: e.name, type: e.type,
@@ -112,12 +131,13 @@ async def _run(
 
 def run_phase_replica(
     tmp_path: Path, *, phase: str, fixture: str, section: Optional[str] = None, prepare_js: str = "",
-    max_cycles: int = 2, broker: bool = False,
+    max_cycles: int = 2, broker: bool = False, live_plus: bool = False, observers: bool = False,
+    data: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], List[Any]]:
-    data = uhaul_input(phase, tmp_path)
+    data = data or uhaul_input(phase, tmp_path)
     result, dom = asyncio.run(_run(
         tmp_path, phase=phase, fixture=fixture, data=data, section=section, prepare_js=prepare_js,
-        max_cycles=max_cycles, broker=broker,
+        max_cycles=max_cycles, broker=broker, live_plus=live_plus, observers=observers,
     ))
     return result, autonomous_target_execution(result), dom
 

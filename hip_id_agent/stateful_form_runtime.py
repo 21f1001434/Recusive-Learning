@@ -2322,7 +2322,7 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
   function headingFrom(cur){while(cur&&cur!==document.body){const candidates=Array.from(cur.children||[]).filter(x=>/^(H1|H2|H3|H4)$/.test(x.tagName)||x.getAttribute('role')==='heading'||x.tagName==='LEGEND');for(const h of candidates){const t=clean(h.innerText||h.textContent);if(t)return t;}cur=cur.parentElement;}return '';}
   function regionLabel(rg){const lb=rg.getAttribute('aria-labelledby');if(lb){const t=clean(lb.split(/\s+/).map(i=>{const x=document.getElementById(i);return x?(x.innerText||x.textContent):'';}).join(' '));if(t)return t;}return clean(rg.getAttribute('aria-label')||'');}
   function section(el){const rg=el.closest('[role=region][aria-labelledby],[role=region][aria-label]');const nearFs=el.closest('fieldset');if(rg&&(!nearFs||nearFs.contains(rg))){const t=regionLabel(rg);if(t)return t;}const tab=el.closest('[role=tabpanel]');if(tab){const labelled=tab.getAttribute('aria-labelledby');if(labelled){const l=document.getElementById(labelled);if(l&&clean(l.innerText||l.textContent))return clean(l.innerText||l.textContent);}const h=tab.querySelector('h1,h2,h3,h4,[role=heading],legend');if(h&&clean(h.innerText||h.textContent))return clean(h.innerText||h.textContent);}const fs=el.closest('fieldset');const lg=fs&&fs.querySelector(':scope > legend');if(lg&&clean(lg.innerText||lg.textContent))return clean(lg.innerText||lg.textContent);return headingFrom(el.parentElement);}
-  function row(el){const array=el.closest('[formarrayname=conditions]');if(array){const direct=Array.from(array.children||[]).filter(x=>x.querySelector&&x.querySelector('[formcontrolname=conditionType],dds-dropdown[name=conditionType]'));const rr=direct.find(x=>x===el||x.contains(el));if(rr)return {signature:css(rr),text:clean(rr.innerText||rr.textContent).slice(0,240),parent:css(array)};}
+  function row(el){const array=el.closest('[formarrayname=conditions]');if(array){const direct=Array.from(array.children||[]).filter(x=>x.querySelector&&x.querySelector('[formcontrolname=conditionType],dds-dropdown[name=conditionType]'));const rr=direct.find(x=>x===el||x.contains(el));if(rr)return {signature:css(rr),text:clean(rr.innerText||rr.textContent).slice(0,240),parent:css(array),hint:'array:conditions'};}
     /* Angular FormArray row: [formgroupname=<n>] inside [formarrayname] */
     const fg=el.closest('[formgroupname]');if(fg&&/^\d+$/.test(fg.getAttribute('formgroupname')||'')){const arr=fg.closest('[formarrayname]');const an=(arr&&arr.getAttribute('formarrayname'))||'';return {signature:css(fg),text:clean(fg.innerText||fg.textContent).slice(0,240),parent:arr?css(arr):(fg.parentElement?css(fg.parentElement):''),hint:an?('array:'+an):''};}const selectors=['tr','[role=row]','.dds__table__row','[class*=condition-row]','[class*=action-row]','[class*=attribute-row]','[class*=process-step]','[class*=filename-part]','[class*=file-name-part]','.dds__d-flex.dds__justify-content-start'];const cands=selectors.map(s=>el.closest(s)).filter(r=>r&&r.querySelectorAll('input:not([type=hidden]),textarea,select,[role=combobox],[role=radio]').length>1);/* innermost container wins: a File Name part row inside a Process Step is its own row */const inner=cands.find(c=>cands.every(o=>o===c||!c.contains(o)));if(inner){const hint=inner.matches('[class*=filename-part],[class*=file-name-part]')?'filename_part':inner.matches('[class*=process-step]')?'process_step':inner.matches('[class*=condition-row]')?'condition':inner.matches('[class*=action-row]')?'action':inner.matches('[class*=attribute-row]')?'attribute':'';return {signature:css(inner),text:clean(inner.innerText||inner.textContent).slice(0,240),parent:inner.parentElement?css(inner.parentElement):'',hint};}return {signature:'',text:'',parent:'',hint:''};}
   function groupInfo(el){
@@ -2423,6 +2423,7 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
                 # Any other Angular FormArray (Tags, Cross Reference rows, ...):
                 # its own name is its row kind.
                 c["row_kind"] = _norm(hint[len("array:"):])
+                c["row_kind_source"] = "array_name"
     # DDS labels only the first row of a repeatable group, so an unlabelled row
     # has no text to classify it by.  Sibling rows under the same container are
     # the same kind: inherit it.
@@ -2439,6 +2440,28 @@ async def capture_stateful_controls(page: Page, phase: str) -> List[Dict[str, An
             if len(bucket) == 1:
                 c["row_kind"] = next(iter(bucket))
                 c["row_kind_inferred_from_siblings"] = True
+    # V243R20: rows added with the portal's "+" carry no labels (DDS labels only
+    # the first row), so their own text cannot classify them: they fell back to
+    # the FormArray name ("attributes") or took a kind from unrelated nearby
+    # text ("routing_action").  An Angular FormArray holds one kind of item, so
+    # every row of it takes the kind read from its first, labelled row.
+    first_kind: Dict[str, Tuple[int, str]] = {}
+    for c in controls:
+        parent = str(c.get("row_parent") or "")
+        if not parent or not str(c.get("row_kind_hint") or "").startswith("array:") or not c.get("row_kind"):
+            continue
+        if c.get("row_kind_source") == "array_name" or c.get("row_kind_inferred_from_siblings"):
+            continue
+        index = int(c.get("row_index") or 0)
+        if parent not in first_kind or index < first_kind[parent][0]:
+            first_kind[parent] = (index, str(c["row_kind"]))
+    for c in controls:
+        parent = str(c.get("row_parent") or "")
+        if parent in first_kind and str(c.get("row_kind_hint") or "").startswith("array:"):
+            kind = first_kind[parent][1]
+            if c.get("row_kind") != kind:
+                c["row_kind"] = kind
+                c["row_kind_source"] = "formarray_first_row"
     # Physical row indexes count every row in a section; the ordinal within one
     # row kind is what a node's zero-based row index means.
     kind_rows: Dict[Tuple[str, str], List[str]] = {}

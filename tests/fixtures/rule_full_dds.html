@@ -32,6 +32,30 @@
   if (!window.__variant) for (let i = 0; i < rowCount; i++) conditionsHost.appendChild(conditionRow(i));
 
   const mappingHost = document.createElement('div');
+  const executeWhen = H.row(H.dropdown({ label: 'Execute Action(s) When *', name: 'executeActionsWhen', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] }));
+  function actionRow() {
+    return H.row(
+      H.text({ label: 'Name *', name: 'name', placeholder: 'Name' }),
+      H.dropdown({
+        label: 'Type *', name: 'type', options: ['Route Document', 'Transform Document'],
+        // The mapping identifier dropdown is rendered only for a chosen Type.
+        onChange: () => setTimeout(() => H.when(mappingHost, () => H.dropdown({
+          label: 'Mapping Identifier Name (Version) *', name: 'target',
+          options: ['DELLCoXMLASNXX08C_U-HAUL(1.0)', 'DELLCoXMLASNXX08C_U-HAUL(2.0)'],
+        })), 150),
+      }),
+      mappingHost,
+    );
+  }
+  // Live portal (window.__livePlus): one condition to start; the only way to
+  // add another is the icon "+" in the "Conditions :" legend.  "Actions :" has
+  // its own "+", which one action does not need.
+  const conditionsFieldset = window.__livePlus
+    ? H.liveList({ legend: 'Conditions :', tooltip: 'Create Condition', name: 'conditions', buildRow: (i) => conditionRow(i), before: [executeWhen] })
+    : H.fieldset('Conditions :', executeWhen, conditionsBlock);
+  const actionsFieldset = window.__livePlus
+    ? H.liveList({ legend: 'Actions :', tooltip: 'Create Action', name: 'actions', buildRow: () => actionRow() })
+    : H.fieldset('Actions :', actionRow());
   const form = H.form(
     H.fieldset('Rule :',
       H.row(
@@ -49,24 +73,8 @@
         H.text({ label: 'Description', name: 'description', placeholder: 'Description', textarea: true }),
       ),
     ),
-    H.fieldset('Conditions :',
-      H.row(H.dropdown({ label: 'Execute Action(s) When *', name: 'executeActionsWhen', options: ['all conditions are satisfied', 'one or more conditions are satisfied'] })),
-      conditionsBlock,
-    ),
-    H.fieldset('Actions :',
-      H.row(
-        H.text({ label: 'Name *', name: 'name', placeholder: 'Name' }),
-        H.dropdown({
-          label: 'Type *', name: 'type', options: ['Route Document', 'Transform Document'],
-          // The mapping identifier dropdown is rendered only for a chosen Type.
-          onChange: () => setTimeout(() => H.when(mappingHost, () => H.dropdown({
-            label: 'Mapping Identifier Name (Version) *', name: 'target',
-            options: ['DELLCoXMLASNXX08C_U-HAUL(1.0)', 'DELLCoXMLASNXX08C_U-HAUL(2.0)'],
-          })), 150),
-        }),
-        mappingHost,
-      ),
-    ),
+    conditionsFieldset,
+    actionsFieldset,
     window.__variant && H.accordion('Advanced', [
       H.segmented({ label: 'Priority', name: 'priority', options: ['Low', 'Normal', 'High'], value: 'Normal' }),
     ]),

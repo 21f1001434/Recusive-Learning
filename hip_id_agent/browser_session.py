@@ -4334,6 +4334,10 @@ class BrowserSession:
                 role:el.getAttribute('role')||'', type:el.getAttribute('type')||'',
                 tag:(el.tagName||'').toLowerCase(), href:el.getAttribute('href')||'',
                 combobox_option: !!(list && list.id && document.querySelector('[role="combobox"][aria-controls="' + list.id + '"]')),
+                add_icon: (() => {
+                  const blob = [el.getAttribute('class')].concat(Array.from(el.querySelectorAll('*')).filter(c => !c.matches('dds-tooltip,[role=tooltip],.dds__tooltip')).map(c => [c.getAttribute('class'), c.getAttribute('href'), c.getAttribute('xlink:href')].join(' '))).join(' ');
+                  return /add-cir|plus-cir|add-circle|plus-circle|icon-add|icon-plus|(^|[\s_-])(add|plus)([\s_-]|$)/i.test(blob) && !/remove|minus|delete|trash/i.test(blob);
+                })(),
               };
             }""")
         except Exception:
@@ -4349,6 +4353,10 @@ class BrowserSession:
             allow = True
         if str(details.get("tag") or "") in {"input", "textarea"} and str(details.get("type") or "text").lower() not in {"submit", "button", "image", "reset"}:
             # A field's own value ("Delete" in a combobox) is not a button label.
+            allow = True
+        if "structural_opener" in action_l and details.get("add_icon"):
+            # V243R20: a list's icon-only "+" (tooltip "Create Condition") adds a
+            # row; it renders fields, it does not save anything.
             allow = True
         if details.get("combobox_option"):
             # V243R19: choosing "Delete" / "Update" as a dropdown value is a form
