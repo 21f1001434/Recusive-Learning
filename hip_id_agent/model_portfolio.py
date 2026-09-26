@@ -29,6 +29,22 @@ ON_PREM_MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
     "nomic-embed-vision-v1-5": {"family": "image_embedding", "modalities": ["image_embedding"], "dimensions": 786, "roles": ["visual_similarity", "golden_reference_similarity"], "function_calling": False, "chat_completions": False, "rest_api": True},
 }
 
+# V243R21: relative reasoning strength of each deployment.  A model's own
+# "confidence" field is not comparable across models (gpt-oss-20b reports 0.98
+# where gpt-oss-120b reports 0.72), so it never outranks a stronger model on its
+# own; downstream task evidence still can.
+MODEL_CAPABILITY: Dict[str, float] = {
+    "gpt-oss-120b": 1.00,
+    "llama-3-3-70b-instruct": 0.86,
+    "mistral-small-3-1-24b-instruct-2503": 0.78,
+    "gemma-3-27b-it": 0.76,
+    "gpt-oss-20b": 0.72,
+    "pixtral-12b-2409": 0.62,
+    "florence-2-large-ft": 0.50,
+    "llama-3-2-3b-instruct": 0.40,
+    "nomic-embed-vision-v1-5": 0.0,
+}
+
 DEFAULT_TEXT_MODELS = ["gpt-oss-120b", "gpt-oss-20b", "mistral-small-3-1-24b-instruct-2503", "llama-3-3-70b-instruct", "gemma-3-27b-it", "llama-3-2-3b-instruct"]
 DEFAULT_VISION_MODELS = ["gemma-3-27b-it", "pixtral-12b-2409", "florence-2-large-ft"]
 DEFAULT_EMBEDDING_MODELS = ["nomic-embed-vision-v1-5"]
@@ -80,6 +96,29 @@ class OnPremModelPortfolioRouter:
 
     def _cfg(self, name: str, default: Any) -> Any:
         return getattr(self.config, name, default) if self.config is not None else default
+
+    def _prefer_strongest(self) -> bool:
+        return bool(self._cfg("prefer_strongest_model", True))
+
+    @staticmethod
+    def capability(model: str) -> float:
+        return float(MODEL_CAPABILITY.get(str(model or ""), 0.5))
+
+    def primary_text_model(self) -> str:
+        """The operator's configured text model (``aia.model``), the floor for default calls."""
+        explicit = str(self._cfg("primary_text_model", "") or "").strip()
+        configured = explicit or str(getattr(self.aia_config, "model", "") or "").strip() or "gpt-oss-120b"
+        return configured if configured in ON_PREM_MODEL_CATALOG else "gpt-oss-120b"
+
+    def strongest_available(self, role: str = "", kind: str = "text") -> str:
+        models = self.available_models(kind, role=role)
+        if not models:
+            return ""
+        return max(models, key=lambda m: (self.capability(m), -models.index(m)))
+
+    def _champion_key(self, score: float, model: str) -> float:
+        weight = float(self._cfg("capability_weight", 0.30) or 0.0) if self._prefer_strongest() else 0.0
+        return (1.0 - weight) * float(score) + weight * self.capability(model)
 
     def _load(self) -> Dict[str, Any]:
         raw = _read_json(self.state_path)
@@ -246,7 +285,7 @@ class OnPremModelPortfolioRouter:
             task_score = self._task_score(task_stats) if task_trials else role_score
             # Task evidence is stronger than generic role evidence once available.
             score = _bounded((0.68 * task_score + 0.32 * role_score) if task_trials else role_score)
-            rows.append({"model": model, "score": score, "role_score": role_score, "task_score": task_score, "trials": int(stats.get("trials") or 0), "task_trials": task_trials, "stats": dict(stats)})
+            rows.append({"model": model, "score": score, "role_score": role_score, "task_score": task_score, "capability": self.capability(model), "trials": int(stats.get("trials") or 0), "task_trials": task_trials, "stats": dict(stats)})
         rows.sort(key=lambda r: (-float(r["score"]), -int(r["task_trials"]), -int(r["trials"]), models.index(r["model"])))
         return rows
 
@@ -276,6 +315,13 @@ class OnPremModelPortfolioRouter:
         role_champion = str((self.state.get("role_champions") or {}).get(role) or "")
         ordered: List[str] = []
         valid = {x["model"] for x in ranked}
+        if self._prefer_strongest():
+            # V243R21: exploration fills the other slots with the least-tried
+            # challengers, but never leaves out the strongest available model (or
+            # the capability-aware champion proven by downstream evidence).
+            anchor = next((c for c in (task_champion, role_champion) if c and c in valid), "") or self.strongest_available(role, kind=kind)
+            if anchor and anchor in valid:
+                ordered.append(anchor)
         if not exploration:
             for candidate in (task_champion, role_champion):
                 if candidate and candidate in valid and candidate not in ordered:
@@ -313,7 +359,12 @@ class OnPremModelPortfolioRouter:
                 text = self.client.autogen_reply(system, task, model=model)
                 latency = (time.perf_counter() - started) * 1000.0
                 quality, parsed = self._response_quality(text, expected_json=expected_json, require_keys=require_keys)
-                prior = self._prior_score(self._model_stats(model, role)); immediate = _bounded(0.62 * quality + 0.38 * prior)
+                prior = self._prior_score(self._model_stats(model, role))
+                if self._prefer_strongest():
+                    weight = float(self._cfg("capability_weight", 0.30) or 0.0)
+                    immediate = _bounded((1.0 - weight) * (0.62 * quality + 0.38 * prior) + weight * self.capability(model))
+                else:
+                    immediate = _bounded(0.62 * quality + 0.38 * prior)
                 proposal_keys = (
                     "candidate_index", "task_family", "confidence", "live_discovery_advisable",
                     "pass", "verdict", "needs_human", "evidence_conflict", "reason_codes",
@@ -387,7 +438,7 @@ class OnPremModelPortfolioRouter:
             task_models = (self.state.get("tasks", {}).get(task_key, {}).get("models") or {})
             ranked_task = sorted(
                 ((m, self._task_score(st), int((st or {}).get("trials") or 0)) for m, st in task_models.items() if m in ON_PREM_MODEL_CATALOG),
-                key=lambda x: (-x[1], -x[2], x[0]),
+                key=lambda x: (-self._champion_key(x[1], x[0]), -x[1], -x[2], x[0]),
             )
             if ranked_task:
                 m, score, trials = ranked_task[0]
@@ -409,6 +460,7 @@ class OnPremModelPortfolioRouter:
             eligible = [row for row in ranked if int(row.get("trials") or 0) >= int(self._cfg("min_champion_trials", 3) or 3) and float(row.get("score") or 0.0) >= float(self._cfg("min_champion_score", 0.78) or 0.78)]
             old = str(previous.get(role) or "")
             if eligible:
+                eligible.sort(key=lambda row: -self._champion_key(float(row.get("score") or 0.0), str(row.get("model") or "")))
                 champion = eligible[0]["model"]
                 self.state.setdefault("role_champions", {})[role] = champion
                 if old != champion:
@@ -419,17 +471,25 @@ class OnPremModelPortfolioRouter:
                     changed[role] = {"from": old, "to": ""}
         self.state["cycle"] = int(self.state.get("cycle") or 0) + 1; self._save()
         cycle = {"schema_version": "hip.model-portfolio-dream-cycle.v2", "cycle": self.state["cycle"], "recorded_at": utc_now(), "reason": reason, "champion_changes": changed, "role_champions": dict(self.state.get("role_champions") or {}), "promotion_requires_downstream_evidence": True}
-        _append_jsonl(self.dreams_path, cycle)
         general = str((self.state.get("role_champions") or {}).get("planning") or (self.state.get("role_champions") or {}).get("action_selection") or "")
+        primary = self.primary_text_model()
+        if general and self._prefer_strongest() and self.capability(general) < self.capability(primary):
+            # V243R21: a weaker champion never replaces the configured model for
+            # every default call, unless the configured model is proven down.
+            row = (self.state.get("availability") or {}).get(primary) or {}
+            if not (self._availability_fresh(primary) and row.get("available") is False):
+                general = ""
         if general:
             os.environ["HIP_MODEL_ROUTER_SELECTED_TEXT"] = general
         else:
             os.environ.pop("HIP_MODEL_ROUTER_SELECTED_TEXT", None)
+        cycle["default_text_model"] = general or primary
+        _append_jsonl(self.dreams_path, cycle)
         return mask_sensitive_data(cycle)
 
     def manifest(self) -> Dict[str, Any]:
         roles = sorted(set((self.state.get("role_champions") or {}).keys()) | {"planning", "action_selection", "judge", "recovery"})
-        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": self.recent_usage(25), "recent_distinct_models": sorted({m for row in self.recent_usage(25) for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
+        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "primary_text_model": self.primary_text_model(), "default_text_model": os.environ.get("HIP_MODEL_ROUTER_SELECTED_TEXT") or self.primary_text_model(), "prefer_strongest_model": self._prefer_strongest(), "model_capability": {m: self.capability(m) for m in self.configured_models("text")}, "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": self.recent_usage(25), "recent_distinct_models": sorted({m for row in self.recent_usage(25) for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
 
 
 def model_portfolio_from_config(app_config: Any) -> OnPremModelPortfolioRouter:

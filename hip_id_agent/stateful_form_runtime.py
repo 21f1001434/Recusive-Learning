@@ -2000,6 +2000,10 @@ async def execute_document_type_state_graph(
         }
         dom_cursor = await _mark_dom_transition_cursor(page)
         node_started = asyncio.get_running_loop().time()
+        try:
+            setattr(page, "_hip_last_broker_error", None)
+        except Exception:
+            pass
         for retry in range(max_retries + 1):
             if retry and asyncio.get_running_loop().time() - node_started > _node_time_budget_seconds(interaction_profile):
                 # Leave this field to the repair pass instead of holding the form.
@@ -2163,6 +2167,9 @@ async def execute_document_type_state_graph(
                 if current is not None:
                     actual_control = current
                 last_error = "control did not reach a stable exact expected value after blur/rerender"
+                refused = getattr(page, "_hip_last_broker_error", None)
+                if isinstance(refused, dict) and refused.get("error"):
+                    last_error += f"; last refused portal action: {refused.get('label') or refused.get('action')}: {refused.get('error')}"
             except Exception as exc:
                 raise_if_environment_fatal(exc)
                 last_error = mask_sensitive_string(str(exc))
@@ -3501,6 +3508,10 @@ async def execute_phase_state_graph(
             )
         elif repair and control is not None and str(node.get("action")) != "upload_file":
             node_started = asyncio.get_running_loop().time()
+            try:
+                setattr(page, "_hip_last_broker_error", None)
+            except Exception:
+                pass
             for retry in range(max_retries + 1):
                 if retry and asyncio.get_running_loop().time() - node_started > _node_time_budget_seconds(interaction_profile):
                     reason = "HIP_NODE_TIME_BUDGET_EXCEEDED: field did not commit within its time budget; the repair pass retries it"
@@ -3637,6 +3648,9 @@ async def execute_phase_state_graph(
                     if current is not None:
                         actual = current
                     reason = "control did not commit exact stable value after repair"
+                    refused = getattr(page, "_hip_last_broker_error", None)
+                    if isinstance(refused, dict) and refused.get("error"):
+                        reason += f"; last refused portal action: {refused.get('label') or refused.get('action')}: {refused.get('error')}"
                 except Exception as exc:
                     raise_if_environment_fatal(exc)
                     reason = mask_sensitive_string(str(exc))

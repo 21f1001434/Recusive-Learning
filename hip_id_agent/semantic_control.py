@@ -197,7 +197,7 @@ INVENTORY_JS = r"""
       tag:(el.tagName||'').toLowerCase(), role:String(role||'').toLowerCase(), type:String(el.getAttribute('type')||'').toLowerCase(),
       section:sectionFor(el), framework_key:norm(el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')), name:norm(el.getAttribute('name')), testid:norm(el.getAttribute('data-testid')),
       visible:visible(el), enabled:!(el.disabled||el.getAttribute('aria-disabled')==='true'), readonly:!!(el.readOnly||el.getAttribute('aria-readonly')==='true'), required:!!(el.required||el.getAttribute('aria-required')==='true'), accept:norm(el.getAttribute('accept')),
-      checked:!!el.checked, selected:!!el.selected, selected_count:selected, expanded:el.getAttribute('aria-expanded'), aria_haspopup:el.getAttribute('aria-haspopup')||'', aria_controls:el.getAttribute('aria-controls')||'', aria_owns:el.getAttribute('aria-owns')||'',
+      checked:!!el.checked||el.getAttribute('aria-checked')==='true'||!!(el.querySelector&&el.querySelector('input[type=checkbox]:checked')), selected:!!el.selected||el.getAttribute('aria-selected')==='true', selected_count:selected, expanded:el.getAttribute('aria-expanded'), aria_haspopup:el.getAttribute('aria-haspopup')||'', aria_controls:el.getAttribute('aria-controls')||'', aria_owns:el.getAttribute('aria-owns')||'',
       owned_surface_visible:ownerVisible, owned_surface_role:ownerRole, has_value:!!(String(el.value||'').trim()||selected||el.checked), row_kind:row.kind,row_index:row.index,
     };
   });
@@ -866,7 +866,7 @@ class SemanticActionGate:
             result["status"] = "warning_fail_open"
         return result
 
-    async def revalidate(self, *, page: Any, resolution: Mapping[str, Any]) -> Dict[str, Any]:
+    async def revalidate(self, *, page: Any, resolution: Mapping[str, Any], locator: Any = None) -> Dict[str, Any]:
         """Re-prove the same semantic control immediately before dispatch.
 
         If Angular/DDS rerendered, a stable semantic selector may change. We search
@@ -895,6 +895,24 @@ class SemanticActionGate:
                     status = "ambiguous_same_generation"
             else:
                 status = "ambiguous_after_rerender" if current_generation != before_generation else "ambiguous"
+            if not candidate and locator is not None:
+                # V243R21: the value-free fingerprint cannot tell look-alikes apart
+                # (a row's "Derived From" in every attribute row, every option of a
+                # multi-select, a dds-button host and its button), and the DOM
+                # generation always advances before dispatch -- the overlay that
+                # highlights the target, hover and focus classes.  The executor's
+                # own row-exact locator is the authority: dispatch to it when it
+                # still points at the same control in the same row.
+                anchored_state = await capture_semantic_state(page, locator=locator)
+                anchored = [dict(c) for c in anchored_state.get("controls", []) if isinstance(c, Mapping) and c.get("anchor_match")]
+                same = [c for c in anchored if str(c.get("semantic_control_id") or "") == sid or str(c.get("control_fingerprint") or "") == fp]
+                if len(same) == 1:
+                    before_row, now_row = before_candidate.get("row_index"), same[0].get("row_index")
+                    if before_row is None or now_row is None or int(before_row) == int(now_row):
+                        candidate = same[0]
+                        status = "stable_vetted_locator"
+                    else:
+                        status = "row_moved_after_rerender"
         unique = bool(candidate)
         action_family = str(((resolution.get("evidence") or {}).get("action_family") or ""))
         hidden_upload_ok = action_family == "upload" and _norm(candidate.get("tag")) == "input" and _norm(candidate.get("type")) == "file"
@@ -918,12 +936,18 @@ class SemanticActionGate:
         action: str,
         phase: str,
         exact_value_verified: bool = False,
+        locator: Any = None,
     ) -> Dict[str, Any]:
-        after = await capture_semantic_state(page)
+        after = await capture_semantic_state(page, locator=locator)
         sid = str(resolution.get("semantic_control_id") or "")
         before_state = dict(resolution.get("before_state") or {})
         candidate_before = dict(resolution.get("candidate_before") or resolution.get("candidate") or {})
-        candidate_after = self._candidate_by_semantic_id(after, sid)
+        # V243R21: look-alikes share one semantic id (every option of a
+        # multi-select, a row's control in every row); the first of them is not
+        # the control that was acted on.  Compare the element the action used.
+        anchored_after = [dict(c) for c in after.get("controls", []) if isinstance(c, Mapping) and c.get("anchor_match")
+                          and str(c.get("semantic_control_id") or "") == sid]
+        candidate_after = anchored_after[0] if len(anchored_after) == 1 else self._candidate_by_semantic_id(after, sid)
         effect = verify_semantic_effect(
             before=before_state,
             after=after,

@@ -913,6 +913,12 @@ class ModelPortfolioConfig(BaseModel):
     record_usage_ledger: bool = True
     min_champion_trials: int = 3
     min_champion_score: float = 0.78
+    # V243R21: the strongest available model always takes part and is preferred;
+    # a model's self-reported confidence never outranks a stronger model, and a
+    # weaker champion never replaces the configured aia.model for default calls.
+    prefer_strongest_model: bool = True
+    capability_weight: float = 0.30
+    primary_text_model: str = ""
     text_models: List[str] = Field(default_factory=lambda: [
         "gpt-oss-120b", "gpt-oss-20b", "mistral-small-3-1-24b-instruct-2503",
         "llama-3-3-70b-instruct", "gemma-3-27b-it", "llama-3-2-3b-instruct",

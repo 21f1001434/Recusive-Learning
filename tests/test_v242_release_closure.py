@@ -24,6 +24,9 @@ def cfg(**overrides):
         fast_exploitation_single_model=True,
         min_champion_trials=3,
         min_champion_score=0.78,
+        # Pure downstream-evidence mode (see test_v243r21_model_preference.py for
+        # the default strongest-model preference).
+        prefer_strongest_model=False,
         text_models=[
             "gpt-oss-120b",
             "gpt-oss-20b",

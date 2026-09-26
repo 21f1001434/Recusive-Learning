@@ -1,3 +1,22 @@
+# V243R21 — Live-gate look-alike controls, strongest model, lean live view (2026-09-26)
+
+- `SemanticActionGate.revalidate(locator=)`: when several controls share the target's fingerprint, the target is re-proven through the executor's own locator. It must be the same fingerprint, and the same row when the row is known (`stable_vetted_locator`). A re-created or moved control is still refused. `BrowserSession._semantic_dispatch_target` passes the locator and keeps it.
+- `SemanticActionGate.verify_and_learn(locator=)`: the effect is read from the element acted on, not from the first look-alike. `INVENTORY_JS` counts `aria-selected`, `aria-checked` and a checked inner checkbox as selection state. The three broker call sites pass their locator.
+- `model_portfolio`:
+  - `MODEL_CAPABILITY` tiers;
+  - `prefer_strongest_model`, `capability_weight` (0.30) and `primary_text_model` (default `aia.model`);
+  - the tournament winner weighs capability, not only self-reported confidence;
+  - the strongest available model, or a proven champion, always takes part;
+  - champions are ranked capability-aware;
+  - `HIP_MODEL_ROUTER_SELECTED_TEXT` never downgrades `aia.model` unless it is proven down;
+  - the manifest reports `default_text_model` and `model_capability`.
+- `AgentLiveViewRecorder`: in-memory state; only the new entry is masked; compact history entries (`_HISTORY_KEYS`).
+- `dds_control_driver._remember_broker_execution(error=)`: records why the broker refused. The Document Type and generic executors append `last refused portal action: …` to a failed field's reason.
+- Tests:
+  - `phase_replica_support.run_phase_replica(gate=True)` (live gate + overlay, `gate_stats`);
+  - `tests/test_v243r21_gate_lookalikes.py` (5) and `tests/test_v243r21_model_preference.py` (6);
+  - the R241/R242 portfolio tests pin `prefer_strongest_model=False`.
+
 # V243R20 — Live legend "+" rows for every phase (2026-09-25)
 
 - `form_structure_healer._ADD_BUTTON_JS`: icon-only add controls are recognised by:

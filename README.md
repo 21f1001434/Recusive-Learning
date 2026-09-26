@@ -1,3 +1,18 @@
+## V243R21 — Derived From and Usage in every row are filled on the live portal; gpt-oss-120b is used (2026-09-26)
+
+- **Row dropdowns and multi-selects are filled.** On the live portal every action passes a safety gate that re-checks the target just before the click. Controls that look alike, such as "Derived From" in every attribute row or every option of Usage, could not be told apart once the page had changed at all, and the gate's own highlight changes it. So every such click was refused: the overlay stayed on SELECTING and the phase repeated cycles.
+- The gate now:
+  - re-checks the exact element the agent chose, still requiring the same control in the same row;
+  - verifies an option click on the option clicked.
+- **Every phase was verified with that gate on.** All pass in one cycle with no refusals; Document Type fills all five rows, including all four Usage values.
+- **gpt-oss-120b is used.** gpt-oss-20b won the model votes on its own over-confident score, then replaced the configured model everywhere. Now:
+  - the strongest available model always takes part and is preferred;
+  - a weaker model wins only when the stronger one gives no usable answer, or is down.
+- **Faster:** the live view no longer rewrites its whole 9 MB history about four times per action. A gated Rule run takes 91 s, down from 170 s.
+- A failed field now names the portal action that was refused and why.
+
+See `V243R21_LIVE_GATE_ROW_DROPDOWNS_BEST_MODEL_20260926.md`. Apply with `APPLY_V243R21_IN_PLACE.ps1`; it includes R13–R20.
+
 ## V243R20 — Rows that input.json needs are added with the portal's own "+" in every phase, then filled (2026-09-25)
 
 - **The live "+" is now found and used.** On the portal it is an icon-only button in the list's heading (legend), named only by a hover tooltip such as "Create Condition". The agent missed it, so lists stayed at one row (or none) while the fields were highlighted.

@@ -25,6 +25,9 @@ def portfolio_cfg():
         parallel_models=3,
         max_parallel_models=4,
         shadow_reward_weight=0.35,
+        # Pure downstream-evidence mode: these tests exercise the reward and
+        # champion bookkeeping, not the V243R21 strongest-model preference.
+        prefer_strongest_model=False,
         text_models=[
             "gpt-oss-120b",
             "gpt-oss-20b",

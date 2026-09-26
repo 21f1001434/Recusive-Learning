@@ -251,7 +251,7 @@ def _last_session_executor(session: Any) -> str:
         return ""
 
 
-def _remember_broker_execution(page: Page, *, action: str, selector: str, label: str, success: bool, executor: str = "", value_present: bool = False) -> Dict[str, Any]:
+def _remember_broker_execution(page: Page, *, action: str, selector: str, label: str, success: bool, executor: str = "", value_present: bool = False, error: Any = None) -> Dict[str, Any]:
     row = {
         "action": str(action or ""),
         "selector": str(selector or ""),
@@ -265,7 +265,13 @@ def _remember_broker_execution(page: Page, *, action: str, selector: str, label:
             or str(executor or "").startswith("python-playwright")
         )),
     }
+    if error:
+        # V243R21: why the broker refused (e.g. HIP_SEMANTIC_TARGET_DRIFT), so a
+        # failed field names its real cause instead of only "no stable value".
+        row["error"] = mask_sensitive_string(str(error))[:300]
     try:
+        if not success and row.get("error"):
+            setattr(page, "_hip_last_broker_error", dict(row))
         setattr(page, "_hip_last_control_execution", row)
         hist = getattr(page, "_hip_control_execution_history", None)
         if not isinstance(hist, list):
@@ -331,7 +337,7 @@ async def _broker_click(page: Page, selector: str, *, label: str, phase: str = "
             except Exception as exc:
                 _remember_broker_execution(
                     page, action="click", selector=selector, label=label, success=False,
-                    executor=_last_session_executor(session) or "browser-session",
+                    executor=_last_session_executor(session) or "browser-session", error=exc,
                 )
                 # A stuck portal loader / refreshed page / expired login is not a
                 # field failure: let it end the attempt for the recovery ladder.
@@ -381,7 +387,7 @@ async def _broker_fill(page: Page, selector: str, value: str, *, label: str, pha
             except Exception as exc:
                 _remember_broker_execution(
                     page, action=action_type, selector=selector, label=label, success=False,
-                    executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)),
+                    executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)), error=exc,
                 )
                 raise_if_environment_fatal(exc)
                 return False
@@ -416,7 +422,8 @@ async def _broker_press(page: Page, selector: str, key: str, *, label: str, phas
                 await session.press_and_log(locator=loc, key=key, selector=selector)
                 _remember_broker_execution(page, action="press", selector=selector, label=label, success=True, executor=_last_session_executor(session) or "browser-session")
                 return True
-            except Exception:
+            except Exception as exc:
+                _remember_broker_execution(page, action="press", selector=selector, label=label, success=False, executor=_last_session_executor(session) or "browser-session", error=exc)
                 return False
         backend = getattr(page, "_hip_playwright_mcp_backend", None)
         if backend is not None and hasattr(backend, "press"):

@@ -48,8 +48,14 @@ def replica_html(fixture: str, setup_js: str = "") -> str:
     return html.replace("<!--HIP_DDS_KIT-->", f"<script>{setup_js}</script><script>{kit}</script>")
 
 
-def attach_broker_session(page: Any, tmp_path: Path, phase: str) -> None:
-    """Route every click/fill through the real BrowserSession broker."""
+def attach_broker_session(page: Any, tmp_path: Path, phase: str, gate: bool = False) -> None:
+    """Route every click/fill through the real BrowserSession broker.
+
+    ``gate=True`` keeps the semantic action gate on, as on the live portal: every
+    action is re-proven before dispatch and its effect verified afterwards, and
+    the live-view overlay highlights each target.  The MCP evidence servers are
+    not running here, so the gate uses config.yaml's adaptive evidence policy.
+    """
     from hip_id_agent.browser_session import BrowserSession
     from hip_id_agent.config import AppConfig
 
@@ -65,7 +71,8 @@ def attach_broker_session(page: Any, tmp_path: Path, phase: str) -> None:
     session._ensure_active_page = _active_page
     # The live MCP evidence servers are not running in unit tests.
     if getattr(session, "semantic_action_gate", None) is not None:
-        session.semantic_action_gate.enabled = False
+        session.semantic_action_gate.enabled = bool(gate)
+        session.semantic_action_gate.strict_external_evidence = False
     page._hip_browser_session = session
 
 
@@ -85,7 +92,7 @@ def live_plus_html(fixture: str) -> str:
 
 async def _run(
     tmp_path: Path, *, phase: str, fixture: str, data: Dict[str, Any], section: Optional[str], prepare_js: str,
-    max_cycles: int, broker: bool, live_plus: bool = False, observers: bool = False,
+    max_cycles: int, broker: bool, live_plus: bool = False, observers: bool = False, gate: bool = False,
 ) -> Tuple[Dict[str, Any], List[Any]]:
     async with async_playwright() as pw:
         try:
@@ -98,7 +105,7 @@ async def _run(
             await page.evaluate(prepare_js)
             await page.wait_for_timeout(300)
         if broker:
-            attach_broker_session(page, tmp_path, phase)
+            attach_broker_session(page, tmp_path, phase, gate=gate)
         if observers:
             await install_observers(page)
         try:
@@ -109,6 +116,14 @@ async def _run(
                 page=page, graph=compile_phase_state_graph(data, phase), phase=phase, input_data=data,
                 config=None, output_dir=tmp_path / "out", max_cycles=max_cycles, **kwargs,
             )
+            if gate:
+                session = page._hip_browser_session
+                gate_dir = session.semantic_action_gate.evidence_dir
+                result = dict(result, gate_stats={
+                    "pre_checks": len(list(gate_dir.glob("*_pre_*.json"))),
+                    "target_drift": sum(1 for e in session.action_events if "HIP_SEMANTIC_TARGET_DRIFT" in str(getattr(e, "error", "") or "")),
+                    "effect_not_proven": sum(1 for e in session.action_events if "HIP_SEMANTIC_EFFECT_NOT_PROVEN" in str(getattr(e, "error", "") or "")),
+                })
             # Blur everything first: a dropdown value that was only typed into
             # the search box (not committed) disappears here.
             await page.mouse.click(5, 700)
@@ -132,12 +147,12 @@ async def _run(
 def run_phase_replica(
     tmp_path: Path, *, phase: str, fixture: str, section: Optional[str] = None, prepare_js: str = "",
     max_cycles: int = 2, broker: bool = False, live_plus: bool = False, observers: bool = False,
-    data: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None, gate: bool = False,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], List[Any]]:
     data = data or uhaul_input(phase, tmp_path)
     result, dom = asyncio.run(_run(
         tmp_path, phase=phase, fixture=fixture, data=data, section=section, prepare_js=prepare_js,
-        max_cycles=max_cycles, broker=broker, live_plus=live_plus, observers=observers,
+        max_cycles=max_cycles, broker=broker, live_plus=live_plus, observers=observers, gate=gate,
     ))
     return result, autonomous_target_execution(result), dom
 

@@ -117,29 +117,50 @@ class AgentLiveViewRecorder:
             })
 
     def _read(self) -> Dict[str, Any]:
+        # V243R21: the recorder is the file's only writer, so its state is kept in
+        # memory instead of being re-read (several MB) for every event.
+        cached = getattr(self, "_state", None)
+        if isinstance(cached, dict):
+            return cached
         try:
             data = json.loads(self.path.read_text(encoding="utf-8-sig"))
-            return data if isinstance(data, dict) else {}
+            data = data if isinstance(data, dict) else {}
         except Exception:
-            return {}
+            data = {}
+        self._state = data
+        return data
 
     def _persist(self, state: Mapping[str, Any]) -> None:
-        payload = mask_sensitive_data(dict(state))
+        # History entries are masked once, when appended; only the rest is masked here.
+        payload = mask_sensitive_data({k: v for k, v in dict(state).items() if k != "history"})
+        payload["history"] = list(state.get("history") or [])
         payload["schema_version"] = self.SCHEMA_VERSION
         payload["updated_at"] = utc_now()
+        self._state = payload
         safe_write_json(self.path, payload, mask=False)
 
+    # What the decision timeline shows; the full evidence stays in ``current``.
+    _HISTORY_KEYS = (
+        "event", "at", "action_id", "phase", "page_url", "page_url_after", "intent", "action", "expected_value",
+        "active_surface", "selected_control", "execution", "verification", "screenshot_relative_path", "screenshot_stage",
+    )
+
     def _append(self, current: Mapping[str, Any]) -> None:
-        state = self._read() or {
+        state = dict(self._read() or {
             "schema_version": self.SCHEMA_VERSION,
             "available": self.enabled,
             "history": [],
-        }
+        })
+        masked = mask_sensitive_data(dict(current))
+        entry = {k: masked[k] for k in self._HISTORY_KEYS if k in masked}
+        stage = (masked.get("visual_overlay") or {}).get("stage") if isinstance(masked.get("visual_overlay"), Mapping) else None
+        if stage:
+            entry["visual_overlay"] = {"stage": stage}
         history = list(state.get("history") or [])
-        history.append(mask_sensitive_data(dict(current)))
+        history.append(entry)
         if len(history) > self.history_limit:
             history = history[-self.history_limit :]
-        state["current"] = mask_sensitive_data(dict(current))
+        state["current"] = masked
         state["history"] = history
         self._persist(state)
 

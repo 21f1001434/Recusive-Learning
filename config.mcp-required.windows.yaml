@@ -559,6 +559,11 @@ model_portfolio:
   record_usage_ledger: true
   min_champion_trials: 3
   min_champion_score: 0.78
+  # V243R21: prefer the strongest available model (gpt-oss-120b); weaker models
+  # take part as challengers and win only on downstream evidence.
+  prefer_strongest_model: true
+  capability_weight: 0.30
+  primary_text_model: ""   # empty = aia.model
   text_models:
     - "gpt-oss-120b"
     - "gpt-oss-20b"

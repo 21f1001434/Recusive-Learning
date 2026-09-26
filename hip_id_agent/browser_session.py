@@ -4623,11 +4623,15 @@ class BrowserSession:
         cfg = getattr(self.config, "semantic_understanding", None)
         if gate is None or not resolution.get("semantic_control_id") or not bool(getattr(cfg, "revalidate_before_dispatch", True)):
             return locator, selector, {"pass": True, "status": "not_required"}
-        proof = await gate.revalidate(page=self.page, resolution=resolution)
+        proof = await gate.revalidate(page=self.page, resolution=resolution, locator=locator)
         if not proof.get("pass"):
             raise RuntimeError(
                 f"HIP_SEMANTIC_TARGET_DRIFT: {proof.get('status')} match_count={proof.get('match_count')}"
             )
+        if proof.get("status") == "stable_vetted_locator":
+            # V243R21: re-proven through the executor's own row-exact locator;
+            # a structural path among look-alikes is no better than it.
+            return locator, selector, proof
         candidate = proof.get("candidate") if isinstance(proof.get("candidate"), dict) else {}
         fresh_selector = str(candidate.get("selector") or "")
         use_fresh = bool(
@@ -4645,7 +4649,7 @@ class BrowserSession:
         return locator, selector, proof
 
     async def _semantic_post_action_verify(
-        self, *, resolution: Dict[str, Any], action: str, exact_value_verified: bool = False
+        self, *, resolution: Dict[str, Any], action: str, exact_value_verified: bool = False, locator: Any = None
     ) -> Dict[str, Any]:
         gate = getattr(self, "semantic_action_gate", None)
         if gate is None or not resolution.get("semantic_control_id"):
@@ -4656,6 +4660,7 @@ class BrowserSession:
             action=action,
             phase=self._active_phase_name or "standalone",
             exact_value_verified=exact_value_verified,
+            locator=locator,
         )
         if bool(getattr(gate, "require_effect", True)) and not effect.get("pass"):
             raise RuntimeError(
@@ -5535,7 +5540,7 @@ class BrowserSession:
                 }
             await self.record_dom_transition(action_id=ev.action_id, action_type="click", target=selector or action, cursor=dom_cursor)
             semantic_effect = await self._semantic_post_action_verify(
-                resolution=semantic_resolution, action="click", exact_value_verified=False
+                resolution=semantic_resolution, action="click", exact_value_verified=False, locator=locator
             )
             ev.execution_provenance = mask_sensitive_data({
                 "planner": "autowebglm-primary",
@@ -5747,7 +5752,7 @@ class BrowserSession:
                 await self._mcp_snapshot_after_action(ev.action_id)
             await self.record_dom_transition(action_id=ev.action_id, action_type=action_name, target=selector or action_type, cursor=dom_cursor)
             semantic_effect = await self._semantic_post_action_verify(
-                resolution=semantic_resolution, action=action_name, exact_value_verified=bool(exact_commit.get("pass"))
+                resolution=semantic_resolution, action=action_name, exact_value_verified=bool(exact_commit.get("pass")), locator=locator
             )
 
             executor = pyautogui_executor if executed_by_pyautogui else ("playwright-mcp-fallback" if executed_by_mcp else "python-playwright-fallback")
@@ -5911,7 +5916,7 @@ class BrowserSession:
             if fallback_notes:
                 ev.error = "; ".join(fallback_notes)
             semantic_effect = await self._semantic_post_action_verify(
-                resolution=semantic_resolution, action="press", exact_value_verified=False
+                resolution=semantic_resolution, action="press", exact_value_verified=False, locator=locator
             )
             ev.execution_provenance = mask_sensitive_data({
                 "planner": "autowebglm-primary",
