@@ -202,6 +202,7 @@ async function runLiveRuntimeCertification() {
       target_url:"",
       ttl_seconds:0,
       require_pyautogui_mcp:false,
+      requalify_models:!!$("requalifyModels")?.checked,
     })});
     state.liveRuntimeCertification=result;
     renderLiveRuntimeCertification(result,false);
@@ -579,7 +580,11 @@ async function refreshStatus() {
       const champ=champs.planning||champs.action_selection||"";
       const scored=Object.values(mp.scored_decisions||{}).reduce((a,b)=>a+Number(b||0),0);
       $("modelPortfolioMetric").textContent = !mp.enabled ? "Off" : (mp.default_text_model||champ||"Learning");
-      $("modelPortfolioDetail").textContent = mp.enabled ? `${champ ? "champion "+champ : "champion: earning"} • ${scored} scored decisions • cycle ${mp.cycle||0}` : "model portfolio disabled";
+      // V243R24: a model selected once by live task performance is used everywhere.
+      const q=mp.qualification||{};
+      $("modelPortfolioDetail").textContent = !mp.enabled ? "model portfolio disabled" : (q.locked
+        ? `selected by live task: ${q.correct||0}/${q.total||0} correct • ${String(q.qualified_at||"").slice(0,10)}${q.in_use&&q.in_use!==q.selected_model?" • fallback "+q.in_use:""}`
+        : `not qualified yet (runs on Live certification) • ${champ ? "champion "+champ : "champion: earning"} • ${scored} scored decisions`);
     }
     if ($("recursiveMetric")) {
       $("recursiveMetric").textContent = !ri.enabled ? "Off" : `Cycle ${ri.cycle||0}`;

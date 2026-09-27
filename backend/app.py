@@ -478,6 +478,8 @@ class LiveRuntimeCertificationRequest(BaseModel):
     target_url: str = ""
     ttl_seconds: int = 0
     require_pyautogui_mcp: bool = False
+    # V243R24: the model is qualified on a live task once; this runs it again.
+    requalify_models: bool = False
 
 
 class LiveReadinessRequest(BaseModel):
@@ -1070,6 +1072,7 @@ async def mission_live_runtime_certification(req: LiveRuntimeCertificationReques
         target_url=req.target_url or str(cfg.portal.base_url or ""),
         ttl_seconds=ttl,
         require_pyautogui_mcp=require_py,
+        requalify_models=bool(req.requalify_models),
     )
 
 

@@ -240,7 +240,10 @@ class PortalSkillStore:
         row = (self.load(phase).get("openers") or {}).get(str(operation or "")) or {}
         return [str(x) for x in (row.get("labels") or []) if str(x).strip()]
 
-    def record_opener(self, phase: str, operation: str, *, path: Sequence[str], label: str) -> None:
+    def record_opener(
+        self, phase: str, operation: str, *, path: Sequence[str], label: str,
+        selectors: Sequence[Mapping[str, Any]] = (), expander: Optional[bool] = None,
+    ) -> None:
         if not label and not path:
             return
         data = self.load(phase)
@@ -248,10 +251,53 @@ class PortalSkillStore:
         if label and label not in row["labels"]:
             row["labels"].insert(0, label)
         row["labels"] = row["labels"][:5]
-        row["path"] = [str(x) for x in path][:6]
+        row["path"] = [str(x) for x in path][:8]
         row["verified"] = int(row.get("verified") or 0) + 1
+        if selectors:
+            # V243R24: semantic selectors (role, accessible name, context) --
+            # never coordinates or generated CSS paths.
+            row["selectors"] = [{k: str(v) for k, v in dict(sel).items() if k in {"role", "name", "context"}} for sel in selectors][:8]
+        if expander is not None:
+            row["expander"] = bool(expander)
+        row.setdefault("mode", "exploration")
         self.log(data, "opener_learned", None, operation=str(operation), label=str(label), path=" > ".join(row["path"]))
         self.save(phase, data)
+
+    # V243R24: a learned action path is EXPLORATION until its outcome was verified
+    # twice (or a human verified it); then it is DETERMINISTIC and replayed
+    # directly.  A deterministic path that stops working drops back.
+    def opener_plan(self, phase: str, operation: str) -> Dict[str, Any]:
+        row = (self.load(phase).get("openers") or {}).get(str(operation or "")) or {}
+        return {k: row.get(k) for k in ("labels", "path", "selectors", "expander", "mode", "verified_outcomes", "human_verified") if k in row}
+
+    def record_opener_outcome(self, phase: str, operation: str, *, success: bool, reason: str = "") -> str:
+        data = self.load(phase)
+        row = (data.get("openers") or {}).get(str(operation))
+        if row is None:
+            return ""
+        if success:
+            row["verified_outcomes"] = int(row.get("verified_outcomes") or 0) + 1
+            if row.get("mode") != "deterministic" and (row.get("human_verified") or row["verified_outcomes"] >= 2):
+                row["mode"] = "deterministic"
+                self.log(data, "action_promoted_deterministic", None, operation=str(operation), path=" > ".join(row.get("path") or []))
+        elif row.get("mode") == "deterministic":
+            row["mode"] = "exploration"
+            row["verified_outcomes"] = 0
+            self.log(data, "action_demoted_exploration", None, operation=str(operation), reason=str(reason)[:200])
+        self.save(phase, data)
+        return str(row.get("mode") or "exploration")
+
+    def verify_opener(self, phase: str, operation: str) -> bool:
+        """A human confirmed this learned action path: promote it."""
+        data = self.load(phase)
+        row = (data.get("openers") or {}).get(str(operation))
+        if row is None:
+            return False
+        row["human_verified"] = True
+        row["mode"] = "deterministic"
+        self.log(data, "action_human_verified", None, operation=str(operation), path=" > ".join(row.get("path") or []))
+        self.save(phase, data)
+        return True
 
     # The Save / Submit a verified phase form was committed with (mission save).
     def phase_commit_labels(self, phase: str) -> List[str]:
@@ -277,6 +323,9 @@ class PortalSkillStore:
             "operations": sorted({str(s.get("operation")) for s in skills}),
             "branch_fields": sorted(data["branch_fields"]),
             "learned_actions": {op: row.get("labels", [])[:1] for op, row in (data.get("openers") or {}).items()},
+            "action_paths": {op: {"path": row.get("path") or [], "mode": row.get("mode") or "exploration",
+                                  "expander": bool(row.get("expander")), "verified_outcomes": int(row.get("verified_outcomes") or 0)}
+                             for op, row in (data.get("openers") or {}).items()},
             "commit_labels": list(data.get("commit_labels") or [])[:1],
             "file": str(self.file(phase)),
         }

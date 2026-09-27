@@ -1,3 +1,27 @@
+## V243R24 — The model is chosen once by live task performance; Edit / Clone / Migrate go through the row's expander (2026-09-27)
+
+- **Model selection on a live task, once.** Run **Certify Windows runtime** (Live GO/NO-GO) once:
+  - every available Dell AIA text model gets the same questions about the real Document Types listing (which control opens row X's Edit or Migrate, which control searches, which one adds);
+  - each model is scored on its answers;
+  - the most accurate model is locked, and every later call uses it.
+  - Re-run it with "Re-run the model qualification" or `qualify-models --force`.
+- **Document Types, as on the live portal.** The agent:
+  - searches for the name;
+  - picks the row whose name is exactly that name;
+  - clicks the row's chevron;
+  - checks that the details belong to that row;
+  - picks the environment tab (DEV / TEST1 / TEST2 / PROD) and the Version;
+  - clicks Edit, Clone or Migrate.
+- **Migrate:**
+  - checks that the target is offered and does not already hold the version;
+  - clicks the target once, and the confirmation when the portal asks;
+  - checks the new environment badge.
+- **Edit:** changes only the requested fields. It is not saved when anything else changed. After the save it reads the values back.
+- **Clone:** needs a new name.
+- **Results:** every action reports SUCCESS, EXISTING, FAILED, BLOCKED or NEEDS_INPUT.
+
+See `V243R24_LIVE_MODEL_QUALIFICATION_AND_ROW_PANEL_OPERATIONS_20260927.md`. Apply with `APPLY_V243R24_IN_PLACE.ps1`; it includes R13–R23.
+
 ## V243R23 — "Deploy / migrate … the document type X" knows where to click; Save after a verified fill; a longer phase time budget (2026-09-27)
 
 - **Ask for an action on a HIP object in the task box**, for example *"Deploy the document type XML_DellAutoASN_10_U-HAUL_ANS_IB to PROD"*. The agent then:

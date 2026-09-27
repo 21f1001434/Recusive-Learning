@@ -71,7 +71,8 @@ def test_the_task_box_plan_goes_to_the_document_types_listing_and_its_row_action
     }).json()
     assert plan["execution_mode"] == "portal_operation"
     kinds = [s["type"] for s in plan["steps"]]
-    assert kinds == ["navigate", "search", "open_row_action", "fill", "commit", "verify_listing"]
+    # V243R24: a deploy's "fill" is choosing the target the portal offers.
+    assert kinds == ["navigate", "search", "open_row_action", "choose_target", "commit", "verify_listing"]
     assert plan["steps"][0]["target"].endswith("/securelink/doctypes")
     assert "More actions menu" in plan["steps"][2]["fallbacks"]
 

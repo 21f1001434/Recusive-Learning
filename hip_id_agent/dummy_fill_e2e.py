@@ -2410,6 +2410,9 @@ class FullDummyFillOptions:
     save_after_fill: bool = False
     allow_portal_mutation: bool = False
     mutation_confirmation: str = ""
+    # V243R24: when no model was qualified yet (Live certification never ran),
+    # the first live mission page qualifies them once (read-only).
+    qualify_models_on_first_page: bool = False
 
 
 class FullDummyFillE2EFlow:
@@ -2732,6 +2735,23 @@ class FullDummyFillE2EFlow:
             semantic_understanding_enabled=bool(getattr(self.config.semantic_understanding, "enabled", True)),
             autonomous_all_form_phases=bool(getattr(self.config.autonomous_form, "apply_to_all_form_phases", True)),
         )
+        if self.options.qualify_models_on_first_page:
+            from .model_qualification import load_selection
+
+            if not load_selection(self.config).get("locked"):
+                from .live_runtime_certification import qualify_models_on_live_page
+
+                qualification = await qualify_models_on_live_page(self.config, shared_browser, root_dir, source="first_live_mission")
+                safe_write_json(root_dir / "model_qualification_status.json", mask_sensitive_data(qualification))
+                try:
+                    mission_trace.record_observation(
+                        phases[0] if phases else "mission",
+                        summary=f"Model qualification on the live page: {qualification.get('status')} {qualification.get('selected_model') or ''}".strip(),
+                        source="model_qualification",
+                        details={k: qualification.get(k) for k in ("status", "selected_model", "correct", "total")},
+                    )
+                except Exception:
+                    pass
         safe_write_json(root_dir / "browser_session_reuse_contract.json", {
             "schema_version": "hip.browser-session-reuse.v1",
             "session_id": shared_browser.session_id,

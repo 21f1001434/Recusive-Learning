@@ -51,7 +51,9 @@ OPENER_LABELS: Dict[str, Sequence[str]] = {
     "edit": ("Edit", "Update", "Modify"),
     "clone": ("Clone", "Copy", "Duplicate"),
     "merge": ("Merge",),
-    "deploy": ("Deploy",),
+    # V243R24: objects without a Deploy (Document Types) make a version available
+    # in an environment with Migrate.
+    "deploy": ("Deploy", "Migrate", "Promote"),
     "migrate": ("Migrate", "Promote"),
     "validate": ("Validate",),
     "delete": ("Delete", "Remove"),
@@ -67,6 +69,50 @@ _GUARDED = re.compile(r"\b(save|create|submit|delete|remove|deploy|publish|updat
 
 def _norm(value: Any) -> str:
     return " ".join(str(value or "").lower().replace("_", " ").split())
+
+
+class OperationNeedsInput(Exception):
+    """V243R24: a value the operation needs is missing, ambiguous or not offered.
+
+    Never guessed: the operation stops before any change and says which value
+    it needs, what the portal offers and where the value can come from.
+    """
+
+    def __init__(self, field: str, reason: str, *, offered: Sequence[str] = (), observed: Any = None, source: str = ""):
+        super().__init__(f"HIP_OPERATION_NEEDS_INPUT: {field}: {reason}")
+        self.detail = {"status": "NEEDS_INPUT", "field": field, "reason": reason, "offered": [str(x) for x in offered][:12],
+                       "observed_existing_value": observed, "suggested_source": source or "the task text or input.json"}
+
+
+# V243R24: what an operation's status means for the requester.
+RESULTS = {
+    "committed_and_verified": "SUCCESS", "committed": "SUCCESS", "filled_not_committed": "SUCCESS",
+    "validated_not_committed": "SUCCESS", "already_in_target": "EXISTING", "no_change_needed": "EXISTING",
+    "needs_input": "NEEDS_INPUT", "blocked_mutation_authorization": "BLOCKED", "commit_not_authorized": "BLOCKED",
+    "commit_waiting_for_certified_skill": "BLOCKED",
+}
+
+
+def operation_result(status: str) -> str:
+    return RESULTS.get(str(status or ""), "FAILED")
+
+
+def _same_value(a: Any, b: Any) -> bool:
+    x, y = _norm(a), _norm(b)
+    if x == y:
+        return True
+    truthy = {"true", "enable", "enabled", "yes", "on", "active"}
+    falsy = {"false", "disable", "disabled", "no", "off", "inactive"}
+    if (x in truthy and y in truthy) or (x in falsy and y in falsy):
+        return True
+    try:
+        return bool(re.fullmatch(r"[\d.]+", x) and re.fullmatch(r"[\d.]+", y) and float(x) == float(y))
+    except ValueError:
+        return False
+
+
+def _label_key(value: Any) -> str:
+    return re.sub(r"\s*[*:]\s*$", "", " ".join(str(value or "").lower().split()))
 
 
 def operation_gate(allow_portal_mutation: bool, confirmation: str) -> Dict[str, Any]:
@@ -123,8 +169,19 @@ _ROW_ACTION_JS = r"""
   // A row whose own cell is exactly the target beats one that only contains it
   // ("TP_BETA" must not open "TP_BETA_COPY").
   const exact = r => !!t && Array.from(r.querySelectorAll('td,th,[role=cell],[role=gridcell],a,span')).some(c => norm(c.innerText) === t);
-  const rows = Array.from(document.querySelectorAll('tr,[role=row],.dds__table__row,[class*=card],li'))
-    .filter(visible).filter(r => !t || norm(r.innerText).includes(t))
+  // An expanded row's detail panel is not a data row.
+  const isPanel = r => /--expanded\b/.test(String(r.className || '')) || !!r.querySelector('[class*=expandable-content]');
+  let rows = Array.from(document.querySelectorAll('tr,[role=row],.dds__table__row')).filter(visible)
+    .filter(r => !isPanel(r) && !r.querySelector('[role=columnheader],th'));
+  if (!rows.length) rows = Array.from(document.querySelectorAll('[class*=card],li')).filter(visible);
+  const matching = rows.filter(r => !t || norm(r.innerText).includes(t));
+  const exacts = matching.filter(exact);
+  if (t && (exacts.length > 1 || (!exacts.length && matching.length > 1))) {
+    // V243R24: never pick one of several candidates.
+    return {found: 'ambiguous', rows: rows.length,
+            candidates: (exacts.length ? exacts : matching).slice(0, 8).map(r => (r.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 120))};
+  }
+  const chosen = (exacts.length ? exacts : matching)
     .sort((a, b) => (exact(b) - exact(a)) || ((a.innerText || '').length - (b.innerText || '').length));
   const pick = root => {
     const els = Array.from(root.querySelectorAll('button,a,[role=button],[role=menuitem],[role=link]')).filter(visible);
@@ -134,16 +191,223 @@ _ROW_ACTION_JS = r"""
     }
     return null;
   };
-  for (const row of rows) {
+  for (const row of chosen) {
     const hit = pick(row);
     if (hit) { hit.setAttribute('data-hip-op', token); return {found: 'row_action', label: textOf(hit), rows: rows.length}; }
   }
-  for (const row of rows) {
+  for (const row of chosen) {
+    // V243R24: the row's expander (chevron): its actions live in the expanded panel.
+    const exp = Array.from(row.querySelectorAll('button,[role=button]')).filter(visible).find(e =>
+      /expand|collapse/i.test((e.getAttribute('aria-label') || '') + ' ' + String(e.className || ''))
+      || (e.hasAttribute('aria-expanded') && !e.getAttribute('aria-haspopup') && !norm(e.innerText)));
+    if (exp) {
+      exp.setAttribute('data-hip-op', token); row.setAttribute('data-hip-row', token);
+      return {found: 'expander', expanded: exp.getAttribute('aria-expanded') === 'true', label: textOf(exp) || 'expand the row', rows: rows.length,
+              badges: Array.from(row.querySelectorAll('[class*=badge]')).map(e => norm(e.innerText).toUpperCase()).filter(Boolean)};
+    }
+  }
+  for (const row of chosen) {
     const els = Array.from(row.querySelectorAll('button,a,[role=button]')).filter(visible);
     const menu = els.find(e => e.getAttribute('aria-haspopup') || /\b(more|actions|options|menu)\b|⋮|…|\.\.\./.test(textOf(e)));
     if (menu) { menu.setAttribute('data-hip-op', token); return {found: 'menu', label: textOf(menu), rows: rows.length}; }
   }
-  return {found: '', rows: rows.length};
+  return {found: '', rows: rows.length, matching: matching.length};
+}
+"""
+
+# V243R24: the detail panel a row's expander opened (Document Types: description,
+# environment tabs, Version, Edit / Clone / Migrate), proven to belong to that row.
+_PANEL_JS = r"""
+({token, target}) => {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const labelledHost = (root, want) => {
+    // A dropdown / select named `want` by its own label, placeholder or aria-label,
+    // else the first one after a caption such as "Version :".
+    const hosts = Array.from(root.querySelectorAll('dds-dropdown,select'));
+    const own = h => { const l = h.querySelector && h.querySelector('label'); const i = h.querySelector && h.querySelector('input');
+      return norm((l && l.innerText) || h.getAttribute('aria-label') || (i && (i.getAttribute('aria-label') || i.getAttribute('placeholder'))) || ''); };
+    let host = hosts.find(h => own(h).replace(/\s*[*:]\s*$/, '') === want) || hosts.find(h => own(h).includes(want));
+    if (!host) {
+      const cap = Array.from(root.querySelectorAll('label,span,div,b,strong,p')).find(e => !e.children.length && new RegExp('^' + want + '\\s*:?$').test(norm(e.innerText)));
+      if (cap) host = hosts.find(h => cap.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+    return host || null;
+  };
+  const visible = el => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const textOf = el => norm(el.innerText || el.textContent || el.getAttribute('aria-label') || el.value);
+  const row = document.querySelector(`[data-hip-row="${token}"]`);
+  if (!row) return {found: false, reason: 'row_not_rendered'};
+  const exp = row.querySelector(`[data-hip-op="${token}"]`);
+  const expanded = exp ? exp.getAttribute('aria-expanded') : null;
+  const isPanel = el => !!el && (/expand/i.test(String(el.className || '')) || !!el.querySelector('[class*=expandable-content]'));
+  let panel = null;
+  const owned = exp && exp.getAttribute('aria-controls');
+  if (owned) panel = document.getElementById(owned);
+  if (!panel) { let s = row.nextElementSibling; while (s && !visible(s)) s = s.nextElementSibling; if (isPanel(s)) panel = s; }
+  if (!panel && row.parentElement) { const s = row.parentElement.nextElementSibling; if (isPanel(s)) panel = s; }
+  if (!panel || !visible(panel)) return {found: false, expanded};
+  panel.setAttribute('data-hip-panel', token);
+  const t = norm(target);
+  const values = Array.from(panel.querySelectorAll('input,textarea')).map(i => norm(i.value));
+  const text = norm(panel.innerText);
+  const verified_by = t && values.includes(t) ? 'name_field' : (t && text.includes(t) ? 'panel_text' : (expanded === 'true' ? 'expanded_adjacent_row' : 'adjacent_row'));
+  const tabs = Array.from(panel.querySelectorAll('[role=tab]')).filter(visible).map(e => ({
+    text: textOf(e).toUpperCase(), selected: e.getAttribute('aria-selected') === 'true',
+    disabled: !!e.disabled || e.getAttribute('aria-disabled') === 'true'}));
+  const actions = Array.from(panel.querySelectorAll('button,a,[role=button]')).filter(visible)
+    .filter(e => !e.closest('[role=tablist],[role=menu],[role=listbox],dds-dropdown,.dds__dropdown')).map(textOf).filter(Boolean);
+  const labelled = {};
+  panel.querySelectorAll('input,textarea,select').forEach(el => {
+    let label = '';
+    if (el.id) { const l = panel.querySelector(`label[for="${CSS.escape(el.id)}"]`); if (l) label = l.innerText; }
+    if (!label) { const g = el.closest('.dds__form-group,dds-dropdown'); const l = g && g.querySelector('label,.dds__label'); if (l) label = l.innerText; }
+    label = norm(label || el.getAttribute('aria-label') || el.getAttribute('placeholder')).replace(/\s*[*:]\s*$/, '');
+    if (label && !(label in labelled)) labelled[label] = (el.value || '').trim();
+  });
+  const versionHost = labelledHost(panel, 'version');
+  const versions = versionHost ? Array.from(versionHost.querySelectorAll('option,[role=option]')).map(o => (o.innerText || o.textContent || '').trim()).filter(Boolean) : [];
+  const versionInput = versionHost ? (versionHost.tagName === 'SELECT' ? versionHost : versionHost.querySelector('input')) : null;
+  const desc = (panel.innerText.match(/description\s*:\s*([^\n]*)/i) || [])[1] || '';
+  return {found: true, verified_by, expanded, tabs, actions, details: labelled, version: versionInput ? String(versionInput.value || '').trim() : '',
+          versions, description: desc.trim().slice(0, 200)};
+}
+"""
+
+_PANEL_PICK_JS = r"""
+({token, kind, value, label, pickToken}) => {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const labelledHost = (root, want) => {
+    // A dropdown / select named `want` by its own label, placeholder or aria-label,
+    // else the first one after a caption such as "Version :".
+    const hosts = Array.from(root.querySelectorAll('dds-dropdown,select'));
+    const own = h => { const l = h.querySelector && h.querySelector('label'); const i = h.querySelector && h.querySelector('input');
+      return norm((l && l.innerText) || h.getAttribute('aria-label') || (i && (i.getAttribute('aria-label') || i.getAttribute('placeholder'))) || ''); };
+    let host = hosts.find(h => own(h).replace(/\s*[*:]\s*$/, '') === want) || hosts.find(h => own(h).includes(want));
+    if (!host) {
+      const cap = Array.from(root.querySelectorAll('label,span,div,b,strong,p')).find(e => !e.children.length && new RegExp('^' + want + '\\s*:?$').test(norm(e.innerText)));
+      if (cap) host = hosts.find(h => cap.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+    return host || null;
+  };
+  const visible = el => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const panel = document.querySelector(`[data-hip-panel="${token}"]`);
+  if (!panel) return {found: false, reason: 'panel_gone'};
+  const same = (a, b) => { const x = norm(a), y = norm(b); if (x === y) return true;
+    const fx = parseFloat(x), fy = parseFloat(y); return !isNaN(fx) && !isNaN(fy) && /^[\d.]+$/.test(x) && /^[\d.]+$/.test(y) && fx === fy; };
+  if (kind === 'tab') {
+    const tab = Array.from(panel.querySelectorAll('[role=tab]')).filter(visible).find(e => same(e.innerText || e.textContent, value));
+    if (!tab) return {found: false};
+    tab.setAttribute('data-hip-op', pickToken);
+    return {found: true, selected: tab.getAttribute('aria-selected') === 'true', disabled: !!tab.disabled || tab.getAttribute('aria-disabled') === 'true'};
+  }
+  if (kind === 'action') {
+    const els = Array.from(panel.querySelectorAll('button,a,[role=button]')).filter(visible)
+      .filter(e => !e.closest('[role=tablist],[role=menu],[role=listbox],dds-dropdown,.dds__dropdown'));
+    for (const w of value.map(norm)) {
+      const hit = els.find(e => norm(e.innerText || e.getAttribute('aria-label')) === w);
+      if (hit) { hit.setAttribute('data-hip-op', pickToken);
+        return {found: true, label: norm(hit.innerText || hit.getAttribute('aria-label')), menu: !!(hit.getAttribute('aria-controls') || hit.getAttribute('aria-haspopup')),
+                controls: hit.getAttribute('aria-controls') || ''}; }
+    }
+    return {found: false};
+  }
+  // kind === 'dropdown': the control labelled `label` (Version ...)
+  const host = labelledHost(panel, norm(label));
+  if (!host) return {found: false};
+  if (host.tagName === 'SELECT') {
+    const opt = Array.from(host.options).find(o => same(o.text, value));
+    if (!opt) return {found: false, options: Array.from(host.options).map(o => o.text)};
+    host.setAttribute('data-hip-op', pickToken); return {found: true, native: true, option: opt.value};
+  }
+  const input = host.querySelector('input,[role=combobox]');
+  if (!input) return {found: false};
+  if (same(input.value, value)) return {found: true, already: true};
+  input.setAttribute('data-hip-op', pickToken);
+  return {found: true, native: false, listbox: input.getAttribute('aria-controls') || ''};
+}
+"""
+
+_OPTION_JS = r"""
+({listbox, value, token}) => {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const same = (a, b) => { const x = norm(a), y = norm(b); if (x === y) return true;
+    const fx = parseFloat(x), fy = parseFloat(y); return !isNaN(fx) && !isNaN(fy) && /^[\d.]+$/.test(x) && /^[\d.]+$/.test(y) && fx === fy; };
+  const root = (listbox && document.getElementById(listbox)) || document;
+  const opts = Array.from(root.querySelectorAll('[role=option]')).filter(o => o.getBoundingClientRect().height > 0);
+  const hit = opts.find(o => same(o.innerText || o.textContent, value));
+  if (!hit) return {found: false, options: opts.map(o => (o.innerText || '').trim()).slice(0, 20)};
+  hit.setAttribute('data-hip-op', token); return {found: true};
+}
+"""
+
+_MENU_ITEMS_JS = r"""
+({controls}) => {
+  const visible = el => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const root = (controls && document.getElementById(controls)) || null;
+  const scopes = root ? [root] : Array.from(document.querySelectorAll('[role=menu],.dds__action-menu,[role=listbox]')).filter(visible);
+  const items = [];
+  scopes.forEach(s => s.querySelectorAll('[role=menuitem],[role=option],button,li').forEach(e => {
+    if (!visible(e)) return; const t = (e.innerText || e.textContent || '').replace(/\s+/g, ' ').trim();
+    if (t && !items.includes(t)) items.push(t);
+  }));
+  return items;
+}
+"""
+
+_CONFIRM_JS = r"""
+({labels, token}) => {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const visible = el => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const dialogs = Array.from(document.querySelectorAll('[role=dialog],[role=alertdialog],.dds__modal')).filter(visible)
+    .filter(d => !d.querySelector('form input:not([type=hidden]),textarea'));
+  for (const d of dialogs.reverse()) {
+    const els = Array.from(d.querySelectorAll('button,[role=button]')).filter(visible);
+    for (const w of labels.map(norm)) {
+      const hit = els.find(e => norm(e.innerText || e.getAttribute('aria-label')) === w);
+      if (hit) { hit.setAttribute('data-hip-op', token); return {found: true, label: norm(hit.innerText), dialog: norm(d.innerText).slice(0, 200)}; }
+    }
+  }
+  return {found: false};
+}
+"""
+
+# V243R24: the open form's labelled values, before and after the fill -- only
+# the requested fields may change.
+_FORM_SNAPSHOT_JS = r"""
+() => {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const visible = el => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const surfaces = Array.from(document.querySelectorAll('[role=dialog],dds-drawer,.dds__drawer,.dds__modal,form')).filter(visible);
+  const scope = surfaces.length ? surfaces[surfaces.length - 1] : document;
+  const labelOf = el => {
+    if (el.id) { const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`); if (l) return l.innerText; }
+    const by = el.getAttribute('aria-labelledby'); if (by) { const l = document.getElementById(by.split(' ')[0]); if (l) return l.innerText; }
+    const g = el.closest('.dds__form-group,dds-dropdown'); const l = g && g.querySelector('label,.dds__label');
+    return (l && l.innerText) || el.getAttribute('placeholder') || el.getAttribute('name') || '';
+  };
+  const out = {}; const counts = {};
+  scope.querySelectorAll('input,textarea,select').forEach(el => {
+    const type = String(el.type || '').toLowerCase();
+    if (['hidden', 'button', 'submit', 'file'].includes(type)) return;
+    const dd = el.closest('dds-dropdown');
+    if (!dd && !visible(el)) return;
+    if (dd && el !== dd.querySelector('input')) return;
+    let value;
+    if (dd) { const tags = Array.from(dd.querySelectorAll('.dds__tag')).map(t => norm(t.innerText)).filter(Boolean); value = tags.length ? tags.join(', ') : norm(el.value); }
+    else if (type === 'checkbox') value = el.checked ? 'true' : 'false';
+    else if (type === 'radio') { if (!el.checked) return; const l = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`); value = norm((l && l.innerText) || el.value); }
+    else value = norm(el.value);
+    const label = norm(type === 'radio' ? (el.getAttribute('name') || '') : labelOf(el)).toLowerCase().replace(/\s*[*:]\s*$/, '');
+    if (!label) return;
+    const n = counts[label] = (counts[label] === undefined ? 0 : counts[label] + 1);
+    out[`${label}#${n}`] = String(value).slice(0, 300);
+  });
+  return out;
 }
 """
 
@@ -153,7 +417,7 @@ _MENU_ITEM_JS = r"""
   const visible = el => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
     return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
   const textOf = el => norm(el.getAttribute('aria-label') || el.innerText || el.textContent);
-  const items = Array.from(document.querySelectorAll('[role=menuitem],[role=menu] button,[role=menu] a,.dds__dropdown__item-option')).filter(visible);
+  const items = Array.from(document.querySelectorAll('[role=menuitem],[role=menu] button,[role=menu] a,[role=menu] li,.dds__action-menu__option,.dds__dropdown__item-option')).filter(visible);
   for (const w of labels.map(norm)) {
     const hit = items.find(e => textOf(e) === w);
     if (hit) { hit.setAttribute('data-hip-op', token); return {found: true, label: textOf(hit)}; }
@@ -208,6 +472,8 @@ class PortalOperationRunner:
         self.require_certified = bool(getattr(ops_cfg, "commit_requires_certified_skill", True))
         self.verify_after_commit = bool(getattr(ops_cfg, "verify_after_commit", True))
         self.effect_timeout = float(getattr(ops_cfg, "commit_effect_timeout_seconds", 20.0) or 20.0)
+        # V243R24: an Edit / Clone that changed fields nobody asked for is not saved.
+        self.block_unrelated_changes = bool(getattr(ops_cfg, "block_unrelated_changes", True))
 
     # ------------------------------------------------------------------ helpers
     def _listing_url(self, phase: str) -> str:
@@ -271,10 +537,203 @@ class PortalOperationRunner:
             await page.wait_for_timeout(250)
         return False
 
+    async def _find_row(self, page: Any, target: str, labels: Sequence[str], token: str, timeout_s: float = 6.0) -> Dict[str, Any]:
+        """The requested row, once the listing (re-)rendered after the search."""
+        deadline = time.monotonic() + timeout_s
+        while True:
+            hit = await page.evaluate(_ROW_ACTION_JS, {"target": target, "labels": list(labels), "token": token})
+            if hit.get("found") or time.monotonic() >= deadline:
+                return hit
+            await page.wait_for_timeout(300)
+
+    async def _panel(self, token: str, target: str, timeout_s: float = 8.0) -> Dict[str, Any]:
+        page = await self._page()
+        deadline = time.monotonic() + timeout_s
+        while True:
+            panel = await page.evaluate(_PANEL_JS, {"token": token, "target": target})
+            if panel.get("found") or time.monotonic() >= deadline:
+                return panel
+            await page.wait_for_timeout(250)
+
+    async def _pick_panel_version(self, token: str, target: str, version: str, label: str = "version") -> Dict[str, Any]:
+        page = await self._page()
+        pick = uuid.uuid4().hex[:10]
+        found = await page.evaluate(_PANEL_PICK_JS, {"token": token, "kind": "dropdown", "label": label, "value": version, "pickToken": pick})
+        if not found.get("found"):
+            return {"picked": False, "options": found.get("options") or []}
+        if found.get("already"):
+            return {"picked": True, "already": True}
+        selector = f'[data-hip-op="{pick}"]'
+        if found.get("native"):
+            await page.locator(selector).select_option(value=str(found.get("option")))
+            return {"picked": True}
+        await self._click_token(pick, label.title())
+        option = uuid.uuid4().hex[:10]
+        hit: Dict[str, Any] = {}
+        for _ in range(12):
+            hit = await page.evaluate(_OPTION_JS, {"listbox": found.get("listbox") or "", "value": version, "token": option})
+            if hit.get("found"):
+                break
+            await page.wait_for_timeout(150)
+        if not hit.get("found"):
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+            return {"picked": False, "options": hit.get("options") or []}
+        await self._click_token(option, str(version))
+        return {"picked": True}
+
+    async def _select_tab(self, token: str, target: str, env: str, panel: Dict[str, Any]) -> Dict[str, Any]:
+        page = await self._page()
+        pick = uuid.uuid4().hex[:10]
+        tab = await page.evaluate(_PANEL_PICK_JS, {"token": token, "kind": "tab", "value": env, "pickToken": pick})
+        enabled = [t["text"] for t in panel.get("tabs") or [] if not t.get("disabled")]
+        if not tab.get("found"):
+            raise OperationNeedsInput("environment", f"{env} is not an environment of this object", offered=enabled, observed=panel.get("tabs"))
+        if tab.get("disabled"):
+            raise OperationNeedsInput("environment", f"{target!r} is not available in {env}", offered=enabled)
+        if not tab.get("selected"):
+            await self._click_token(pick, env)
+            await page.wait_for_timeout(250)
+        return await self._panel(token, target)
+
+    async def _open_panel_action(
+        self, hit: Mapping[str, Any], *, token: str, target: str, labels: Sequence[str], options: Mapping[str, Any],
+        audit: Dict[str, Any], operation: str,
+    ) -> None:
+        """V243R24: expand the row, prove the panel is that row's, choose the
+        environment tab and version the task names, then click the action."""
+        page = await self._page()
+        if not hit.get("expanded"):
+            await self._click_token(token, "Expand the row")
+        audit["path"].append("expand row")
+        audit["selectors"].append({"role": "button", "name": "Expand the row", "context": "row whose name cell is exactly the requested object"})
+        panel = await self._panel(token, target)
+        if not panel.get("found"):
+            raise RuntimeError(f"HIP_OPERATION_ROW_PANEL_NOT_FOUND: the expanded details of {target!r} did not appear")
+        audit["row_badges"] = list(hit.get("badges") or [])
+        env = str(options.get("environment") or "").strip().upper()
+        if env:
+            panel = await self._select_tab(token, target, env, panel)
+            audit["path"].append(f"tab:{env}")
+        version = str(options.get("version") or "").strip()
+        if version:
+            picked = await self._pick_panel_version(token, target, version)
+            if not picked.get("picked"):
+                raise OperationNeedsInput("version", f"version {version} is not offered for {target!r}", offered=picked.get("options") or panel.get("versions") or [],
+                                          observed=panel.get("version"))
+            panel = await self._panel(token, target)
+            audit["path"].append(f"version:{version}")
+        for key, value in options.items():
+            # Any other choice on the expanded details (a tab or a labelled
+            # dropdown), e.g. {"Sharing": "..."} from input.json "panel".
+            if key in {"environment", "version", "target_environment"} or value in (None, ""):
+                continue
+            pick = uuid.uuid4().hex[:10]
+            tab = await page.evaluate(_PANEL_PICK_JS, {"token": token, "kind": "tab", "value": str(value), "pickToken": pick})
+            if tab.get("found") and not tab.get("disabled"):
+                if not tab.get("selected"):
+                    await self._click_token(pick, str(value))
+                    await page.wait_for_timeout(250)
+            else:
+                picked = await self._pick_panel_version(token, target, str(value), label=str(key).lower())
+                if not picked.get("picked"):
+                    raise OperationNeedsInput(str(key), f"{value!r} is not offered for {key!r} on {target!r}", offered=picked.get("options") or [])
+            panel = await self._panel(token, target)
+            audit["path"].append(f"{str(key).lower()}:{value}")
+        audit["panel"] = {k: panel.get(k) for k in ("verified_by", "tabs", "version", "versions", "description", "actions")}
+        audit["before"] = {"environment": next((t["text"] for t in panel.get("tabs") or [] if t.get("selected")), ""),
+                           "version": panel.get("version"), "available_environments": audit["row_badges"], "details": panel.get("details") or {}}
+        wanted = str(options.get("target_environment") or "").strip().upper()
+        if operation in {"migrate", "deploy"} and wanted and wanted in audit["row_badges"]:
+            existing = await self._target_holds_version(token, target, wanted, panel)
+            audit["target_check"] = existing
+            if existing.get("holds_version"):
+                audit["existing"] = True
+                return
+        pick = uuid.uuid4().hex[:10]
+        action = await page.evaluate(_PANEL_PICK_JS, {"token": token, "kind": "action", "value": list(labels), "pickToken": pick})
+        if not action.get("found"):
+            raise OperationNeedsInput("operation", f"{labels[0]!r} is not an action of {target!r} in {env or 'this environment'}",
+                                      offered=panel.get("actions") or [])
+        label = str(action.get("label") or labels[0])
+        await self._click_token(pick, label, mutation=bool(_GUARDED.search(label)))
+        audit["path"].append(label)
+        audit["selectors"].append({"role": "button", "name": label.title(), "context": "expanded details of the requested row"})
+        if action.get("menu"):
+            items: List[str] = []
+            for _ in range(12):
+                items = await page.evaluate(_MENU_ITEMS_JS, {"controls": action.get("controls") or ""})
+                if items:
+                    break
+                await page.wait_for_timeout(150)
+            audit["menu_opened"] = True
+            audit["menu_items"] = items
+            audit["menu_controls"] = action.get("controls") or ""
+
+    async def _target_holds_version(self, token: str, target: str, env: str, panel: Dict[str, Any]) -> Dict[str, Any]:
+        """Does the target environment already hold the selected version?  (Read-only: tab clicks.)"""
+        source_env = next((t["text"] for t in panel.get("tabs") or [] if t.get("selected")), "")
+        source_version = str(panel.get("version") or "")
+        result: Dict[str, Any] = {"target_environment": env, "source_environment": source_env, "source_version": source_version}
+        try:
+            there = await self._select_tab(token, target, env, panel)
+            versions = list(there.get("versions") or ([there.get("version")] if there.get("version") else []))
+            result["target_versions"] = versions
+            result["holds_version"] = bool(source_version) and any(_same_value(v, source_version) for v in versions)
+            if source_env and not result["holds_version"]:
+                back = await self._select_tab(token, target, source_env, there)
+                if source_version:
+                    await self._pick_panel_version(token, target, source_version)
+                result["restored"] = bool(back.get("found"))
+        except OperationNeedsInput as exc:
+            result.update(holds_version=False, error=exc.detail.get("reason"))
+        return result
+
+    async def _form_snapshot(self) -> Dict[str, str]:
+        page = await self._page()
+        try:
+            return dict(await page.evaluate(_FORM_SNAPSHOT_JS))
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _requested_fields(form_phase: str, values: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        from .stateful_form_runtime import compile_phase_state_graph
+
+        graph = compile_phase_state_graph({"objects": {form_phase: dict(values)}}, form_phase)
+        rows: List[Dict[str, Any]] = []
+        for node in graph.get("nodes") or []:
+            if not isinstance(node, Mapping):
+                continue
+            loc = node.get("semantic_locator") if isinstance(node.get("semantic_locator"), Mapping) else {}
+            names = [_label_key(x) for x in [*(loc.get("labels") or []), *(loc.get("placeholders") or []), *(loc.get("names") or [])] if str(x).strip()]
+            path = str(node.get("input_path") or "")
+            top = path.split(".")[3] if path.count(".") == 3 else ""
+            rows.append({"field": str(node.get("field_key") or ""), "labels": list(dict.fromkeys(names)), "row_index": node.get("row_index"),
+                         "requested": node.get("expected_value"), "top_key": top})
+        return rows
+
+    @staticmethod
+    def _plan_changes(fields: Sequence[Mapping[str, Any]], before: Mapping[str, str]) -> List[Dict[str, Any]]:
+        """CURRENT / REQUESTED / CHANGE for every requested field (EDIT SAFETY)."""
+        plan: List[Dict[str, Any]] = []
+        for f in fields:
+            index = int(f.get("row_index") or 0)
+            current = next((before[f"{label}#{index}"] for label in f.get("labels") or [] if f"{label}#{index}" in before), None)
+            requested = f.get("requested")
+            plan.append({"field": f.get("field"), "current": current, "requested": requested,
+                         "change": current is None or not _same_value(current, requested), "top_key": f.get("top_key")})
+        return plan
+
     # ------------------------------------------------------------------ open
-    async def open_surface(self, *, phase: str, operation: str, target: str, form_phase: str) -> Dict[str, Any]:
+    async def open_surface(
+        self, *, phase: str, operation: str, target: str, form_phase: str, options: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
         url = self._listing_url(phase)
-        audit: Dict[str, Any] = {"listing_url": url, "operation": operation, "path": []}
+        options = dict(options or {})
+        audit: Dict[str, Any] = {"listing_url": url, "operation": operation, "path": [], "selectors": []}
         await self._navigate(url)
         page = await self._page(url)
         if operation == "create":
@@ -305,12 +764,30 @@ class PortalOperationRunner:
                 # V243R23: the label that opened this action last time comes first.
                 labels = list(dict.fromkeys([*learned, *labels]))
                 audit["learned_opener_labels"] = learned
+            plan = store.opener_plan(phase, operation) if store is not None else {}
+            if plan.get("mode"):
+                audit["learned_mode"] = plan.get("mode")
             start_net = len(getattr(self.browser, "network_tab_events", []) or [])
             token = uuid.uuid4().hex[:10]
-            hit = await page.evaluate(_ROW_ACTION_JS, {"target": target, "labels": labels, "token": token})
-            if hit.get("found") == "row_action":
+            hit = await self._find_row(page, target, labels, token)
+            if hit.get("found") == "ambiguous":
+                raise OperationNeedsInput(
+                    "target", f"{len(hit.get('candidates') or [])} rows match {target!r} and none (or more than one) is exactly it",
+                    offered=hit.get("candidates") or [], source="the exact object name in the task or input.json")
+            if not hit.get("found") and target and int(hit.get("rows") or 0) > 0 and not hit.get("matching"):
+                raise OperationNeedsInput("target", f"no row named {target!r} on the listing", source="the exact object name")
+            if hit.get("found") == "expander":
+                await self._open_panel_action(hit, token=token, target=target, labels=labels, options=options, audit=audit, operation=operation)
+                if audit.get("menu_opened") and audit.get("menu_items") and store is not None:
+                    # The action's menu (Migrate > TEST1 / TEST2) opened: that is where it lives.
+                    store.record_opener(phase, operation, path=list(audit["path"]), label=str(audit["path"][-1]),
+                                        selectors=audit.get("selectors") or (), expander=True)
+                if audit.get("existing") or audit.get("menu_opened"):
+                    return audit
+            elif hit.get("found") == "row_action":
                 await self._click_token(token, str(hit.get("label") or labels[0]), mutation=bool(_GUARDED.search(labels[0])))
                 audit["path"].append(str(hit.get("label")))
+                audit["selectors"].append({"role": "button", "name": str(hit.get("label") or ""), "context": "row of the requested object"})
             elif hit.get("found") == "menu":
                 await self._click_token(token, str(hit.get("label") or "More actions"))
                 audit["path"].append(str(hit.get("label") or "more actions"))
@@ -340,9 +817,10 @@ class PortalOperationRunner:
             if audit["form_visible"]:
                 try:
                     store = PortalSkillStore.for_run(self.config, await self._page())
-                    clicked = [str(x) for x in audit["path"] if str(x) and not str(x).startswith("semantic:")]
+                    clicked = [str(x) for x in audit["path"] if str(x) and ":" not in str(x) and str(x) != "expand row"]
                     if store is not None and audit["path"]:
-                        store.record_opener(phase, operation, path=[str(x) for x in audit["path"]], label=clicked[-1] if clicked else "")
+                        store.record_opener(phase, operation, path=[str(x) for x in audit["path"]], label=clicked[-1] if clicked else "",
+                                            selectors=audit.get("selectors") or (), expander="expand row" in audit["path"])
                 except Exception:
                     pass
         if audit["form_visible"]:
@@ -419,18 +897,55 @@ class PortalOperationRunner:
         if not hit.get("found"):
             return {"pass": False, "status": "commit_control_not_found", "labels": list(labels)}
         label = str(hit.get("label") or labels[0])
+        return await self._commit_click(token, label, allowed=list(labels), task_id=task_id, entity=entity)
+
+    async def commit_menu_choice(self, *, label: str, gate: Mapping[str, Any], task_id: str, entity: str = "",
+                                 confirm_labels: Sequence[str] = ()) -> Dict[str, Any]:
+        """V243R24: the mutation is the menu item itself (Migrate > TEST2), plus the
+        portal's confirmation dialog when it shows one -- each clicked once."""
+        page = await self._page()
+        token = uuid.uuid4().hex[:10]
+        hit = await page.evaluate(_MENU_ITEM_JS, {"labels": [label], "token": token})
+        if not hit.get("found"):
+            return {"pass": False, "status": "commit_control_not_found", "labels": [label]}
+        return await self._commit_click(token, str(hit.get("label") or label), allowed=[label], task_id=task_id, entity=entity,
+                                        confirm_labels=confirm_labels)
+
+    async def _commit_click(self, token: str, label: str, *, allowed: Sequence[str], task_id: str, entity: str = "",
+                            confirm_labels: Sequence[str] = ()) -> Dict[str, Any]:
+        page = await self._page()
         before_url = page.url
         start_net = len(getattr(self.browser, "network_tab_events", []) or [])
-        self.browser.set_portal_mutation_authorization(enabled=True, allowed_labels=list(labels), task_id=task_id)
+        self.browser.set_portal_mutation_authorization(enabled=True, allowed_labels=[*allowed, *confirm_labels], task_id=task_id)
         click_error = ""
+        confirm: Dict[str, Any] = {}
+        effect_token = token
         try:
             # Clicked once.  An unclear outcome is reported, never retried blindly.
             await self._click_token(token, label, mutation=True)
+            if confirm_labels:
+                confirm_token = uuid.uuid4().hex[:10]
+                for _ in range(10):
+                    confirm = await page.evaluate(_CONFIRM_JS, {"labels": list(confirm_labels), "token": confirm_token})
+                    if confirm.get("found"):
+                        # The choice only opened the portal's confirmation (no write
+                        # was sent): that click is reconciled, and the confirmation
+                        # is the one mutation click.
+                        opened = await self._reconcile_opener(start_net, form_visible=True)
+                        confirm["choice_outcome"] = opened.get("classification")
+                        if opened.get("classification") != "opened_surface_no_write":
+                            break
+                        await self._click_token(confirm_token, str(confirm.get("label") or confirm_labels[0]), mutation=True)
+                        effect_token = confirm_token
+                        break
+                    await page.wait_for_timeout(200)
         except Exception as exc:
             click_error = mask_sensitive_string(str(exc))[:500]
         finally:
             self.browser.clear_portal_mutation_authorization()
-        effect = await self._await_effect(token, before_url) if not click_error else {"pass": False, "status": "commit_click_error"}
+        effect = await self._await_effect(effect_token, before_url) if not click_error else {"pass": False, "status": "commit_click_error"}
+        if confirm.get("found"):
+            effect["confirmation"] = {"label": confirm.get("label"), "dialog": mask_sensitive_string(str(confirm.get("dialog") or ""))[:200]}
         effect["reconciliation"] = await self._reconcile(start_net, label=label, entity=entity, effect=effect, click_error=click_error)
         if click_error:
             effect["error"] = click_error
@@ -563,12 +1078,14 @@ class PortalOperationRunner:
                 from .environment_faults import is_environment_fatal
 
                 row = {"phase": spec.get("phase"), "operation": spec.get("operation"), "pass": False,
-                       "status": "error", "error": mask_sensitive_string(str(exc))[:800],
+                       "status": "error", "result": "FAILED", "error": mask_sensitive_string(str(exc))[:800],
                        "environment_fault": is_environment_fatal(exc)}
             report["operations"].append(row)
             if row.get("environment_fault"):
                 break
         report["pass"] = bool(specs) and all(r.get("pass") for r in report["operations"])
+        report["results"] = [{"phase": r.get("phase"), "operation": r.get("operation"), "target": r.get("target"),
+                              "result": r.get("result"), "status": r.get("status")} for r in report["operations"]]
         report["seconds"] = round(time.monotonic() - started, 1)
         safe_write_json(self.run_dir / "portal_operations.json", mask_sensitive_data(report))
         return mask_sensitive_data(report)
@@ -592,25 +1109,62 @@ class PortalOperationRunner:
         row: Dict[str, Any] = {"phase": phase, "operation": operation, "form": form_phase, "target": target,
                                "commit_requested": commit_wanted}
         opener = (OPENER_LABELS.get(operation) or (operation.title(),))[0]
+        # V243R24: which environment / version of the object (the expanded row's
+        # tabs and Version), and a Migrate / Deploy target checked before any click.
+        options: Dict[str, Any] = dict(spec.get("panel") or {}) if isinstance(spec.get("panel"), Mapping) else {}
+        if values.get("target_environment"):
+            options["target_environment"] = values.get("target_environment")
+        if operation == "clone":
+            new_name = _name_in(values)
+            if not new_name or (target and _norm(new_name) == _norm(target)):
+                return self._needs_input(row, OperationNeedsInput(
+                    "name", "a clone needs a new, unique name; the source object's name is taken", observed=target,
+                    source=f"objects.{phase}.name (a new name) or the task text"), started, out_dir)
         if operation != "create" and _GUARDED.search(opener) and not gate.get("pass"):
             # The row action itself (Deploy, Delete ...) is a portal mutation.
             row.update({"pass": False, "status": "blocked_mutation_authorization",
                         "reason": f"opening {opener!r} is itself a portal mutation; the three-part gate is closed"})
-            return row
+            return self._finish(row, started, out_dir)
         task_id = f"op-{uuid.uuid4().hex[:10]}"
-        payload: Dict[str, Any] = {"objects": {form_phase: values}, "_operation": operation}
-        for key in ("_upload_assets_dir", "_input_json_path"):
-            if key in input_data:
-                payload[key] = input_data[key]
+        fields: List[Dict[str, Any]] = []
         if gate.get("pass") and _GUARDED.search(opener):
             self.browser.set_portal_mutation_authorization(enabled=True, allowed_labels=[opener], task_id=task_id)
         try:
-            row["open"] = await self.open_surface(phase=phase, operation=operation, target=target, form_phase=form_phase)
+            try:
+                row["open"] = await self.open_surface(phase=phase, operation=operation, target=target, form_phase=form_phase, options=options)
+            except OperationNeedsInput as exc:
+                return self._needs_input(row, exc, started, out_dir)
+            if row["open"].get("existing"):
+                row.update({"pass": True, "status": "already_in_target",
+                            "reason": f"{target!r} {row['open'].get('target_check', {}).get('source_version') or ''} is already in {options.get('target_environment')}; nothing was clicked"})
+                return self._finish(row, started, out_dir)
+            if row["open"].get("menu_opened"):
+                return await self._menu_choice(row, values=values, gate=gate, task_id=task_id, target=target, phase=phase,
+                                               opener=opener, commit_wanted=commit_wanted, started=started, out_dir=out_dir)
+            if operation in {"edit", "clone"} and form_phase == phase and row["open"].get("form_visible"):
+                # V243R24 EDIT SAFETY: capture the form as it is, compare every
+                # requested value with it, and only change what differs.
+                row["before"] = await self._form_snapshot()
+                fields = self._requested_fields(form_phase, values)
+                row["changes"] = self._plan_changes(fields, row["before"])
+                if operation == "edit" and row["changes"]:
+                    if not any(c["change"] for c in row["changes"]):
+                        row.update({"pass": True, "status": "no_change_needed",
+                                    "reason": "every requested value already equals the current one; nothing was changed"})
+                        return self._finish(row, started, out_dir)
+                    same = {c["top_key"] for c in row["changes"] if not c["change"] and c["top_key"]}
+                    differ = {c["top_key"] for c in row["changes"] if c["change"] and c["top_key"]}
+                    values = {k: v for k, v in values.items() if k not in (same - differ)}
+                    fields = [f for f in fields if f.get("top_key") not in (same - differ)]
+            payload: Dict[str, Any] = {"objects": {form_phase: values}, "_operation": operation}
+            for key in ("_upload_assets_dir", "_input_json_path"):
+                if key in input_data:
+                    payload[key] = input_data[key]
             reopen_count = {"n": 0}
 
             async def reopen() -> None:
                 reopen_count["n"] += 1
-                await self.open_surface(phase=phase, operation=operation, target=target, form_phase=form_phase)
+                await self.open_surface(phase=phase, operation=operation, target=target, form_phase=form_phase, options=options)
 
             fill = await self.fill(phase=phase, form_phase=form_phase, payload=payload, out_dir=out_dir, reopen=reopen)
         finally:
@@ -628,6 +1182,22 @@ class PortalOperationRunner:
         if not fill.get("pass"):
             row.update({"pass": False, "status": "fill_not_proven", "failure_summary": fill.get("failure_summary") or {}})
             return self._finish(row, started, out_dir)
+        if fields and isinstance(row.get("before"), Mapping):
+            # Let the form react to the last edit (Angular validates / resets
+            # dependent fields on blur) before comparing it with the snapshot.
+            page = await self._page()
+            try:
+                await page.evaluate("() => document.activeElement && document.activeElement.blur && document.activeElement.blur()")
+                await page.wait_for_timeout(400)
+            except Exception:
+                pass
+            after_fill = await self._form_snapshot()
+            unrelated = self._unrelated_changes(fields, row["before"], after_fill)
+            row["unrelated_changes"] = unrelated
+            if unrelated and self.block_unrelated_changes:
+                row.update({"pass": False, "status": "unrelated_field_changed",
+                            "reason": "fields that were not requested changed while filling; nothing was saved"})
+                return self._finish(row, started, out_dir)
         if not commit_wanted:
             row.update({"pass": True, "status": "filled_not_committed"})
             return self._finish(row, started, out_dir)
@@ -663,12 +1233,116 @@ class PortalOperationRunner:
                 # committed state: that is the authoritative outcome.
                 row["reconciliation_by_listing"] = self.browser.resolve_mutation_dispatch_guard(
                     {"classification": "committed_verified", "pass": True})
+            if row["pass"] and "expand row" in (row["open"].get("path") or []) and fields:
+                # V243R24: re-open the object's details and read the requested values back.
+                row["after"] = await self.read_details(phase=phase, target=name, options=options, fields=fields)
         else:
             row.update({"pass": True, "status": "committed"})
         return self._finish(row, started, out_dir)
 
+    async def _menu_choice(
+        self, row: Dict[str, Any], *, values: Mapping[str, Any], gate: Mapping[str, Any], task_id: str, target: str, phase: str,
+        opener: str, commit_wanted: bool, started: float, out_dir: Path,
+    ) -> Dict[str, Any]:
+        """Migrate > TEST2: the target is a menu choice; checked, then clicked once."""
+        page = await self._page()
+        items = [str(x) for x in row["open"].get("menu_items") or []]
+        want = str(values.get("target_environment") or values.get("environment") or values.get("to") or "").strip()
+
+        async def close_menu() -> None:
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+
+        source_env = str((row["open"].get("before") or {}).get("environment") or "")
+        if not want:
+            await close_menu()
+            return self._needs_input(row, OperationNeedsInput(
+                "target_environment", f"{opener} needs a target environment", offered=items, source="'to <ENV>' in the task"), started, out_dir)
+        match = next((i for i in items if _same_value(i, want)), "")
+        if not match:
+            await close_menu()
+            return self._needs_input(row, OperationNeedsInput(
+                "target_environment", f"{want} is not offered by {opener} from {source_env or 'this environment'}", offered=items), started, out_dir)
+        row["choice"] = match
+        if not commit_wanted:
+            await close_menu()
+            row.update({"pass": True, "status": "validated_not_committed"})
+            return self._finish(row, started, out_dir)
+        if not gate.get("pass"):
+            await close_menu()
+            row.update({"pass": False, "status": "commit_not_authorized",
+                        "reason": f"{opener} to {match} is a portal mutation; the three-part gate is closed and nothing was clicked"})
+            return self._finish(row, started, out_dir)
+        clicked = str((row["open"].get("path") or [opener])[-1] or opener)
+        confirm_labels = list(dict.fromkeys([clicked.title(), opener, "Confirm", "Yes", "OK", "Continue", "Submit"]))
+        committed = await self.commit_menu_choice(label=match, gate=gate, task_id=task_id, entity=target, confirm_labels=confirm_labels)
+        row["commit"] = committed
+        if not committed.get("pass"):
+            row.update({"pass": False, "status": committed.get("status") or "commit_failed"})
+            return self._finish(row, started, out_dir)
+        row["verification"] = await self.verify_listing(phase=phase, name=target, expect=[match])
+        row["pass"] = bool(row["verification"].get("pass"))
+        row["status"] = "committed_and_verified" if row["pass"] else "committed_verification_failed"
+        row["after"] = {"available_environments_row": row["verification"].get("row_text")}
+        guard = (committed.get("reconciliation") or {}).get("mutation_dispatch_guard") or {}
+        if row["pass"] and guard.get("retained") and hasattr(self.browser, "resolve_mutation_dispatch_guard"):
+            row["reconciliation_by_listing"] = self.browser.resolve_mutation_dispatch_guard({"classification": "committed_verified", "pass": True})
+        return self._finish(row, started, out_dir)
+
+    async def read_details(self, *, phase: str, target: str, options: Mapping[str, Any], fields: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+        """Re-open the object's expanded details and check the requested values."""
+        try:
+            await self._navigate(self._listing_url(phase))
+            await self._search(target)
+            page = await self._page()
+            token = uuid.uuid4().hex[:10]
+            hit = await self._find_row(page, target, [], token)
+            if hit.get("found") != "expander":
+                return {"read": False, "reason": f"row {hit.get('found') or 'not found'}"}
+            if not hit.get("expanded"):
+                await self._click_token(token, "Expand the row")
+            panel = await self._panel(token, target)
+            if options.get("environment"):
+                panel = await self._select_tab(token, target, str(options["environment"]).upper(), panel)
+            details = panel.get("details") or {}
+            seen = {str(f.get("field")): any(_same_value(v, f.get("requested")) for v in details.values())
+                    for f in fields if isinstance(f.get("requested"), (str, int, float)) and str(f.get("requested"))}
+            return {"read": True, "details": details, "requested_values_seen": seen, "all_seen": all(seen.values()) if seen else None}
+        except Exception as exc:
+            return {"read": False, "reason": mask_sensitive_string(str(exc))[:300]}
+
+    @staticmethod
+    def _unrelated_changes(fields: Sequence[Mapping[str, Any]], before: Mapping[str, str], after: Mapping[str, str]) -> List[Dict[str, Any]]:
+        allowed = {label for f in fields for label in f.get("labels") or []}
+        out: List[Dict[str, Any]] = []
+        for key, old in before.items():
+            if key not in after or key.rsplit("#", 1)[0] in allowed:
+                continue
+            if not _same_value(old, after[key]):
+                out.append({"field": key.rsplit("#", 1)[0], "before": old, "after": after[key]})
+        return out
+
+    def _needs_input(self, row: Dict[str, Any], exc: OperationNeedsInput, started: float, out_dir: Path) -> Dict[str, Any]:
+        row.update({"pass": False, "status": "needs_input", "needs_input": exc.detail, "reason": exc.detail.get("reason")})
+        return self._finish(row, started, out_dir)
+
     def _finish(self, row: Dict[str, Any], started: float, out_dir: Path) -> Dict[str, Any]:
         row["seconds"] = round(time.monotonic() - started, 1)
+        row["result"] = operation_result(str(row.get("status") or ""))
+        opened = row.get("open") if isinstance(row.get("open"), Mapping) else {}
+        if opened.get("path") and row.get("status") in {"committed_and_verified", "already_in_target", "committed_verification_failed", "error"}:
+            # V243R24: a verified outcome promotes the learned action path
+            # (EXPLORATION -> DETERMINISTIC); a failed one demotes it.
+            try:
+                store = PortalSkillStore.for_run(self.config, getattr(self.browser, "page", None))
+                if store is not None:
+                    row["learned_mode"] = store.record_opener_outcome(
+                        str(row.get("phase") or ""), str(row.get("operation") or ""),
+                        success=row.get("status") in {"committed_and_verified", "already_in_target"}, reason=str(row.get("status")))
+            except Exception:
+                pass
         safe_write_json(out_dir / "operation.json", mask_sensitive_data(row))
         return mask_sensitive_data(row)
 

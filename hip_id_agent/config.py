@@ -949,6 +949,15 @@ class ModelPortfolioConfig(BaseModel):
     persist_customer_values: bool = False
     persist_selectors: bool = False
     persist_coordinates: bool = False
+    # V243R24: once, on the live GO/NO-GO run (or the first live mission page),
+    # every available text model answers the same questions about the real HIP
+    # page; the most accurate one is locked and used for every later call.
+    qualification_enabled: bool = True
+    use_qualified_model: bool = True
+    qualification_min_accuracy: float = 0.6
+    qualification_max_questions: int = 8
+    qualification_in_first_live_mission: bool = True
+    qualification_page: str = "source_document_type"
 
 
 class RecursiveSelfImprovementConfig(BaseModel):
@@ -1151,6 +1160,9 @@ class PortalOperationsConfig(BaseModel):
     commit_requires_certified_skill: bool = True
     verify_after_commit: bool = True
     commit_effect_timeout_seconds: float = 20.0
+    # V243R24: Edit / Clone capture the form first and change only the requested
+    # fields; a fill that changed any other field is not saved.
+    block_unrelated_changes: bool = True
 
 
 class AppConfig(BaseModel):

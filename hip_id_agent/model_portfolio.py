@@ -105,7 +105,13 @@ class OnPremModelPortfolioRouter:
         self.dreams_path = self.root / "model_dream_cycles.jsonl"
         self.usage_path = self.root / "model_usage.jsonl"
         self.availability_path = self.root / "model_availability.json"
+        self.selection_path = self.root / "model_selection.json"
         self.state = self._load()
+        qualified = self.qualified_model()
+        if qualified:
+            # V243R24: every default call (AIAClient) uses the model selected once
+            # by live task performance, from the first call of every process.
+            os.environ["HIP_MODEL_ROUTER_SELECTED_TEXT"] = qualified
 
     def _cfg(self, name: str, default: Any) -> Any:
         return getattr(self.config, name, default) if self.config is not None else default
@@ -122,6 +128,40 @@ class OnPremModelPortfolioRouter:
         explicit = str(self._cfg("primary_text_model", "") or "").strip()
         configured = explicit or str(getattr(self.aia_config, "model", "") or "").strip() or "gpt-oss-120b"
         return configured if configured in ON_PREM_MODEL_CATALOG else "gpt-oss-120b"
+
+    def qualification(self) -> Dict[str, Any]:
+        """V243R24: the one-time live qualification's locked selection, if any."""
+        from .model_qualification import SCHEMA as QUALIFICATION_SCHEMA
+
+        data = _read_json(self.selection_path)
+        if data.get("schema_version") != QUALIFICATION_SCHEMA or not data.get("locked") or not data.get("selected_model"):
+            return {}
+        return data
+
+    def qualified_model(self, role: str = "") -> str:
+        """The model selected by live task performance; the next qualified model
+        when it is proven down.  Empty when no qualification is locked."""
+        if not bool(self._cfg("use_qualified_model", True)):
+            return ""
+        selection = self.qualification()
+        if not selection:
+            return ""
+        availability = self.state.get("availability") or {}
+        eligible = set(self.configured_models("text", role=role)) if role else set(ON_PREM_MODEL_CATALOG)
+        for model in dict.fromkeys([str(selection.get("selected_model") or ""), *[str(m) for m in selection.get("fallback_order") or []]]):
+            if model not in ON_PREM_MODEL_CATALOG or model not in eligible:
+                continue
+            if self._availability_fresh(model) and (availability.get(model) or {}).get("available") is False:
+                continue
+            return model
+        return ""
+
+    def _qualification_summary(self) -> Dict[str, Any]:
+        from .model_qualification import qualification_summary
+
+        summary = qualification_summary(self.qualification())
+        summary["in_use"] = self.qualified_model()
+        return summary
 
     def strongest_available(self, role: str = "", kind: str = "text") -> str:
         models = self.available_models(kind, role=role)
@@ -320,6 +360,11 @@ class OnPremModelPortfolioRouter:
             requested = max(requested, int(self._cfg("complex_task_parallel_models", 4) or 4))
             force_multi_model = True
         count = max(1, min(requested, int(self._cfg("max_parallel_models", 6) or 6)))
+        if kind == "text":
+            qualified = self.qualified_model(role)
+            if qualified:
+                # V243R24: chosen once by live task performance and used from then on.
+                return [qualified]
         ranked = self.rank(role, kind=kind, task=task)
         if not ranked:
             return []
@@ -506,7 +551,7 @@ class OnPremModelPortfolioRouter:
                     changed[role] = {"from": old, "to": ""}
         self.state["cycle"] = int(self.state.get("cycle") or 0) + 1; self._save()
         cycle = {"schema_version": "hip.model-portfolio-dream-cycle.v2", "cycle": self.state["cycle"], "recorded_at": utc_now(), "reason": reason, "champion_changes": changed, "role_champions": dict(self.state.get("role_champions") or {}), "promotion_requires_downstream_evidence": True}
-        general = self.default_text_model(champion_only=True)
+        general = self.qualified_model() or self.default_text_model(champion_only=True)
         primary = self.primary_text_model()
         if general:
             os.environ["HIP_MODEL_ROUTER_SELECTED_TEXT"] = general
@@ -519,6 +564,9 @@ class OnPremModelPortfolioRouter:
     def default_text_model(self, *, champion_only: bool = False) -> str:
         """The model every default call uses: the evidence champion, but never a
         weaker one than the configured model unless that model is proven down."""
+        qualified = self.qualified_model()
+        if qualified:
+            return qualified
         champs = self.state.get("role_champions") or {}
         general = str(champs.get("planning") or champs.get("action_selection") or "")
         primary = self.primary_text_model()
@@ -532,7 +580,7 @@ class OnPremModelPortfolioRouter:
 
     def manifest(self) -> Dict[str, Any]:
         roles = sorted(set((self.state.get("role_champions") or {}).keys()) | {"planning", "action_selection", "judge", "recovery"})
-        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "primary_text_model": self.primary_text_model(), "default_text_model": self.default_text_model(), "credit_rule": str(self.state.get("credit_rule") or ""), "scored_decisions": {role: sum(int(((self.state.get("models") or {}).get(m, {}).get("roles") or {}).get(role, {}).get("trials") or 0) for m in (self.state.get("models") or {})) for role in ("planning", "action_selection", "judge", "recovery")}, "min_champion_trials": int(self._cfg("min_champion_trials", 3) or 3), "prefer_strongest_model": self._prefer_strongest(), "model_capability": {m: self.capability(m) for m in self.configured_models("text")}, "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": self.recent_usage(25), "recent_distinct_models": sorted({m for row in self.recent_usage(25) for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
+        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "primary_text_model": self.primary_text_model(), "default_text_model": self.default_text_model(), "qualification": self._qualification_summary(), "credit_rule": str(self.state.get("credit_rule") or ""), "scored_decisions": {role: sum(int(((self.state.get("models") or {}).get(m, {}).get("roles") or {}).get(role, {}).get("trials") or 0) for m in (self.state.get("models") or {})) for role in ("planning", "action_selection", "judge", "recovery")}, "min_champion_trials": int(self._cfg("min_champion_trials", 3) or 3), "prefer_strongest_model": self._prefer_strongest(), "model_capability": {m: self.capability(m) for m in self.configured_models("text")}, "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": self.recent_usage(25), "recent_distinct_models": sorted({m for row in self.recent_usage(25) for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
 
 
 def model_portfolio_from_config(app_config: Any) -> OnPremModelPortfolioRouter:

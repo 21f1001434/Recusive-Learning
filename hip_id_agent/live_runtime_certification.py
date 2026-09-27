@@ -241,6 +241,33 @@ def verify_latest_live_runtime_certificate(config: AppConfig, runs_root: str | P
     }
 
 
+def _qualification_detail(result: Dict[str, Any]) -> str:
+    status = str(result.get("status") or "")
+    if result.get("locked"):
+        prefix = "already qualified" if status == "already_qualified" else "selected now"
+        return f"{prefix}: {result.get('selected_model')} ({result.get('correct')}/{result.get('total')} live questions correct, {result.get('qualified_at')})"
+    return f"{status}: {result.get('reason') or ''}".strip(": ")
+
+
+async def qualify_models_on_live_page(cfg: AppConfig, browser: Any, run_dir: Path, *, force: bool = False, source: str = "live_go_live") -> Dict[str, Any]:
+    """Navigate (read-only) to the qualification listing and qualify the models once."""
+    from .dummy_fill_e2e import PHASE_URLS
+    from .model_qualification import ensure_model_qualification, load_selection
+
+    existing = load_selection(cfg)
+    if existing.get("locked") and not force:
+        return {**existing, "status": "already_qualified", "ran_now": False}
+    try:
+        url = str(PHASE_URLS.get(str(getattr(cfg.model_portfolio, "qualification_page", "") or "source_document_type")) or "")
+        if url:
+            await browser.goto_base_and_complete_sso(url)
+            await browser.wait_ready()
+        page = browser.page
+        return await ensure_model_qualification(cfg, page, source=source, run_dir=Path(run_dir) / "model_qualification", force=force)
+    except Exception as exc:
+        return {"status": "error", "locked": False, "reason": mask_sensitive_string(str(exc))[:500]}
+
+
 async def certify_live_runtime(
     *,
     config: AppConfig,
@@ -248,6 +275,7 @@ async def certify_live_runtime(
     target_url: str = "",
     ttl_seconds: int = 3600,
     require_pyautogui_mcp: bool = False,
+    requalify_models: bool = False,
 ) -> Dict[str, Any]:
     """Perform a non-mutating certification against the actual Windows HIP runtime.
 
@@ -410,6 +438,20 @@ async def certify_live_runtime(
                 "python_playwright": python_playwright_ok,
                 "policy": "PyAutoGUI first when healthy; Playwright MCP next; governed Python Playwright fallback remains authoritative with exact effect verification.",
             },
+        ))
+
+        # V243R24: once, give every available text model the same task on the live
+        # HIP listing and lock the most accurate one (read-only: the page is read,
+        # models only answer).
+        qualification = await qualify_models_on_live_page(cfg, browser, run_dir, force=requalify_models)
+        checks.append(_check(
+            "model_qualification",
+            "Model selected by live task performance (one time)",
+            bool(qualification.get("locked")),
+            blocker=False,
+            detail=_qualification_detail(qualification),
+            evidence={k: qualification.get(k) for k in ("status", "selected_model", "accuracy", "correct", "total", "qualified_at", "source", "fallback_order", "reason")}
+            | {"ranking": [{k: r.get(k) for k in ("model", "accuracy", "correct", "total", "latency_ms", "qualified", "error")} for r in qualification.get("ranking") or []]},
         ))
 
         mutation_auth_off = not bool((getattr(browser, "_portal_mutation_authorization", {}) or {}).get("enabled")) and not bool(cfg.pyautogui.allow_mutation_clicks)

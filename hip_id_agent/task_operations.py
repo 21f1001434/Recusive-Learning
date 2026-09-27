@@ -48,7 +48,12 @@ _VERBS = (
 )
 _SAVE = r"\b(?:save[sd]?|saving|submit(?:s|ted)?|commit)\b"
 _FILL = r"\bfill(?:s|ed|ing)?\b"
-_ENV = r"\b(?:to|in|into|on|for)\s+(?:the\s+)?(prod(?:uction)?|uat|dev|qa|sit|test|stag(?:e|ing))\b"
+_ENV_NAME = r"(prod(?:uction)?|uat|dev|qa|sit|test\d*|stag(?:e|ing))"
+_ENV = r"\b(?:to|in|into|on|for)\s+(?:the\s+)?" + _ENV_NAME + r"\b"
+_TO_ENV = r"\b(?:to|into)\s+(?:the\s+)?" + _ENV_NAME + r"\b"
+_FROM_ENV = r"\bfrom\s+(?:the\s+)?" + _ENV_NAME + r"\b"
+_IN_ENV = r"\b(?:in|on|of)\s+(?:the\s+)?" + _ENV_NAME + r"\b|\b" + _ENV_NAME + r"\s+(?:version|environment|env|tab)\b"
+_VERSION = r"\bversion\s+(\d+(?:\.\d+)?)\b|\bv(\d+(?:\.\d+)?)\b"
 _FORM_OPERATIONS = {"create", "edit", "clone"}
 _ENV_CANONICAL = {"production": "PROD", "staging": "STAGE"}
 
@@ -77,12 +82,32 @@ def _target(task: str) -> str:
     return max(tokens, key=len) if tokens else ""
 
 
-def _environment(task: str) -> str:
-    m = re.search(_ENV, str(task or ""), re.I)
+def _canonical_env(word: str) -> str:
+    word = str(word or "").lower()
+    return _ENV_CANONICAL.get(word, word.upper())
+
+
+def _environment(task: str, pattern: str = _ENV) -> str:
+    m = re.search(pattern, str(task or ""), re.I)
     if not m:
         return ""
-    word = m.group(1).lower()
-    return _ENV_CANONICAL.get(word, word.upper() if word != "prod" else "PROD")
+    return _canonical_env(next(g for g in m.groups() if g))
+
+
+def _panel(task: str, operation: str) -> Dict[str, str]:
+    """V243R24: which environment tab and version of the object the action applies to
+    (the expanded row's DEV / TEST1 / TEST2 / PROD tabs and Version)."""
+    text = str(task or "")
+    panel: Dict[str, str] = {}
+    source = _environment(text, _FROM_ENV)
+    if not source and operation not in {"deploy", "migrate"}:
+        source = _environment(text, _IN_ENV)
+    if source:
+        panel["environment"] = source
+    version = re.search(_VERSION, text, re.I)
+    if version:
+        panel["version"] = next(g for g in version.groups() if g)
+    return panel
 
 
 def task_operation_specs(task: str, input_data: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
@@ -100,7 +125,7 @@ def task_operation_specs(task: str, input_data: Optional[Mapping[str, Any]] = No
         operations = ["edit" if target else "create"]
     if not operations:
         return []
-    env = _environment(text)
+    env = _environment(text, _TO_ENV) or _environment(text)
     merge_into = ""
     into = re.search(r"(\S+)\s+into\s+(?:the\s+)?(\S+)", text, re.I)
     if "merge" in operations and into:
@@ -113,8 +138,11 @@ def task_operation_specs(task: str, input_data: Optional[Mapping[str, Any]] = No
         spec["commit"] = save if operation in _FORM_OPERATIONS else True
         if operation != "create" and target:
             spec["target"] = target
-        if operation in {"deploy", "migrate"} and env:
+        if operation in {"deploy", "migrate"} and env and env != _environment(text, _FROM_ENV):
             spec["values"] = {"target_environment": env}
+        panel = _panel(text, operation)
+        if panel and operation != "create":
+            spec["panel"] = panel
         if operation == "merge" and merge_into:
             spec["values"] = {"merge_into": merge_into}
         specs.append(spec)
@@ -139,11 +167,23 @@ def plan_task_operations(task: str, input_data: Optional[Mapping[str, Any]] = No
             steps.append({"type": "open", "click": list(ADD_LABELS), "risk": "read"})
         else:
             steps.append({"type": "search", "target": spec.get("target") or f"objects.{phase} name", "risk": "read"})
+            panel = spec.get("panel") or {}
             steps.append({"type": "open_row_action", "click": list(OPENER_LABELS.get(operation) or (operation.title(),)),
-                          "fallbacks": ["More actions menu", "semantic affordance resolver"],
+                          # V243R24: Document Types keep Edit / Clone / Migrate in the row's
+                          # expanded details, behind its chevron.
+                          "fallbacks": ["row expander: expanded details" + (f" ({', '.join(f'{k} {v}' for k, v in panel.items())})" if panel else ""),
+                                        "More actions menu", "semantic affordance resolver"],
+                          "exact_row_match": True, "ambiguous_or_missing_row": "NEEDS_INPUT",
                           "risk": "mutation" if operation not in _FORM_OPERATIONS else "read"})
-        steps.append({"type": "fill", "form": form_phase_for(phase, operation, spec), "engine": "certified skill (learn, prove by replay, then replay)",
-                      "values": spec.get("values") or f"objects.{phase}", "risk": "draft"})
+        if operation in {"deploy", "migrate"}:
+            steps.append({"type": "choose_target", "form": form_phase_for(phase, operation, spec),
+                          "values": spec.get("values") or f"objects.{phase}_{operation}",
+                          "checks": ["offered by the portal, else NEEDS_INPUT", "already holds the version: EXISTING, nothing clicked"],
+                          "engine": "action menu choice, or the action's dialog (certified skill)", "risk": "draft"})
+        else:
+            steps.append({"type": "fill", "form": form_phase_for(phase, operation, spec), "engine": "certified skill (learn, prove by replay, then replay)",
+                          "values": spec.get("values") or f"objects.{phase}", "risk": "draft",
+                          **({"edit_safety": "snapshot first; change only requested fields; not saved if another field changed"} if operation in {"edit", "clone"} else {})})
         if spec.get("commit"):
             steps.append({"type": "commit", "click": list(COMMIT_LABELS.get(operation) or ("Save",)),
                           "gate": "--allow-portal-mutation + HIP_ALLOW_PORTAL_MUTATION=YES + 'ALLOW HIP MUTATION'", "risk": "mutation"})

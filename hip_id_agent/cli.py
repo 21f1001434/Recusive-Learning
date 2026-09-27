@@ -94,6 +94,7 @@ def certify_live_runtime_cmd(
     target_url: str = typer.Option("", help="HIP URL to authenticate and prove. Empty uses portal.base_url."),
     ttl_seconds: int = typer.Option(0, help="Certificate validity. 0 uses live_runtime_certification.ttl_seconds."),
     require_pyautogui_mcp: bool = typer.Option(False, "--require-pyautogui-mcp/--allow-missing-pyautogui-mcp", help="Require the PyAutoGUI MCP read-only desktop smoke to pass."),
+    requalify_models: bool = typer.Option(False, "--requalify-models", help="Run the one-time live model qualification again (normally it runs only once)."),
 ):
     """Certify the actual Windows/Dell runtime without mutating the HIP tenant.
 
@@ -117,6 +118,7 @@ def certify_live_runtime_cmd(
         target_url=target_url or str(cfg.portal.base_url or ""),
         ttl_seconds=ttl,
         require_pyautogui_mcp=require_pyautogui_mcp,
+        requalify_models=requalify_models,
     ))
     table = Table(title="HIP Live Runtime Certification")
     table.add_column("Check")
@@ -130,6 +132,62 @@ def certify_live_runtime_cmd(
     console.print(f"Latest receipt: {root / '.hip_runtime' / 'live_runtime_certificate.json'}")
     if not result.get("pass"):
         raise typer.Exit(code=2)
+
+
+@app.command("qualify-models")
+def qualify_models_cmd(
+    config: str = typer.Option("config.yaml", help="Path to config YAML."),
+    runs_dir: str = typer.Option("", help="Evidence root. Empty uses reporting.runs_dir from config."),
+    force: bool = typer.Option(False, "--force", help="Qualify again although a model is already selected."),
+    show: bool = typer.Option(False, "--show", help="Only print the current selection; open no browser."),
+):
+    """Select the model by live task performance, once (V243R24).
+
+    Opens the portal (Dell SSO when needed), reads the Document Types listing
+    and gives every available Dell AIA text model the same questions about it:
+    which control opens row X's Edit / Migrate, which control searches, which
+    field takes an input.json value.  The most accurate model is locked and used
+    for every later call.  Read-only: nothing on the portal is clicked.
+    """
+    from .live_runtime_certification import qualify_models_on_live_page
+    from .model_qualification import load_selection
+
+    load_dotenv()
+    cfg = load_config(config)
+    if show or (load_selection(cfg).get("locked") and not force):
+        selection = load_selection(cfg)
+        if not selection:
+            console.print("No model qualified yet. Run: qualify-models (or Live GO/NO-GO).")
+            return
+        _print_qualification({**selection, "status": "already_qualified"})
+        return
+    root = Path(runs_dir or cfg.reporting.runs_dir).expanduser()
+    run_dir = root / "model_qualification" / datetime.now().strftime("QUAL-%Y%m%d-%H%M%S")
+
+    async def _run() -> Dict[str, Any]:
+        from .browser_session import BrowserSession
+
+        async with BrowserSession(cfg, run_dir / "browser") as session:
+            return await qualify_models_on_live_page(cfg, session, run_dir, force=force, source="qualify_models_cli")
+
+    result = asyncio.run(_run())
+    _print_qualification(result)
+    if not result.get("locked"):
+        raise typer.Exit(code=2)
+
+
+def _print_qualification(result: Dict[str, Any]) -> None:
+    table = Table(title="Model qualification on a live task")
+    for column in ("Model", "Correct", "Accuracy", "Latency ms", "Qualified"):
+        table.add_column(column)
+    for row in result.get("ranking") or []:
+        table.add_row(str(row.get("model")), f"{row.get('correct')}/{row.get('total')}", f"{float(row.get('accuracy') or 0):.0%}",
+                      str(row.get("latency_ms")), "yes" if row.get("qualified") else ("error" if row.get("error") else "no"))
+    console.print(table)
+    console.print(f"Status: [bold]{result.get('status')}[/bold]  Selected: [bold]{result.get('selected_model') or '-'}[/bold]  "
+                  f"Fallback: {', '.join(result.get('fallback_order') or []) or '-'}")
+    if result.get("reason"):
+        console.print(str(result.get("reason")))
 
 
 @app.command("certify-final-mission")
@@ -867,6 +925,7 @@ def run_full_dummy_fill(
             continue_after_phase_block=bool(autonomous_mission),
             live_witness_mode=bool(live_witness),
             save_after_fill=bool(save_after_fill),
+            qualify_models_on_first_page=bool(getattr(cfg.model_portfolio, "qualification_in_first_live_mission", True)),
             allow_portal_mutation=bool(allow_portal_mutation),
             mutation_confirmation=str(confirmation or ""),
         ),
@@ -1781,12 +1840,26 @@ def run_operations_cmd(
 
 
 @app.command("portal-skills")
-def portal_skills_cmd(config: str = typer.Option("config.yaml", help="Path to config YAML.")):
-    """V243R19: certified / candidate / stale skills per phase and the learned branch fields."""
+def portal_skills_cmd(
+    config: str = typer.Option("config.yaml", help="Path to config YAML."),
+    verify: str = typer.Option("", "--verify", help="Mark a learned action path as human verified: <phase>:<operation>, e.g. source_document_type:migrate."),
+):
+    """V243R19: certified / candidate / stale skills per phase and the learned branch fields.
+
+    V243R24: also the learned action paths (for example "expand row > migrate")
+    and whether each is EXPLORATION or DETERMINISTIC.  --verify promotes one a
+    human has checked.
+    """
     from .portal_skills import PortalSkillStore
 
     cfg = load_config(config)
     store = PortalSkillStore(Path(cfg.reporting.memory_dir))
+    if verify:
+        phase, _, operation = verify.partition(":")
+        if not store.verify_opener(phase.strip(), operation.strip()):
+            console.print(f"No learned action path for {verify!r}.")
+            raise typer.Exit(code=2)
+        console.print(f"{verify}: human verified, now DETERMINISTIC.")
     phases = sorted(p.stem for p in store.root.glob("*.json")) if store.root.exists() else []
     console.print_json(json.dumps({"phases": [store.summary(p) for p in phases]}, indent=2, default=str))
 

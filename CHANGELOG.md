@@ -1,3 +1,72 @@
+# V243R24 — One-time live model qualification; Edit / Clone / Migrate through the row expander (2026-09-27)
+
+- `model_qualification` (new):
+  - `SCREEN_JS` / `capture_screen` read the page's visible controls: role, accessible name, form label, placeholder, owning row, `aria-expanded`;
+  - `build_questions` asks questions whose answers come from that page: a row's first click to reach Edit / Migrate / Clone (its expander, else its button or menu), the search box, + Add, next page, and input.json key → field;
+  - `qualify_models` gives every available text model the same prompt and scores the control ids against the page. Ranking is by accuracy, then JSON, latency and capability. A model qualifies at `qualification_min_accuracy` (0.6);
+  - `ensure_model_qualification` locks `model_selection.json` once, re-runs only with `force`, and logs every run to `model_qualification_runs.jsonl`.
+- `OnPremModelPortfolioRouter`:
+  - `qualification()` / `qualified_model(role)`: the locked model, then its qualified fallbacks when it is proven down;
+  - `select_candidates` returns only it (learning and complex tasks included);
+  - `default_text_model()` returns it;
+  - `HIP_MODEL_ROUTER_SELECTED_TEXT` is set at router start;
+  - the manifest has `qualification`.
+- `live_runtime_certification`:
+  - `qualify_models_on_live_page` navigates read-only to `model_portfolio.qualification_page` (Document Types);
+  - `certify_live_runtime(requalify_models=)` adds the warning-level check `model_qualification`.
+- CLI:
+  - `qualify-models [--force|--show]`;
+  - `certify-live-runtime --requalify-models`;
+  - `run-full-dummy-fill` sets `FullDummyFillOptions.qualify_models_on_first_page` (the first live mission page qualifies once when certification never ran).
+- Backend: `LiveRuntimeCertificationRequest.requalify_models`.
+- Web UI:
+  - "Re-run the model qualification";
+  - the Model Champion tile shows "selected by live task: n/m correct".
+- `PortalOperationRunner`:
+  - `_ROW_ACTION_JS`:
+    - exact name-cell match;
+    - `ambiguous` when several rows match without one exact row;
+    - skips expanded-detail rows;
+    - finds the row expander;
+  - `_PANEL_JS` finds the expanded details and proves they belong to the row (`verified_by`); it reads the tabs, actions, labelled details, Version and versions;
+  - `_open_panel_action`:
+    - expand;
+    - environment tab (`_select_tab`);
+    - Version (`_pick_panel_version`);
+    - any other `panel` choice by label;
+    - migrate `EXISTING` pre-check (`_target_holds_version`);
+    - the action; a menu action returns `menu_items`.
+- `commit_menu_choice` / `_commit_click`: a menu choice is clicked once. When the portal then shows a confirmation, the choice is reconciled as `opened_surface_no_write` and the confirmation is clicked once.
+- `OperationNeedsInput` → status `needs_input`, with the field, reason, offered values and suggested source. Its triggers:
+  - an ambiguous or missing row;
+  - an unavailable environment or version;
+  - an action not in the details;
+  - a missing or unoffered target;
+  - a clone without a new name.
+- Edit safety:
+  - `_form_snapshot` before the fill;
+  - `_requested_fields` / `_plan_changes` (CURRENT / REQUESTED / CHANGE); unchanged top-level values are dropped; `no_change_needed` when nothing differs;
+  - after the fill (blur + settle), `_unrelated_changes` → `unrelated_field_changed`, and nothing is saved (`portal_operations.block_unrelated_changes`);
+  - after the commit, `read_details` re-opens the object and checks the requested values.
+- `operation_result`: SUCCESS / EXISTING / FAILED / BLOCKED / NEEDS_INPUT on every operation; `report["results"]`.
+- `OPENER_LABELS["deploy"]` falls back to Migrate / Promote.
+- `PortalSkillStore`:
+  - `record_opener(selectors=, expander=)`: semantic selectors only;
+  - `opener_plan`;
+  - `record_opener_outcome`: EXPLORATION → DETERMINISTIC after two verified outcomes, demoted on failure;
+  - `verify_opener`: human verification (`portal-skills --verify phase:operation`);
+  - the summary has `action_paths`.
+- `task_operations`:
+  - `TEST1` / `TEST2` environments;
+  - `from <ENV>` / `in <ENV>` / `<ENV> version` → `panel.environment`;
+  - `version X` → `panel.version`;
+  - `to <ENV>` → target;
+  - the plan has the row-expander fallback, `choose_target` for deploy / migrate, and `edit_safety`.
+- Tests:
+  - `tests/test_v243r24_live_qualification_and_row_panel_operations.py` (19);
+  - `tests/doctypes_listing_support.py`: a live-faithful Document Types replica;
+  - R23 plan test: deploy step `choose_target`.
+
 # V243R23 — Operations from free-text requests, save after verified fill, 60-minute phase budget (2026-09-27)
 
 - `task_operations`: `task_operation_specs` / `plan_task_operations` turn a request naming a HIP object (document type, data map, rule, transport profile, business flow) and an object action into portal operation specs:

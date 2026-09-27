@@ -512,6 +512,9 @@ portal_operations:
   commit_requires_certified_skill: true
   verify_after_commit: true
   commit_effect_timeout_seconds: 20
+  # V243R24: Edit / Clone snapshot the form first, change only the requested
+  # fields, and do not save when any other field changed.
+  block_unrelated_changes: true
 runtime_self_heal:
   enabled: true
   max_phase_attempts: 5
@@ -734,6 +737,19 @@ model_portfolio:
     - "florence-2-large-ft"
   embedding_models:
     - "nomic-embed-vision-v1-5"
+  # V243R24: one-time model qualification on a live task.  During Live GO/NO-GO
+  # (certify-live-runtime) -- or the first live mission page when that never
+  # ran -- every available text model answers the same questions about the
+  # real Document Types listing (which control opens row X's Edit / Migrate,
+  # which control searches, which field takes an input.json value ...).  The
+  # most accurate model is locked and used for every later call; re-run with
+  # certify-live-runtime --requalify-models or qualify-models --force.
+  qualification_enabled: true
+  use_qualified_model: true
+  qualification_min_accuracy: 0.6
+  qualification_max_questions: 8
+  qualification_in_first_live_mission: true
+  qualification_page: "source_document_type"   # the listing the questions are asked on
   persist_customer_values: false
   persist_selectors: false
   persist_coordinates: false

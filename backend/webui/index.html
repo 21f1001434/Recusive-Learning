@@ -169,6 +169,8 @@
           <div id="liveRuntimeCertSummary" class="empty">Run on the HIP workstation. A headed Edge/Chrome window may open for Dell SSO. The check is non-mutating and proves Playwright MCP, DevTools MCP, HIP Intelligence MCP, Dell AIA and read-only PyAutoGUI MCP against the real desktop.</div>
           <div id="liveRuntimeCertChecks" class="table-wrap"></div>
           <p class="help">The resulting runtime certificate is hash-verified, runtime-fingerprinted and consumed by Live GO/NO-GO when required by config.</p>
+          <label class="check"><input type="checkbox" id="requalifyModels"> Re-run the model qualification</label>
+          <p class="help">The first certification also selects the model, once: every available Dell AIA text model answers the same questions about the live Document Types listing (which control opens a row's Edit or Migrate, which control searches, which field takes an input.json value). The most accurate model is used for every later call. Tick this to run it again.</p>
         </article>
         <article class="panel">
           <div class="panel-head"><h2>Live GO/NO-GO readiness</h2><span id="liveReadinessState" class="badge neutral">Not run</span></div>
@@ -280,7 +282,7 @@
           <article class="panel">
             <h2>Certified future task · Universal portal operator</h2>
             <p class="muted">Learn unfamiliar portal pages/actions, execute the user request from live evidence, and use input.json as the value authority for forms.</p>
-            <textarea id="taskText" rows="6" placeholder='Examples: Deploy the document type "XML_DellAutoASN_10_U-HAUL_ANS_IB" to PROD · Migrate the rule "ASN_ROUTE" · Fill the document type from input.json and save it · Open Partner Settings, edit "ACME", fill the form from input.json, save'></textarea>
+            <textarea id="taskText" rows="6" placeholder='Examples: Migrate document type Abbvie_SRC_DocType_IN from DEV to TEST2 · Edit the DEV version 1.0 of document type "Abbvie_TRGT_Doctype" and save · Clone document type "Abbvie_TRGT_Doctype" (new name in input.json) · Deploy the document type "XML_DellAutoASN_10_U-HAUL_ANS_IB" to PROD · Fill the document type from input.json and save it'></textarea>
             <p class="help">A request naming a HIP object (document type, data map, rule, transport profile, business flow) and an action (deploy, migrate, edit, clone, merge, validate, delete, create/fill and save) goes straight to that object's listing and row action; Plan shows each click. Saves and row actions need "Allow requested portal mutations", the phrase and HIP_ALLOW_PORTAL_MUTATION=YES.</p>
             <div class="two-col"><label>Input JSON<input id="taskInputJson" value="./input.json" /></label><label>Input root (optional)<input id="taskInputRoot" placeholder="$.objects.partner" /></label></div>
             <label>Start URL (optional)<input id="taskStartUrl" placeholder="Uses portal.base_url when blank" /></label>
