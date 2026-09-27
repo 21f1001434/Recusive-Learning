@@ -299,6 +299,12 @@ class PortalOperationRunner:
             if target:
                 audit["search"] = await self._search(target)
             labels = list(OPENER_LABELS.get(operation) or (operation.replace("_", " ").title(),))
+            store = PortalSkillStore.for_run(self.config, page)
+            learned = store.opener_labels(phase, operation) if store is not None else []
+            if learned:
+                # V243R23: the label that opened this action last time comes first.
+                labels = list(dict.fromkeys([*learned, *labels]))
+                audit["learned_opener_labels"] = learned
             start_net = len(getattr(self.browser, "network_tab_events", []) or [])
             token = uuid.uuid4().hex[:10]
             hit = await page.evaluate(_ROW_ACTION_JS, {"target": target, "labels": labels, "token": token})
@@ -331,6 +337,14 @@ class PortalOperationRunner:
             opener = (OPENER_LABELS.get(operation) or (operation.title(),))[0]
             if _GUARDED.search(opener):
                 audit["opener_outcome"] = await self._reconcile_opener(start_net, form_visible=bool(audit["form_visible"]))
+            if audit["form_visible"]:
+                try:
+                    store = PortalSkillStore.for_run(self.config, await self._page())
+                    clicked = [str(x) for x in audit["path"] if str(x) and not str(x).startswith("semantic:")]
+                    if store is not None and audit["path"]:
+                        store.record_opener(phase, operation, path=[str(x) for x in audit["path"]], label=clicked[-1] if clicked else "")
+                except Exception:
+                    pass
         if audit["form_visible"]:
             # The proven surface's route is now the expected route: the commit
             # guard rejects any drift away from it before Save/Deploy.
@@ -424,7 +438,31 @@ class PortalOperationRunner:
             effect.update({"pass": False, "status": "portal_rejected_commit"})
         elif effect["reconciliation"].get("classification") in {"committed_verified", "committed_verified_after_transport_or_ui_error"}:
             effect.update({"pass": True, "status": "committed"})
+        if effect.get("pass"):
+            effect["settled"] = await self._settle_after_commit()
         return dict(effect, label=label)
+
+    async def _settle_after_commit(self, timeout_s: float = 6.0) -> Dict[str, Any]:
+        """V243R23: let the portal finish its own post-save navigation (a redirect
+        to the listing, a route change with a success toast) before the next
+        navigation -- otherwise that late redirect interrupts it."""
+        deadline = time.monotonic() + timeout_s
+        stable, last = 0, ""
+        while time.monotonic() < deadline:
+            try:
+                page = await self._page()
+                state = await page.evaluate("() => location.href + '|' + document.readyState")
+            except Exception:
+                state = ""
+            if state and state == last and state.endswith("|complete"):
+                stable += 1
+                if stable >= 2:
+                    return {"settled": True, "url": self.browser._evidence_url(state.rsplit("|", 1)[0]) if hasattr(self.browser, "_evidence_url") else ""}
+            else:
+                stable = 0
+            last = state
+            await asyncio.sleep(0.3)
+        return {"settled": False}
 
     async def _reconcile_opener(self, start_net: int, *, form_visible: bool) -> Dict[str, Any]:
         """A guarded row action (Deploy ...) either opened its dialog or acted at once."""
@@ -540,9 +578,15 @@ class PortalOperationRunner:
         phase = str(spec.get("phase") or "")
         operation = canonical_operation(spec.get("operation"))
         objects = input_data.get("objects") if isinstance(input_data.get("objects"), Mapping) else {}
-        values = dict(spec.get("values") or objects.get(phase) or {})
-        target = str(spec.get("target") or (_name_in(objects.get(phase) or {}) if operation != "create" else "") or _name_in(values))
         form_phase = form_phase_for(phase, operation, spec)
+        if form_phase == phase:
+            values = dict(spec.get("values") or objects.get(phase) or {})
+        else:
+            # V243R23: an action's own dialog (Deploy, Merge ...) is not the phase
+            # form: its values come from objects.<phase>_<operation> (or
+            # objects.<operation>) plus the operation's own values.
+            values = {**dict(objects.get(f"{phase}_{operation}") or objects.get(operation) or {}), **dict(spec.get("values") or {})}
+        target = str(spec.get("target") or (_name_in(objects.get(phase) or {}) if operation != "create" else "") or _name_in(values))
         commit_wanted = bool(spec.get("commit", False))
         out_dir = self.run_dir / "operations" / f"{index:02d}_{phase}_{operation}"
         row: Dict[str, Any] = {"phase": phase, "operation": operation, "form": form_phase, "target": target,
@@ -627,6 +671,44 @@ class PortalOperationRunner:
         row["seconds"] = round(time.monotonic() - started, 1)
         safe_write_json(out_dir / "operation.json", mask_sensitive_data(row))
         return mask_sensitive_data(row)
+
+
+PHASE_SAVE_LABELS = ("Submit", "Save", "Create", "Save Changes", "Finish")
+
+
+async def save_verified_phase(
+    config: Any, browser: Any, *, phase: str, run_dir: Path, values: Mapping[str, Any], gate: Mapping[str, Any],
+    listing_url: str = "",
+) -> Dict[str, Any]:
+    """V243R23: save a phase form that is filled and exactly verified.
+
+    Clicks the form's Save / Submit once through the governed commit (the
+    three-part gate authorizes only these labels), reconciles the outcome from
+    the write response and the page, then checks the listing shows the object.
+    A rejected or unclear save is reported, never retried; the label that
+    worked is learned for the next run.
+    """
+    name = _name_in(values)
+    result: Dict[str, Any] = {"schema_version": "hip.phase-save.v1", "phase": phase, "object": name, "saved": False}
+    if not gate.get("pass"):
+        return {**result, "pass": False, "status": "save_not_authorized",
+                "reason": "save after fill requested but the three-part mutation gate is closed; the form was filled and left unsaved",
+                "gate": dict(gate)}
+    runner = PortalOperationRunner(config, browser, Path(run_dir), listing_urls={phase: listing_url} if listing_url else None)
+    store = PortalSkillStore.for_run(config, await runner._page())
+    learned = store.phase_commit_labels(phase) if store is not None else []
+    labels = list(dict.fromkeys([*learned, *PHASE_SAVE_LABELS]))
+    committed = await runner.commit(labels=labels, gate=gate, task_id=f"save-{uuid.uuid4().hex[:10]}", entity=name)
+    result["commit"] = committed
+    if not committed.get("pass"):
+        return {**result, "pass": False, "status": str(committed.get("status") or "save_failed")}
+    if store is not None:
+        store.record_phase_commit(phase, str(committed.get("label") or ""))
+    if runner.verify_after_commit and name:
+        result["verification"] = await runner.verify_listing(phase=phase, name=name, expect=[])
+        ok = bool(result["verification"].get("pass"))
+        return {**result, "pass": ok, "saved": True, "status": "saved_and_verified" if ok else "saved_listing_not_confirmed"}
+    return {**result, "pass": True, "saved": True, "status": "saved"}
 
 
 async def run_portal_operations(

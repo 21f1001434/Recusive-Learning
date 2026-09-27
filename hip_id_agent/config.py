@@ -319,14 +319,16 @@ class RuntimeSelfHealConfig(BaseModel):
     # portal phase must demonstrate progress; the same failure state cannot be
     # replayed forever and no phase may occupy the browser for hours.
     max_no_progress_repeats: int = 3
-    max_phase_wall_seconds: int = 1200
+    # V243R23: 60 minutes per phase before progress extensions (was 20); a live
+    # Document Type with five attribute rows under the live gate needs more.
+    max_phase_wall_seconds: int = 3600
     # V243R22: the wall budget guards against stagnation, not against a slow but
     # advancing form.  An attempt that keeps verifying new fields earns another
     # ``progress_extension_seconds`` each time it reaches the budget (at most
     # ``max_progress_extensions`` times) instead of being cancelled mid-form and
     # handed to a human.  An attempt without new verified fields is stopped as before.
-    progress_extension_seconds: int = 600
-    max_progress_extensions: int = 6
+    progress_extension_seconds: int = 900
+    max_progress_extensions: int = 8
     # Active structural watchdog. Unlike failure-signature counting, this runs
     # while the phase coroutine is still alive and interrupts repeated UI cycles.
     no_progress_watchdog_seconds: float = 90.0
@@ -832,6 +834,10 @@ class UniversalOperatorConfig(BaseModel):
     live page evidence remains authoritative and mutations still require the
     explicit three-part mutation gate. Persisted learning is semantic/value-free.
     """
+    # V243R23: a request naming a HIP object and an object action ("deploy the
+    # document type X to PROD") runs as a portal operation: its listing, its
+    # row action, its learned dialog and a governed commit.
+    route_object_operations: bool = True
     enabled: bool = True
     deep_learning_enabled: bool = True
     max_execution_steps: int = 40

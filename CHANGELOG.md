@@ -1,3 +1,29 @@
+# V243R23 — Operations from free-text requests, save after verified fill, 60-minute phase budget (2026-09-27)
+
+- `task_operations`: `task_operation_specs` / `plan_task_operations` turn a request naming a HIP object (document type, data map, rule, transport profile, business flow) and an object action into portal operation specs:
+  - the phase and its source/target qualifier;
+  - the target name (quoted, "named …", or a portal-style token);
+  - "to PROD/UAT/…" → `target_environment`;
+  - "merge X into Y";
+  - "save/submit" → commit;
+  - chained actions.
+- `cli._route_object_operation`: `run-portal-task` and `operate-hip` run such requests through `run_portal_operations`. `/api/portal-task/plan` returns the operation plan (listing, search, row action with fallbacks, dialog fill, gated commit, listing check). `universal_operator.route_object_operations` (default true).
+- `PortalOperationRunner`:
+  - learned opener labels are tried first and recorded after a proven open (`PortalSkillStore.opener_labels` / `record_opener`);
+  - an action dialog's default values are `objects.<phase>_<operation>` (or `objects.<operation>`) plus the operation's values, no longer the phase form's.
+- `portal_operations.save_verified_phase`: a governed single-click Save/Submit of a verified phase form, with reconciliation, listing check and learned commit label (`PortalSkillStore.phase_commit_labels` / `record_phase_commit`).
+- Mission:
+  - `FullDummyFillOptions.save_after_fill` / `allow_portal_mutation` / `mutation_confirmation`;
+  - CLI `run-full-dummy-fill --save-after-fill --allow-portal-mutation --confirmation`;
+  - the save runs after the judges pass and before the handoff (`phase_save.json`); a rejected or unconfirmed save blocks the phase with `HIP_PHASE_SAVE_NOT_CONFIRMED`.
+- Control Center:
+  - the mission panel has "Save each form after it is filled and verified" plus the phrase;
+  - `MissionStart.save_after_fill` / `save_confirmation`;
+  - the command builders gain `save_after_fill_flags`;
+  - the task-box help shows operation examples.
+- `runtime_self_heal.max_phase_wall_seconds` 1200 → 3600, `progress_extension_seconds` 600 → 900, `max_progress_extensions` 6 → 8.
+- Tests: `tests/test_v243r23_task_operations_and_save.py` (18).
+
 # V243R22 — Progress-earned phase time, one model per vetted intent, fair champion credit, per-attempt RSI (2026-09-27)
 
 - `phase_progress.run_with_progress_budget` replaces the attempt's hard `asyncio.wait_for`. At the wall budget, an attempt with new progress units (distinct verified fields + committed fills + distinct clicked targets; `capture_phase_progress_marker.progress_units`) is extended through `RuntimeSelfHealController.extend_for_progress`, bounded by `runtime_self_heal.progress_extension_seconds` (600) and `max_progress_extensions` (6). An attempt without progress stops as `HIP_PHASE_NO_PROGRESS_WATCHDOG` (recovery ladder). The mission loop credits progress before the wall-clock stall guard asks a human. `handle_failure` uses the extended wall budget. `publish_executor_progress` records distinct verified nodes.

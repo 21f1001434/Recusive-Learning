@@ -202,7 +202,7 @@ class PortalSkillStore:
             data = {}
         if not isinstance(data, dict) or data.get("schema_version") != SCHEMA:
             data = {"schema_version": SCHEMA, "phase": phase, "skills": {}, "branch_fields": {}, "choice_fields": [], "history": []}
-        for key, default in (("skills", {}), ("branch_fields", {}), ("choice_fields", []), ("history", [])):
+        for key, default in (("skills", {}), ("branch_fields", {}), ("choice_fields", []), ("history", []), ("openers", {}), ("commit_labels", [])):
             data.setdefault(key, default)
         return data
 
@@ -235,6 +235,37 @@ class PortalSkillStore:
         self.log(data, "commit_verified", skill, label=label)
         self.save(phase, data)
 
+    # V243R23: where an action lives on this object's listing, as learned.
+    def opener_labels(self, phase: str, operation: str) -> List[str]:
+        row = (self.load(phase).get("openers") or {}).get(str(operation or "")) or {}
+        return [str(x) for x in (row.get("labels") or []) if str(x).strip()]
+
+    def record_opener(self, phase: str, operation: str, *, path: Sequence[str], label: str) -> None:
+        if not label and not path:
+            return
+        data = self.load(phase)
+        row = data.setdefault("openers", {}).setdefault(str(operation), {"labels": [], "path": [], "verified": 0})
+        if label and label not in row["labels"]:
+            row["labels"].insert(0, label)
+        row["labels"] = row["labels"][:5]
+        row["path"] = [str(x) for x in path][:6]
+        row["verified"] = int(row.get("verified") or 0) + 1
+        self.log(data, "opener_learned", None, operation=str(operation), label=str(label), path=" > ".join(row["path"]))
+        self.save(phase, data)
+
+    # The Save / Submit a verified phase form was committed with (mission save).
+    def phase_commit_labels(self, phase: str) -> List[str]:
+        return [str(x) for x in (self.load(phase).get("commit_labels") or []) if str(x).strip()]
+
+    def record_phase_commit(self, phase: str, label: str) -> None:
+        if not label:
+            return
+        data = self.load(phase)
+        labels = [x for x in (data.get("commit_labels") or []) if x != label]
+        data["commit_labels"] = [label, *labels][:5]
+        self.log(data, "phase_commit_verified", None, label=str(label))
+        self.save(phase, data)
+
     def summary(self, phase: str) -> Dict[str, Any]:
         data = self.load(phase)
         skills = list(data["skills"].values())
@@ -245,6 +276,8 @@ class PortalSkillStore:
             "stale": sum(1 for s in skills if s.get("status") == "stale"),
             "operations": sorted({str(s.get("operation")) for s in skills}),
             "branch_fields": sorted(data["branch_fields"]),
+            "learned_actions": {op: row.get("labels", [])[:1] for op, row in (data.get("openers") or {}).items()},
+            "commit_labels": list(data.get("commit_labels") or [])[:1],
             "file": str(self.file(phase)),
         }
 

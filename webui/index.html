@@ -43,6 +43,9 @@
         <label class="check"><input id="heavyEvidence" type="checkbox" /> Capture heavy evidence</label>
         <label class="check"><input id="untilComplete" type="checkbox" /> Self-heal until complete</label>
         <label class="check danger-check"><input id="allowApiMutation" type="checkbox" /> Allow API mutation</label>
+        <label class="check danger-check"><input id="saveAfterFill" type="checkbox" /> Save each form after it is filled and verified</label>
+        <label>Save confirmation<input id="saveConfirmation" placeholder="ALLOW HIP MUTATION" /></label>
+        <p class="help">Save after fill clicks the form's Save / Submit once, only after every input value is verified and the judges pass, then checks the listing. It also needs HIP_ALLOW_PORTAL_MUTATION=YES on this machine and witness mode off.</p>
         <p class="help">Use witness mode for the first Dell test. It exercises real SSO, AutoWebGLM, Playwright MCP, DevTools MCP and all selected HIP forms, but never clicks Create/Save/Submit/Finish/Deploy/Delete.</p>
       </section>
 
@@ -277,7 +280,8 @@
           <article class="panel">
             <h2>Certified future task · Universal portal operator</h2>
             <p class="muted">Learn unfamiliar portal pages/actions, execute the user request from live evidence, and use input.json as the value authority for forms.</p>
-            <textarea id="taskText" rows="6" placeholder='Example: Open Partner Settings, edit "ACME", fill the form from input.json, save, validate, then deploy'></textarea>
+            <textarea id="taskText" rows="6" placeholder='Examples: Deploy the document type "XML_DellAutoASN_10_U-HAUL_ANS_IB" to PROD · Migrate the rule "ASN_ROUTE" · Fill the document type from input.json and save it · Open Partner Settings, edit "ACME", fill the form from input.json, save'></textarea>
+            <p class="help">A request naming a HIP object (document type, data map, rule, transport profile, business flow) and an action (deploy, migrate, edit, clone, merge, validate, delete, create/fill and save) goes straight to that object's listing and row action; Plan shows each click. Saves and row actions need "Allow requested portal mutations", the phrase and HIP_ALLOW_PORTAL_MUTATION=YES.</p>
             <div class="two-col"><label>Input JSON<input id="taskInputJson" value="./input.json" /></label><label>Input root (optional)<input id="taskInputRoot" placeholder="$.objects.partner" /></label></div>
             <label>Start URL (optional)<input id="taskStartUrl" placeholder="Uses portal.base_url when blank" /></label>
             <label class="check"><input id="taskDeepLearn" type="checkbox" checked /> Learn unfamiliar pages, actions and form semantics</label>

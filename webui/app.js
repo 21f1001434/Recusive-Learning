@@ -103,6 +103,8 @@ function missionPayload() {
     resume_run: $("resumeRun").value.trim(),
     until_complete: $("untilComplete").checked,
     readiness_token: state.liveReadiness?.token || "",
+    save_after_fill: !!$("saveAfterFill")?.checked,
+    save_confirmation: ($("saveConfirmation")?.value || "").trim(),
   };
 }
 
@@ -344,6 +346,8 @@ async function startMission() {
     if (!state.liveReadiness?.pass || !state.liveReadiness?.token) throw new Error("Live GO/NO-GO readiness is blocked. Fix the live blockers before starting.");
     const payload = missionPayload();
     if (payload.witness_mode && (payload.api_mode === "write" || payload.allow_api_mutation)) throw new Error("Live witness mode is strictly non-mutating. Disable API mutation/write mode.");
+    if (payload.witness_mode && payload.save_after_fill) throw new Error("Live witness mode never clicks Save/Submit. Turn it off to save each form after verified fill.");
+    if (payload.save_after_fill && payload.save_confirmation !== "ALLOW HIP MUTATION") throw new Error("Save after fill needs the confirmation phrase: ALLOW HIP MUTATION");
     if (payload.api_mode === "write" && !payload.allow_api_mutation) throw new Error("API write mode requires explicit Allow API mutation.");
     const result = await api("/api/mission/start", { method:"POST", body:JSON.stringify(payload) });
     toast(`Mission started (PID ${result.pid})`);

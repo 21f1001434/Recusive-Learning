@@ -2403,6 +2403,13 @@ class FullDummyFillOptions:
     # inspection/recovery and resumes the same phase after the operator responds.
     hold_browser_on_incomplete_phase: bool = True
     never_finalize_incomplete_run: bool = True
+    # V243R23: save a phase form once it is filled and exactly verified (every
+    # input value read back, judges passed).  Governed: the three-part gate
+    # (allow_portal_mutation, HIP_ALLOW_PORTAL_MUTATION=YES, the phrase) must
+    # pass; the Save / Submit is clicked once, reconciled, and the listing checked.
+    save_after_fill: bool = False
+    allow_portal_mutation: bool = False
+    mutation_confirmation: str = ""
 
 
 class FullDummyFillE2EFlow:
@@ -3150,6 +3157,7 @@ class FullDummyFillE2EFlow:
                 verification: Dict[str, Any] = {}
                 judge_result: Dict[str, Any] = {}
                 phase_completed = False
+                phase_save_block_reason = ""
                 max_phase_attempts = runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2
                 attempt_index = 0
                 phase_loop_started = time.monotonic()
@@ -4441,6 +4449,39 @@ class FullDummyFillE2EFlow:
                     # run can adopt this phase without replaying the browser.
                     safe_write_json(phase_dir / PHASE_VERIFICATION_FILENAME, verification)
                     safe_write_json(phase_dir / PHASE_JUDGE_RESULT_FILENAME, judge_result or {"pass": True, "status": "judge_disabled"})
+                    if self.options.save_after_fill and not self.options.live_witness_mode:
+                        # V243R23: the form is filled, every input value verified and
+                        # the judges passed -- learning is complete.  Save it once,
+                        # governed, before the handoff navigates away.
+                        from .portal_operations import operation_gate, save_verified_phase
+                        from .stateful_form_runtime import phase_object
+
+                        save_gate = operation_gate(bool(self.options.allow_portal_mutation), self.options.mutation_confirmation)
+                        try:
+                            phase_values = phase_object(phase_payload_for_memory if isinstance(phase_payload_for_memory, dict) else {}, phase)[0] or {}
+                        except Exception:
+                            phase_values = {}
+                        try:
+                            phase_save = await save_verified_phase(
+                                self.config, shared_browser, phase=phase, run_dir=phase_dir, values=phase_values,
+                                gate=save_gate, listing_url=PHASE_URLS.get(phase, ""),
+                            )
+                        except Exception as save_exc:
+                            phase_save = {"pass": False, "saved": False, "status": "save_error", "error": mask_sensitive_string(str(save_exc))[:800]}
+                        safe_write_json(phase_dir / "phase_save.json", phase_save)
+                        try:
+                            mission_trace.record_observation(
+                                phase, summary=f"Save after verified fill: {phase_save.get('status')}", source="phase_save",
+                                details={"saved": bool(phase_save.get("saved")), "status": phase_save.get("status")},
+                            )
+                        except Exception:
+                            pass
+                        if save_gate.get("pass") and not phase_save.get("pass"):
+                            # A rejected or unconfirmed save is never retried blindly
+                            # and the phase is not reported as saved.
+                            phase_save_block_reason = f"HIP_PHASE_SAVE_NOT_CONFIRMED: {phase_save.get('status')}"
+                            blocked_phase = phase
+                            break
                     mission.mark_phase_complete(phase, attempt=attempt_no, judge_pass=bool(judge_result.get("pass", True)))
                     try:
                         # A committed phase must not leave an old review visible in
@@ -4543,7 +4584,7 @@ class FullDummyFillE2EFlow:
                     mission.mark_phase_blocked(
                         phase,
                         attempt=attempt_index,
-                        reason=(
+                        reason=phase_save_block_reason or (
                             f"blocked by section judge in phase {blocked_phase}"
                             if blocked_phase
                             else "self-heal stopped before a judged pass"

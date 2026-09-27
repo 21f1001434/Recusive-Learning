@@ -517,6 +517,9 @@ class MissionStart(BaseModel):
     resume_run: str = ""
     until_complete: bool = False
     readiness_token: str = ""
+    # V243R23: save each phase form after it is filled and exactly verified.
+    save_after_fill: bool = False
+    save_confirmation: str = ""
 
 
 
@@ -1128,6 +1131,8 @@ def start_mission(req: MissionStart) -> Dict[str, Any]:
     if req.witness_mode:
         if mode == "write" or req.allow_api_mutation:
             raise HTTPException(status_code=422, detail="Live witness mode is strictly non-mutating: API write and mutation authorization are prohibited.")
+        if req.save_after_fill:
+            raise HTTPException(status_code=422, detail="Live witness mode never clicks Save/Submit: turn it off to save after verified fill.")
         # Witness runs are designed to prove the integrated agent without ever
         # clicking a Create/Save/Submit/Deploy/Delete mutation control.
         mode = "capture"
@@ -1139,6 +1144,7 @@ def start_mission(req: MissionStart) -> Dict[str, Any]:
             api_mode=mode, write_heavy_evidence=req.write_heavy_evidence,
             allow_api_mutation=req.allow_api_mutation, resume_run_dir=req.resume_run or None,
             witness_mode=bool(req.witness_mode),
+            save_after_fill=bool(req.save_after_fill), save_confirmation=str(req.save_confirmation or ""),
             python_executable=sys.executable,
         )
     elif spec.get("id") == "custom":
@@ -1148,6 +1154,7 @@ def start_mission(req: MissionStart) -> Dict[str, Any]:
             phases=phases, api_mode=mode, write_heavy_evidence=req.write_heavy_evidence,
             allow_api_mutation=req.allow_api_mutation, until_complete=req.until_complete,
             witness_mode=bool(req.witness_mode),
+            save_after_fill=bool(req.save_after_fill), save_confirmation=str(req.save_confirmation or ""),
             python_executable=sys.executable,
         )
     else:
@@ -1157,6 +1164,7 @@ def start_mission(req: MissionStart) -> Dict[str, Any]:
             section=spec["id"], api_mode=mode, write_heavy_evidence=req.write_heavy_evidence,
             allow_api_mutation=req.allow_api_mutation, until_complete=req.until_complete,
             witness_mode=bool(req.witness_mode),
+            save_after_fill=bool(req.save_after_fill), save_confirmation=str(req.save_confirmation or ""),
             python_executable=sys.executable,
         )
     env = {
@@ -1364,6 +1372,21 @@ def universal_portal_task_plan(req: FutureTaskRequest) -> Dict[str, Any]:
     cfg = _cfg(req.config); graph = _graph(req.config)
     if not bool(getattr(cfg.universal_operator, "enabled", True)):
         return {"pass": False, "reason": "Universal portal operator is disabled in configuration"}
+    if bool(getattr(cfg.universal_operator, "route_object_operations", True)):
+        # V243R23: "deploy / migrate / edit ... the document type X" runs as a
+        # portal operation: show where the agent goes and what it clicks.
+        from hip_id_agent.task_operations import plan_task_operations
+
+        payload: Dict[str, Any] = {}
+        try:
+            if req.input_json and Path(req.input_json).is_file():
+                loaded = json.loads(Path(req.input_json).read_text(encoding="utf-8-sig"))
+                payload = loaded if isinstance(loaded, dict) else {}
+        except Exception:
+            payload = {}
+        operation_plan = plan_task_operations(req.task, payload)
+        if operation_plan.get("matched"):
+            return operation_plan
     return UniversalPortalTaskPlanner(cfg, graph).plan(
         req.task, input_json=req.input_json, input_root=req.input_root,
         start_url=req.start_url, deep_learn=req.deep_learn,

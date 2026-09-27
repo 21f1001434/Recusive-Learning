@@ -76,6 +76,19 @@ def project_runtime_dir(project_root: str | Path) -> Path:
     return path
 
 
+def save_after_fill_flags(save_after_fill: bool, confirmation: str, witness_mode: bool = False) -> List[str]:
+    """V243R23: flags that ask the mission to save each verified phase form.
+
+    The phrase and ``--allow-portal-mutation`` are two parts of the three-part
+    gate; the third, ``HIP_ALLOW_PORTAL_MUTATION=YES``, stays in the operator's
+    environment and is never set by the Control Center."""
+    if not save_after_fill:
+        return []
+    if witness_mode:
+        raise ValueError("Save after verified fill cannot be combined with live witness mode")
+    return ["--save-after-fill", "--allow-portal-mutation", "--confirmation", str(confirmation or "")]
+
+
 def build_mission_command(
     *,
     project_root: str | Path,
@@ -89,6 +102,8 @@ def build_mission_command(
     allow_api_mutation: bool = False,
     resume_run_dir: str | Path | None = None,
     witness_mode: bool = False,
+    save_after_fill: bool = False,
+    save_confirmation: str = "",
     python_executable: str | Path | None = None,
 ) -> List[str]:
     root = Path(project_root).resolve()
@@ -169,6 +184,7 @@ def build_mission_command(
         command.append("--allow-api-mutation")
     if resume_run_dir:
         command.extend(["--resume-run", resolved(resume_run_dir)])
+    command.extend(save_after_fill_flags(save_after_fill, save_confirmation, witness_mode))
     return command
 
 
@@ -187,6 +203,8 @@ def build_section_mission_command(
     allow_api_mutation: bool = False,
     until_complete: bool = False,
     witness_mode: bool = False,
+    save_after_fill: bool = False,
+    save_confirmation: str = "",
     python_executable: str | Path | None = None,
 ) -> List[str]:
     """Build the same governed form mission, limited to one user-facing HIP section."""
@@ -248,6 +266,7 @@ def build_section_mission_command(
         command.append("--bounded-runtime-self-heal")
     if allow_api_mutation:
         command.append("--allow-api-mutation")
+    command.extend(save_after_fill_flags(save_after_fill, save_confirmation, witness_mode))
     return command
 
 
@@ -265,6 +284,8 @@ def build_phase_subset_mission_command(
     allow_api_mutation: bool = False,
     until_complete: bool = False,
     witness_mode: bool = False,
+    save_after_fill: bool = False,
+    save_confirmation: str = "",
     python_executable: str | Path | None = None,
 ) -> List[str]:
     """Build a deterministic no-save mission for an exact phase subset.
@@ -315,6 +336,7 @@ def build_phase_subset_mission_command(
         command.extend(["--live-witness", "--no-capture-submit-api", "--api-capture-best-effort"])
     if allow_api_mutation:
         command.append("--allow-api-mutation")
+    command.extend(save_after_fill_flags(save_after_fill, save_confirmation, witness_mode))
     return command
 
 

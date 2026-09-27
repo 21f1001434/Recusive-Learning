@@ -8,7 +8,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import typer
 from .runtime_env import load_runtime_env, configure_utf8_stdio
@@ -647,6 +647,9 @@ def run_full_dummy_fill(
     allow_api_mutation: bool = typer.Option(False, "--allow-api-mutation", help="Allow the separately replayed observed API request to mutate HIP. Requires --api-mode write and HIP_ALLOW_API_MUTATION=YES; UI submit capture remains blocked."),
     require_api_capture: bool = typer.Option(False, "--require-api-capture/--api-capture-best-effort", help="Fail closed and self-heal when a phase has no observed API contract or incomplete UI/API evidence."),
     runs_dir: Optional[str] = typer.Option(None, "--runs-dir", help="Optional short output directory, e.g. C:/hip_runs, to avoid Windows/OneDrive MAX_PATH failures."),
+    save_after_fill: bool = typer.Option(False, "--save-after-fill/--no-save-after-fill", help="V243R23: once a phase form is filled and exactly verified (every input value read back, judges passed), click its Save / Submit once through the governed commit and check the listing. Needs --allow-portal-mutation, HIP_ALLOW_PORTAL_MUTATION=YES and --confirmation."),
+    allow_portal_mutation: bool = typer.Option(False, "--allow-portal-mutation", help="Part of the three-part gate for --save-after-fill."),
+    confirmation: str = typer.Option("", "--confirmation", help=f"Part of the three-part gate for --save-after-fill: {MUTATION_CONFIRMATION}"),
 ):
     """Open every HIP link, click + Add, fill safe dummy values, screenshot, and verify.
 
@@ -748,6 +751,8 @@ def run_full_dummy_fill(
         allow_api_mutation = False
         api_mode = "capture"
         os.environ["HIP_LIVE_WITNESS"] = "true"
+        if save_after_fill:
+            raise typer.BadParameter("--save-after-fill cannot be combined with --live-witness (witness mode never clicks Save/Submit)")
     if api_mode == "write" and not allow_api_mutation:
         raise typer.BadParameter("--api-mode write requires --allow-api-mutation and HIP_ALLOW_API_MUTATION=YES")
     cfg.api.capture_observed_contracts = bool(agentq_crawler_fusion or dual_ui_api or capture_submit_api)
@@ -861,8 +866,19 @@ def run_full_dummy_fill(
             auto_resume=auto_resume,
             continue_after_phase_block=bool(autonomous_mission),
             live_witness_mode=bool(live_witness),
+            save_after_fill=bool(save_after_fill),
+            allow_portal_mutation=bool(allow_portal_mutation),
+            mutation_confirmation=str(confirmation or ""),
         ),
     )
+    if save_after_fill:
+        from .portal_operations import operation_gate
+
+        gate = operation_gate(bool(allow_portal_mutation), confirmation)
+        if gate.get("pass"):
+            console.print("[bold yellow]SAVE AFTER VERIFIED FILL[/bold yellow]: each phase form is saved once, after every input value is verified and the judges pass; the listing is then checked.")
+        else:
+            console.print("[bold yellow]--save-after-fill requested but the mutation gate is closed[/bold yellow] (needs --allow-portal-mutation, HIP_ALLOW_PORTAL_MUTATION=YES and --confirmation); forms are filled and left unsaved.")
     console.print(f"[bold]Starting HIP full dummy-fill E2E[/bold] run_id={rid}")
     if autonomous_mission:
         console.print("Autonomous mission profile enabled: completion-first Data Map through BizFlow execution with Microsoft AutoGen AgentChat 0.7.5 reasoning, AutoWebGLM primary decisions, AgentQ gates, bounded self-heal, three-channel MCP evidence, text/vision judges, and deterministic phase completion checkpoints.")
@@ -1637,6 +1653,40 @@ def plan_portal_task(
     console.print_json(json.dumps(plan, indent=2, ensure_ascii=False, default=str))
 
 
+def _route_object_operation(task: str, cfg: Any, *, input_json: str, allow_portal_mutation: bool, confirmation: str) -> Optional[Dict[str, Any]]:
+    """V243R23: run "deploy / migrate / edit / clone ... the <HIP object> X" as a
+    portal operation (listing -> row action -> learned dialog -> governed commit
+    -> listing check).  ``None`` when the request is not such an operation."""
+    from .dummy_fill_e2e import read_json_any
+    from .portal_operations import run_portal_operations
+    from .task_operations import plan_task_operations
+
+    if not bool(getattr(getattr(cfg, "universal_operator", None), "route_object_operations", True)):
+        return None
+    payload: Dict[str, Any] = {}
+    if input_json and Path(input_json).is_file():
+        try:
+            loaded = read_json_any(input_json)
+            payload = loaded if isinstance(loaded, dict) else {}
+        except Exception:
+            payload = {}
+    plan = plan_task_operations(task, payload)
+    if not plan.get("matched"):
+        return None
+    rid = make_run_id("HIP-PORTAL-OPERATION")
+    run_dir = Path(cfg.reporting.runs_dir) / rid
+    run_dir.mkdir(parents=True, exist_ok=True)
+    safe_write_json(run_dir / "portal_operation_plan.json", plan)
+    data = dict(payload)
+    data["operations"] = plan["operations"]
+    if input_json:
+        data["_input_json_path"] = str(input_json)
+    result = asyncio.run(run_portal_operations(
+        cfg, data, run_dir=run_dir, allow_portal_mutation=allow_portal_mutation, confirmation=confirmation,
+    ))
+    return {**dict(result), "plan": plan, "run_dir": str(run_dir)}
+
+
 @app.command("run-portal-task")
 def run_portal_task(
     task: str = typer.Argument(..., help="Natural-language task for any currently accessible portal capability."),
@@ -1659,6 +1709,12 @@ def run_portal_task(
     if runs_dir:
         cfg.reporting.runs_dir = runs_dir
     enforce_required_mcp_profile(cfg)
+    operation = _route_object_operation(task, cfg, input_json=input_json, allow_portal_mutation=allow_portal_mutation, confirmation=confirmation)
+    if operation is not None:
+        console.print_json(json.dumps(operation, indent=2, ensure_ascii=False, default=str))
+        if not operation.get("pass"):
+            raise typer.Exit(code=3)
+        return
     graph = HIPCapabilityGraph(Path(cfg.reporting.memory_dir) / str(cfg.brain.directory or "portal_brain"))
     planner = UniversalPortalTaskPlanner(cfg, graph)
     plan = planner.plan(
@@ -1755,6 +1811,12 @@ def operate_hip(
     if runs_dir:
         cfg.reporting.runs_dir = runs_dir
     enforce_required_mcp_profile(cfg)
+    operation = _route_object_operation(task, cfg, input_json=input_json, allow_portal_mutation=allow_portal_mutation, confirmation=confirmation)
+    if operation is not None:
+        console.print_json(json.dumps(operation, indent=2, ensure_ascii=False, default=str))
+        if not operation.get("pass"):
+            raise typer.Exit(code=3)
+        return
     rid = make_run_id("HIP-OPERATOR")
     run_dir = Path(cfg.reporting.runs_dir) / rid
     run_dir.mkdir(parents=True, exist_ok=True)

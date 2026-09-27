@@ -1,3 +1,16 @@
+## V243R23 — "Deploy / migrate … the document type X" knows where to click; Save after a verified fill; a longer phase time budget (2026-09-27)
+
+- **Ask for an action on a HIP object in the task box**, for example *"Deploy the document type XML_DellAutoASN_10_U-HAUL_ANS_IB to PROD"*. The agent then:
+  - opens that object's listing (Document Types) and searches for its row;
+  - opens the row's Deploy, from the row's "More actions" menu if needed;
+  - fills the Deploy dialog (PROD);
+  - clicks Deploy once, through the safety gate, and confirms it in the listing.
+- The same works for migrate, edit, clone, merge, validate, delete, and "create/fill … and save". **Plan** shows each click first. The agent learns where each action is and uses that next time.
+- **Save after fill:** the new mission option "Save each form after it is filled and verified" saves each form once. It saves only after every input.json value is verified and the judges pass, then checks the listing. It needs the usual mutation gate. A rejected save is reported, never retried.
+- **More time:** each phase now gets 60 minutes (was 20), plus 15-minute extensions while fields keep being verified.
+
+See `V243R23_OPERATIONS_FROM_REQUESTS_SAVE_AFTER_FILL_LONGER_BUDGET_20260927.md`. Apply with `APPLY_V243R23_IN_PLACE.ps1`; it includes R13–R22.
+
 ## V243R22 — The agent keeps healing while it makes progress; the model champion is earned on results; learning runs every phase (2026-09-27)
 
 - **No more stopping mid-form to ask you.** Document Type was cancelled in the middle of row 3 by a hard 20-minute attempt timeout, then handed to a human, although every field so far was right. Now:

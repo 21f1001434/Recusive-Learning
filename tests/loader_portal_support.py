@@ -150,9 +150,10 @@ def patch_navigation(session: Any) -> Dict[str, int]:
             # As the live BrowserSession.goto_base_and_complete_sso does: a
             # navigation still in flight (the previous Save's redirect) aborts this
             # one with net::ERR_ABORTED; retry once on the lighter "commit" lifecycle.
-            if "ERR_ABORTED" not in str(exc):
+            if "ERR_ABORTED" not in str(exc) and "interrupted by another navigation" not in str(exc):
                 raise
             await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_timeout(300)
             await page.goto(target_url, wait_until="commit")
             await page.wait_for_load_state("domcontentloaded")
 

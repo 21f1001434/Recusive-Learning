@@ -112,7 +112,7 @@ def test_the_healer_grants_bounded_progress_time_that_counts_in_its_wall_budget(
     healer = RuntimeSelfHealController(config=cfg, root_dir=tmp_path, browser=SimpleNamespace())
     base = healer.wall_budget_seconds("source_document_type")
     first = healer.extend_for_progress("source_document_type", progress_units=9)
-    assert first["granted"] and healer.wall_budget_seconds("source_document_type") == base + 600
+    assert first["granted"] and healer.wall_budget_seconds("source_document_type") == base + cfg.runtime_self_heal.progress_extension_seconds
     healer.extend_for_progress("source_document_type", progress_units=3)
     assert healer.extend_for_progress("source_document_type", progress_units=1)["granted"] is False
     healer.reset_phase_ladder("source_document_type")  # a human Resume starts afresh
