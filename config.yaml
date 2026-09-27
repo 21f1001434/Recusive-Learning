@@ -238,6 +238,10 @@ autowebglm:
   deterministic_tool_fallback: true
   require_intent_alignment: true
   max_primary_decision_seconds: 12
+  # V243R22: a vetted field action asks the strongest/champion model only;
+  # every Nth also asks one challenger (open decisions keep the portfolio).
+  vetted_intent_parallel_models: 1
+  vetted_intent_challenger_every: 10
   use_existing_dell_aia: true
   # Optional external wrapper around a local/native AutoWebGLM checkpoint. Leave
   # empty to use the existing Dell AIA model with the AutoWebGLM protocol.
@@ -515,6 +519,11 @@ runtime_self_heal:
   max_repeated_failure_signature: 2
   max_no_progress_repeats: 3
   max_phase_wall_seconds: 1200
+  # V243R22: an attempt still verifying new fields at the wall budget earns
+  # another progress_extension_seconds (at most max_progress_extensions times)
+  # instead of being cancelled mid-form and handed to a human.
+  progress_extension_seconds: 600
+  max_progress_extensions: 6
   no_progress_watchdog_seconds: 90
   no_progress_poll_seconds: 5
   no_progress_recent_signature_limit: 12

@@ -822,6 +822,7 @@ def runtime_status(config: str = "config.yaml") -> Dict[str, Any]:
             **replay_policy_engine_from_config(cfg).manifest(),
         },
         "model_portfolio": model_portfolio_from_config(cfg).manifest(),
+        "portal_skills": _portal_skills_totals(cfg),
         "recursive_self_improvement": recursive_improvement_from_config(
             cfg, replay_policy=replay_policy_engine_from_config(cfg),
             model_portfolio=model_portfolio_from_config(cfg), skill_library=_skill_library(cfg)
@@ -1465,6 +1466,23 @@ def portal_operations_run(req: OperationsRequest) -> Dict[str, Any]:
     if req.confirmation:
         command.extend(["--confirmation", req.confirmation])
     return _start_cli(command, runs_dir=req.runs_dir)
+
+
+def _portal_skills_totals(cfg: Any) -> Dict[str, Any]:
+    """V243R22: certified form skills (R19) for the Induced Skills tile."""
+    try:
+        from hip_id_agent.portal_skills import PortalSkillStore
+
+        store = PortalSkillStore(Path(cfg.reporting.memory_dir))
+        rows = [store.summary(p.stem) for p in sorted(store.root.glob("*.json"))] if store.root.exists() else []
+        return {
+            "certified": sum(int(r.get("certified") or 0) for r in rows),
+            "candidate": sum(int(r.get("candidate") or 0) for r in rows),
+            "stale": sum(int(r.get("stale") or 0) for r in rows),
+            "phases": [r.get("phase") for r in rows if r.get("certified")],
+        }
+    except Exception as exc:
+        return {"certified": 0, "candidate": 0, "stale": 0, "error": str(exc)[:200]}
 
 
 @app.get("/api/portal-skills")

@@ -555,8 +555,10 @@ async function refreshStatus() {
     const mp=runtime.model_portfolio||{};
     const ri=runtime.recursive_self_improvement||{};
     if ($("skillsMetric")) {
-      $("skillsMetric").textContent = !si.enabled ? "Off" : String(si.validated_skill_count||0);
-      $("skillsDetail").textContent = si.enabled ? `${si.skill_count||0} total • ${si.drift_suspect_count||0} drift • ${si.stale_skill_count||0} stale` : "skill induction disabled";
+      // V243R22: certified form skills (proven by a deterministic replay) count too.
+      const ps=runtime.portal_skills||{};
+      $("skillsMetric").textContent = !si.enabled ? "Off" : String((si.validated_skill_count||0)+(ps.certified||0));
+      $("skillsDetail").textContent = si.enabled ? `${ps.certified||0} certified forms • ${ps.candidate||0} learning • ${si.skill_count||0} task skills • ${(si.stale_skill_count||0)+(ps.stale||0)} stale` : "skill induction disabled";
     }
     if ($("mlflowMetric")) {
       $("mlflowMetric").textContent = !mf.enabled ? "Off" : (mf.package_available ? "Async ready" : "Unavailable");
@@ -568,8 +570,12 @@ async function refreshStatus() {
     }
     if ($("modelPortfolioMetric")) {
       const champs=mp.role_champions||{};
-      $("modelPortfolioMetric").textContent = !mp.enabled ? "Off" : (champs.planning||champs.action_selection||"Learning");
-      $("modelPortfolioDetail").textContent = mp.enabled ? `${(mp.text_models||[]).length} text • ${(mp.vision_models||[]).length} vision • cycle ${mp.cycle||0}` : "model portfolio disabled";
+      // V243R22: show the model actually answering default calls; the champion
+      // is re-earned from fairly scored decisions (see the detail line).
+      const champ=champs.planning||champs.action_selection||"";
+      const scored=Object.values(mp.scored_decisions||{}).reduce((a,b)=>a+Number(b||0),0);
+      $("modelPortfolioMetric").textContent = !mp.enabled ? "Off" : (mp.default_text_model||champ||"Learning");
+      $("modelPortfolioDetail").textContent = mp.enabled ? `${champ ? "champion "+champ : "champion: earning"} • ${scored} scored decisions • cycle ${mp.cycle||0}` : "model portfolio disabled";
     }
     if ($("recursiveMetric")) {
       $("recursiveMetric").textContent = !ri.enabled ? "Off" : `Cycle ${ri.cycle||0}`;

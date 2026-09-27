@@ -16,6 +16,19 @@ from .security import mask_sensitive_data, mask_sensitive_string
 
 SCHEMA = "hip.onprem-model-portfolio.v2"
 TRIAL_SCHEMA = "hip.onprem-model-trial.v1"
+CREDIT_RULE = "fair_decision_credit.v1"
+# What a model *decided* -- never its self-reported confidence or wording.
+DECISION_KEYS = ("action", "candidate_index", "task_family", "pass", "verdict", "needs_human", "live_discovery_advisable")
+
+
+def decision_key(parsed: Any) -> str:
+    if not isinstance(parsed, Mapping):
+        return ""
+    picked = {k: parsed.get(k) for k in DECISION_KEYS if k in parsed}
+    if not picked:
+        return ""
+    # "click(id='12')" and "click( id = \"12\" )" are the same decision.
+    return "".join(json.dumps(picked, sort_keys=True, default=str).lower().replace("\\\"", "'").split())
 
 ON_PREM_MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
     "gpt-oss-20b": {"family": "reasoning", "modalities": ["text"], "context": 131000, "roles": ["reasoning", "planning", "action_selection", "judge", "recovery", "text"], "function_calling": True, "chat_completions": True, "rest_api": True},
@@ -125,12 +138,21 @@ class OnPremModelPortfolioRouter:
         if raw.get("schema_version") == SCHEMA:
             raw.setdefault("tasks", {})
             raw.setdefault("availability", {})
+            if raw.get("credit_rule") != CREDIT_RULE and raw.get("models"):
+                # V243R22: evidence scored under the old rule is biased: a tournament
+                # winner was picked by its own confidence field, and a model that
+                # proposed the *same* action as the winner got only a 35% shadow
+                # credit.  gpt-oss-20b collected full credit for the deterministic
+                # executor's successes and became champion.  Champions must be
+                # re-earned from decisions scored fairly.
+                return {"schema_version": SCHEMA, "credit_rule": CREDIT_RULE, "models": {}, "tasks": {}, "availability": dict(raw.get("availability") or {}), "role_champions": {}, "task_champions": {}, "cycle": int(raw.get("cycle") or 0), "updated_at": utc_now(), "on_prem_only": True, "values_stored": False, "selectors_stored": False, "coordinates_stored": False, "reset_reason": "champion evidence re-earned under fair decision credit (V243R22)", "previous_role_champions": dict(raw.get("role_champions") or {})}
+            raw["credit_rule"] = CREDIT_RULE
             return raw
         # Safe migration from V241: preserve evidence counters but discard proposal-only
         # champions because they were not guaranteed to have downstream success proof.
         if raw.get("schema_version") == "hip.onprem-model-portfolio.v1":
-            return {"schema_version": SCHEMA, "models": dict(raw.get("models") or {}), "tasks": {}, "availability": {}, "role_champions": {}, "task_champions": {}, "cycle": int(raw.get("cycle") or 0), "updated_at": utc_now(), "on_prem_only": True, "values_stored": False, "selectors_stored": False, "coordinates_stored": False, "migrated_from": "hip.onprem-model-portfolio.v1"}
-        return {"schema_version": SCHEMA, "models": {}, "tasks": {}, "availability": {}, "role_champions": {}, "task_champions": {}, "cycle": 0, "updated_at": utc_now(), "on_prem_only": True, "values_stored": False, "selectors_stored": False, "coordinates_stored": False}
+            return {"schema_version": SCHEMA, "credit_rule": CREDIT_RULE, "models": dict(raw.get("models") or {}), "tasks": {}, "availability": {}, "role_champions": {}, "task_champions": {}, "cycle": int(raw.get("cycle") or 0), "updated_at": utc_now(), "on_prem_only": True, "values_stored": False, "selectors_stored": False, "coordinates_stored": False, "migrated_from": "hip.onprem-model-portfolio.v1"}
+        return {"schema_version": SCHEMA, "credit_rule": CREDIT_RULE, "models": {}, "tasks": {}, "availability": {}, "role_champions": {}, "task_champions": {}, "cycle": 0, "updated_at": utc_now(), "on_prem_only": True, "values_stored": False, "selectors_stored": False, "coordinates_stored": False}
 
     def _save(self) -> None:
         self.state["updated_at"] = utc_now(); safe_write_json(self.state_path, self.state)
@@ -370,7 +392,7 @@ class OnPremModelPortfolioRouter:
                     "pass", "verdict", "needs_human", "evidence_conflict", "reason_codes",
                 )
                 proposal = {k: parsed.get(k) for k in proposal_keys if k in parsed}
-                return {"model": model, "ok": True, "latency_ms": round(latency, 2), "quality": quality, "prior": prior, "immediate_score": immediate, "text": text, "parsed": parsed, "proposal": proposal}
+                return {"model": model, "decision_key": decision_key(parsed), "ok": True, "latency_ms": round(latency, 2), "quality": quality, "prior": prior, "immediate_score": immediate, "text": text, "parsed": parsed, "proposal": proposal}
             except Exception as exc:
                 return {"model": model, "ok": False, "latency_ms": round((time.perf_counter() - started) * 1000.0, 2), "quality": 0.0, "prior": self._prior_score(self._model_stats(model, role)), "immediate_score": 0.0, "error": mask_sensitive_string(str(exc))[:800]}
 
@@ -401,18 +423,31 @@ class OnPremModelPortfolioRouter:
         task_key = str(trace.get("task_key") or "")
         candidates = list(trace.get("candidate_results") or [])
         winner_row = next((x for x in candidates if str(x.get("model") or "") == winner), {})
+        fair = bool(self._cfg("fair_decision_credit", True))
+        winner_decision = str(winner_row.get("decision_key") or "")
         for row in candidates:
             model = str(row.get("model") or "")
             if not model or model not in ON_PREM_MODEL_CATALOG:
                 continue
-            stats = self._model_stats(model, role); stats["trials"] = int(stats.get("trials") or 0) + 1
-            if model == winner:
+            credited_success = bool(success and model == winner)
+            if fair and model != winner:
+                # V243R22: a model is scored on what it decided.  The same decision
+                # as the executed one shares its real outcome; a different decision
+                # scores 0 when the executed one was proven right, and is not scored
+                # at all when it failed (that counterfactual is unknown).
+                same = bool(winner_decision and str(row.get("decision_key") or "") == winner_decision)
+                if not same and not success:
+                    continue
+                model_reward = reward if same else 0.0
+                credited_success = bool(success and same)
+            elif model == winner:
                 model_reward = reward
             else:
                 same_proposal = bool(row.get("proposal") and winner_row.get("proposal") and row.get("proposal") == winner_row.get("proposal"))
                 base_shadow = reward if (success and same_proposal) else min(reward, _bounded(row.get("quality")))
                 model_reward = base_shadow * float(self._cfg("shadow_reward_weight", 0.35) or 0.35)
-            if success and model == winner:
+            stats = self._model_stats(model, role); stats["trials"] = int(stats.get("trials") or 0) + 1
+            if credited_success:
                 stats["successes"] = int(stats.get("successes") or 0) + 1
             stats["reward_sum"] = float(stats.get("reward_sum") or 0.0) + model_reward
             stats["quality_sum"] = float(stats.get("quality_sum") or 0.0) + _bounded(row.get("quality"))
@@ -425,7 +460,7 @@ class OnPremModelPortfolioRouter:
             if task_key:
                 tstats = self._task_stats(task_key, model)
                 tstats["trials"] = int(tstats.get("trials") or 0) + 1
-                if success and model == winner:
+                if credited_success:
                     tstats["successes"] = int(tstats.get("successes") or 0) + 1
                 tstats["reward_sum"] = float(tstats.get("reward_sum") or 0.0) + model_reward
                 tstats["last_reward"] = model_reward; tstats["last_used_at"] = utc_now()
@@ -471,14 +506,8 @@ class OnPremModelPortfolioRouter:
                     changed[role] = {"from": old, "to": ""}
         self.state["cycle"] = int(self.state.get("cycle") or 0) + 1; self._save()
         cycle = {"schema_version": "hip.model-portfolio-dream-cycle.v2", "cycle": self.state["cycle"], "recorded_at": utc_now(), "reason": reason, "champion_changes": changed, "role_champions": dict(self.state.get("role_champions") or {}), "promotion_requires_downstream_evidence": True}
-        general = str((self.state.get("role_champions") or {}).get("planning") or (self.state.get("role_champions") or {}).get("action_selection") or "")
+        general = self.default_text_model(champion_only=True)
         primary = self.primary_text_model()
-        if general and self._prefer_strongest() and self.capability(general) < self.capability(primary):
-            # V243R21: a weaker champion never replaces the configured model for
-            # every default call, unless the configured model is proven down.
-            row = (self.state.get("availability") or {}).get(primary) or {}
-            if not (self._availability_fresh(primary) and row.get("available") is False):
-                general = ""
         if general:
             os.environ["HIP_MODEL_ROUTER_SELECTED_TEXT"] = general
         else:
@@ -487,9 +516,23 @@ class OnPremModelPortfolioRouter:
         _append_jsonl(self.dreams_path, cycle)
         return mask_sensitive_data(cycle)
 
+    def default_text_model(self, *, champion_only: bool = False) -> str:
+        """The model every default call uses: the evidence champion, but never a
+        weaker one than the configured model unless that model is proven down."""
+        champs = self.state.get("role_champions") or {}
+        general = str(champs.get("planning") or champs.get("action_selection") or "")
+        primary = self.primary_text_model()
+        if general and self._prefer_strongest() and self.capability(general) < self.capability(primary):
+            # V243R21: a weaker champion never replaces the configured model for
+            # every default call, unless the configured model is proven down.
+            row = (self.state.get("availability") or {}).get(primary) or {}
+            if not (self._availability_fresh(primary) and row.get("available") is False):
+                general = ""
+        return general if (general or champion_only) else primary
+
     def manifest(self) -> Dict[str, Any]:
         roles = sorted(set((self.state.get("role_champions") or {}).keys()) | {"planning", "action_selection", "judge", "recovery"})
-        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "primary_text_model": self.primary_text_model(), "default_text_model": os.environ.get("HIP_MODEL_ROUTER_SELECTED_TEXT") or self.primary_text_model(), "prefer_strongest_model": self._prefer_strongest(), "model_capability": {m: self.capability(m) for m in self.configured_models("text")}, "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": self.recent_usage(25), "recent_distinct_models": sorted({m for row in self.recent_usage(25) for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
+        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "primary_text_model": self.primary_text_model(), "default_text_model": self.default_text_model(), "credit_rule": str(self.state.get("credit_rule") or ""), "scored_decisions": {role: sum(int(((self.state.get("models") or {}).get(m, {}).get("roles") or {}).get(role, {}).get("trials") or 0) for m in (self.state.get("models") or {})) for role in ("planning", "action_selection", "judge", "recovery")}, "min_champion_trials": int(self._cfg("min_champion_trials", 3) or 3), "prefer_strongest_model": self._prefer_strongest(), "model_capability": {m: self.capability(m) for m in self.configured_models("text")}, "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": self.recent_usage(25), "recent_distinct_models": sorted({m for row in self.recent_usage(25) for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
 
 
 def model_portfolio_from_config(app_config: Any) -> OnPremModelPortfolioRouter:

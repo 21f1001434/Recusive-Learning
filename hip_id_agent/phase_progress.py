@@ -209,3 +209,88 @@ async def run_with_progress_watchdog(
             with suppress(asyncio.CancelledError):
                 await task
         raise
+
+
+def progress_units(marker: Optional[Dict[str, Any]]) -> int:
+    """Loop-proof progress count from a phase progress marker (V243R22)."""
+    row = dict(marker or {})
+    if "progress_units" in row:
+        return int(row.get("progress_units") or 0)
+    return int(row.get("verified_node_count") or 0) + int(row.get("successful_fill_count") or 0)
+
+
+async def run_with_progress_budget(
+    operation: Awaitable[Any],
+    *,
+    phase: str,
+    budget_seconds: float,
+    marker_provider: Callable[[], Awaitable[Dict[str, Any]]],
+    extend: Callable[[int], Dict[str, Any]],
+    evidence_path: Optional[str | Path] = None,
+) -> Any:
+    """``asyncio.wait_for`` for a phase attempt, except progress earns time.
+
+    The phase wall budget exists so a stuck phase cannot hold the browser for
+    hours.  A slow but advancing form is not stuck: when the deadline arrives
+    and the attempt has verified new fields since the last deadline, ``extend``
+    is asked for more time (it grants a bounded number of extensions).  With no
+    new progress, or no extension left, the attempt is cancelled and
+    ``asyncio.TimeoutError`` is raised exactly as before.
+    """
+    task = asyncio.ensure_future(operation)
+
+    async def units() -> int:
+        try:
+            return progress_units(await marker_provider())
+        except Exception:
+            return -1
+
+    deadline = time.monotonic() + max(1.0, float(budget_seconds or 0.0))
+    last_units = await units()
+    extensions: list[Dict[str, Any]] = []
+    try:
+        while True:
+            done, _ = await asyncio.wait({task}, timeout=max(0.01, deadline - time.monotonic()))
+            if task in done:
+                return await task
+            now_units = await units()
+            granted: Dict[str, Any] = {}
+            if now_units > last_units >= 0:
+                granted = dict(extend(now_units - last_units) or {})
+            record = {
+                "schema_version": "hip.phase-progress-budget.v1",
+                "phase": str(phase),
+                "progress_units_since_last_deadline": (now_units - last_units) if last_units >= 0 else None,
+                "progress_units": now_units,
+                "extension": granted,
+                "extensions": extensions + ([granted] if granted.get("granted") else []),
+            }
+            if granted.get("granted"):
+                extensions.append(granted)
+                last_units = now_units
+                deadline = time.monotonic() + float(granted.get("seconds") or 0.0)
+                record["decision"] = "extended_for_verified_progress"
+                if evidence_path:
+                    safe_write_json(Path(evidence_path), record)
+                continue
+            record["decision"] = "stopped_no_new_progress" if now_units <= last_units else "stopped_extensions_exhausted"
+            if evidence_path:
+                safe_write_json(Path(evidence_path), record)
+            task.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+            if record["decision"] == "stopped_no_new_progress":
+                # Same recovery class as the structural watchdog: reopen from
+                # input.json, refresh, restart the browser -- then a human.
+                raise asyncio.TimeoutError(
+                    "HIP_PHASE_NO_PROGRESS_WATCHDOG: no new verified field before the phase wall budget "
+                    f"(HIP_PHASE_WALL_BUDGET, {len(extensions)} progress extension(s) used)"
+                )
+            raise asyncio.TimeoutError(
+                f"HIP_PHASE_WALL_BUDGET timed out after {len(extensions)} progress extension(s)"
+            )
+    finally:
+        if not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await task

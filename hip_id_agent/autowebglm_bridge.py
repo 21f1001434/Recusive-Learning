@@ -78,6 +78,9 @@ class AutoWebGLMRecoveryBridge:
         self.deterministic_tool_fallback = bool(getattr(config, "deterministic_tool_fallback", True))
         self.require_intent_alignment = bool(getattr(config, "require_intent_alignment", True))
         self.max_primary_decision_seconds = max(3, int(getattr(config, "max_primary_decision_seconds", 12) or 12))
+        self.vetted_intent_parallel_models = max(1, int(getattr(config, "vetted_intent_parallel_models", 1) or 1))
+        self.vetted_intent_challenger_every = max(0, int(getattr(config, "vetted_intent_challenger_every", 10) or 0))
+        self._vetted_decisions = 0
         self.allowed_actions = {
             str(x).strip() for x in list(getattr(config, "allowed_actions", []) or []) if str(x).strip()
         }
@@ -327,6 +330,7 @@ class AutoWebGLMRecoveryBridge:
         history: Optional[Sequence[Any]] = None,
         learning: bool = False,
         complex_task: bool = True,
+        vetted: bool = False,
     ) -> Dict[str, Any]:
         """Return the primary AutoWebGLM action for one vetted HIP control intent.
 
@@ -377,9 +381,21 @@ class AutoWebGLMRecoveryBridge:
                 "expected_intent": mask_sensitive_data(expected),
                 "tool_adapter_required": True,
             }
+        parallel_models: Optional[int] = None
+        if vetted:
+            # V243R22: the executor already bound the exact control; a 4-model vote
+            # per click only adds its slowest member's latency.  The strongest (or
+            # proven champion) model decides; every Nth vetted intent adds one
+            # least-tried challenger so the portfolio keeps learning.
+            self._vetted_decisions += 1
+            challenger = bool(self.vetted_intent_challenger_every and self._vetted_decisions % self.vetted_intent_challenger_every == 0)
+            parallel_models = self.vetted_intent_parallel_models + (1 if challenger else 0)
+            learning = bool(challenger)
+            complex_task = False
         try:
             decision = await asyncio.wait_for(
-                self.propose(page=page, task=task, history=history, expected_intent=expected, observation=observation, learning=learning, complex_task=complex_task),
+                self.propose(page=page, task=task, history=history, expected_intent=expected, observation=observation,
+                             learning=learning, complex_task=complex_task, parallel_models=parallel_models),
                 timeout=self.max_primary_decision_seconds,
             )
         except Exception as exc:
@@ -429,6 +445,7 @@ class AutoWebGLMRecoveryBridge:
         observation: Optional[Mapping[str, Any]] = None,
         learning: bool = False,
         complex_task: bool = True,
+        parallel_models: Optional[int] = None,
     ) -> Dict[str, Any]:
         if observation is None:
             observation = await self.build_observation(page=page, task=task, history=history, expected_intent=expected_intent)
@@ -502,8 +519,9 @@ class AutoWebGLMRecoveryBridge:
                         self.model_portfolio.tournament_text,
                         system=system, task=prompt, role="action_selection", expected_json=True,
                         require_keys=("action", "confidence"), exploration=bool(learning),
-                        learning=bool(learning), complex_task=bool(complex_task),
-                        force_multi_model=bool(learning or complex_task),
+                        learning=bool(learning) and parallel_models is None, complex_task=bool(complex_task),
+                        force_multi_model=bool(learning or complex_task) and parallel_models is None,
+                        parallel_models=parallel_models,
                     ),
                     timeout=max(self.timeout_seconds, self.max_primary_decision_seconds),
                 )

@@ -320,6 +320,13 @@ class RuntimeSelfHealConfig(BaseModel):
     # replayed forever and no phase may occupy the browser for hours.
     max_no_progress_repeats: int = 3
     max_phase_wall_seconds: int = 1200
+    # V243R22: the wall budget guards against stagnation, not against a slow but
+    # advancing form.  An attempt that keeps verifying new fields earns another
+    # ``progress_extension_seconds`` each time it reaches the budget (at most
+    # ``max_progress_extensions`` times) instead of being cancelled mid-form and
+    # handed to a human.  An attempt without new verified fields is stopped as before.
+    progress_extension_seconds: int = 600
+    max_progress_extensions: int = 6
     # Active structural watchdog. Unlike failure-signature counting, this runs
     # while the phase coroutine is still alive and interrupts repeated UI cycles.
     no_progress_watchdog_seconds: float = 90.0
@@ -561,6 +568,12 @@ class AutoWebGLMConfig(BaseModel):
     deterministic_tool_fallback: bool = True
     require_intent_alignment: bool = True
     max_primary_decision_seconds: int = 12
+    # V243R22: a vetted intent (the executor already bound the exact control and
+    # value) asks the strongest/champion model only; every Nth one also asks one
+    # challenger so the champion keeps being tested on real outcomes.  Open
+    # decisions (planning, judges, self-repair) still use the full portfolio.
+    vetted_intent_parallel_models: int = 1
+    vetted_intent_challenger_every: int = 10
     use_existing_dell_aia: bool = True
     native_model_command: List[str] = Field(default_factory=list)
     max_html_chars: int = 70000

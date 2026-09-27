@@ -7,12 +7,13 @@ param(
 $ErrorActionPreference = "Stop"
 $PatchRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$backupRoot = Join-Path $TargetRoot ".hip_patch_backups\V243R21_$timestamp"
+$backupRoot = Join-Path $TargetRoot ".hip_patch_backups\V243R22_$timestamp"
 New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
 
-# User/environment/runtime state is intentionally preserved. R21 (which includes
-# R13-R20) needs no config.yaml changes; R19's portal_skills/portal_operations
-# and R21's model_portfolio.prefer_strongest_model settings have defaults.
+# User/environment/runtime state is intentionally preserved. R22 (which includes
+# R13-R21) needs no config.yaml changes; R19's portal_skills/portal_operations,
+# R21's model_portfolio.prefer_strongest_model and R22's progress extensions and
+# vetted-intent model settings all have defaults.
 # data\hip_memory keeps what the agent has learned (form_structure_memory,
 # runtime_recovery_ladder.json and, from R19, portal_skills).
 $preserve = @(".env", "config.yaml", "input.json", "runs", "data\hip_memory", ".backend_runtime", ".hip_runtime")
@@ -41,6 +42,7 @@ $files = @(
   "examples\operations_example_input.json",
   "V243R20_PLUS_ROWS_EVERY_PHASE_20260925.md", "APPLY_V243R20_IN_PLACE.ps1", "VERIFY_V243R20_INSTALL.ps1",
   "V243R21_LIVE_GATE_ROW_DROPDOWNS_BEST_MODEL_20260926.md", "APPLY_V243R21_IN_PLACE.ps1", "VERIFY_V243R21_INSTALL.ps1",
+  "V243R22_SELF_HEAL_WHILE_PROGRESSING_FAIR_CHAMPION_RSI_20260927.md", "APPLY_V243R22_IN_PLACE.ps1", "VERIFY_V243R22_INSTALL.ps1",
   "hip_portal_id_agent-2.4.3-py3-none-any.whl"
 )
 
@@ -78,16 +80,16 @@ foreach ($rel in $files) {
 $wheel = Join-Path $TargetRoot "hip_portal_id_agent-2.4.3-py3-none-any.whl"
 if (-not $SkipWheelInstall) {
   if (-not (Test-Path $wheel)) { throw "R20 wheel missing after patch copy: $wheel" }
-  Write-Host "Installing exact V243R21 wheel..." -ForegroundColor Cyan
+  Write-Host "Installing exact V243R22 wheel..." -ForegroundColor Cyan
   & python -m pip install --force-reinstall --no-deps $wheel
   if ($LASTEXITCODE -ne 0) { throw "Wheel installation failed: $LASTEXITCODE" }
 }
 
 if (-not $SkipSmokeCheck) {
   Push-Location $TargetRoot
-  try { & .\VERIFY_V243R21_INSTALL.ps1 } finally { Pop-Location }
+  try { & .\VERIFY_V243R22_INSTALL.ps1 } finally { Pop-Location }
 }
-Write-Host "V243R21 live-gate row dropdowns + strongest model (includes R13-R20) applied in place." -ForegroundColor Green
+Write-Host "V243R22 self-heal while progressing + fair model champion + per-phase RSI (includes R13-R21) applied in place." -ForegroundColor Green
 Write-Host "Target: $TargetRoot"
 Write-Host "Backup: $backupRoot"
 Write-Host "Preserved: config.yaml, .env, input.json, runs, data\hip_memory, .backend_runtime, .hip_runtime"

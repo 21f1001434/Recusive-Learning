@@ -56,7 +56,7 @@ from .live_witness import build_live_witness_report
 from .form_api_agent import FormAPIAgentQRuntime
 from .mission_assurance import capture_mcp_evidence_quorum, build_phase_assurance_report
 from .capability_graph import HIPCapabilityGraph, PHASE_TO_CAPABILITY_FAMILY, promote_validated_phase_to_capability_graph
-from .phase_progress import run_with_progress_watchdog
+from .phase_progress import progress_units, run_with_progress_budget, run_with_progress_watchdog
 from .phase_transition import MissionTransitionCoordinator
 from .final_mission import FinalMissionConsolidator
 from .mlflow_async import AsyncMLflowTracker
@@ -2923,6 +2923,32 @@ class FullDummyFillE2EFlow:
                     phase_dir / "form_api_intelligence" / f"attempt_{attempt_no:02d}_capture_error.json",
                     {"stage": "finish", "error": api_result["error"], "run_continues": api_result["pass"]},
                 )
+            # V243R22: the recursive self-improvement cycle (replay-policy and
+            # model-champion dreaming over the outcomes just recorded) runs after
+            # every phase attempt, not only after a whole mission finished -- a
+            # mission held at one phase never reached it (the dashboard stayed at
+            # "Cycle 0").  A failed attempt is rewarded with its verified share.
+            reward = 1.0 if success else 0.0
+            if not success:
+                try:
+                    marker = await shared_browser.capture_phase_progress_marker(phase_name)
+                    graph = phase_graph_for_memory if isinstance(phase_graph_for_memory, dict) else {}
+                    expected_count = sum(1 for n in (graph.get("nodes") or []) if isinstance(n, dict) and n.get("expected_value") not in (None, "", []))
+                    if expected_count:
+                        reward = min(0.99, int(marker.get("verified_node_count") or 0) / float(expected_count))
+                except Exception:
+                    reward = 0.0
+            try:
+                rsi = close_mission_learning_loop(
+                    self.config, replay_policy=replay_policy, reward=reward, success=bool(success),
+                    reason=f"phase_attempt:{phase_name}:{attempt_no}:{'pass' if success else 'incomplete'}",
+                )
+                safe_write_json(phase_dir / f"recursive_self_improvement_attempt_{attempt_no:02d}.json", rsi)
+            except Exception as exc:
+                safe_write_json(
+                    phase_dir / f"recursive_self_improvement_attempt_{attempt_no:02d}.json",
+                    {"status": "error_fail_open", "error": mask_sensitive_string(str(exc))[:500]},
+                )
             return api_result
 
         async def _execute_phase_once(
@@ -3128,8 +3154,32 @@ class FullDummyFillE2EFlow:
                 attempt_index = 0
                 phase_loop_started = time.monotonic()
 
+                phase_progress_seen = -1
                 while runtime_self_healer.until_complete or attempt_index < max_phase_attempts:
                     elapsed = time.monotonic() - phase_loop_started
+                    # V243R22: an attempt that verified new fields is not a stall.
+                    # Grant bounded time (the same extensions a running attempt
+                    # earns) and let the agent heal the rest itself.
+                    if elapsed >= float(runtime_self_healer.wall_budget_seconds(phase)) and attempt_index > 0:
+                        try:
+                            now_progress = progress_units(await shared_browser.capture_phase_progress_marker(phase))
+                        except Exception:
+                            now_progress = -1
+                        if now_progress > phase_progress_seen >= 0:
+                            granted = runtime_self_healer.extend_for_progress(
+                                phase, progress_units=now_progress - phase_progress_seen,
+                                reason="previous attempt verified new fields")
+                            safe_write_json(phase_dir / f"phase_progress_budget_before_attempt_{attempt_index + 1:02d}.json", {
+                                "schema_version": "hip.phase-progress-budget.v1", "phase": phase,
+                                "decision": "extended_for_verified_progress" if granted.get("granted") else "extensions_exhausted",
+                                "progress_units": now_progress, "previous_progress_units": phase_progress_seen, "extension": granted,
+                            })
+                        phase_progress_seen = max(phase_progress_seen, now_progress)
+                    elif attempt_index == 0:
+                        try:
+                            phase_progress_seen = progress_units(await shared_browser.capture_phase_progress_marker(phase))
+                        except Exception:
+                            phase_progress_seen = -1
                     # Each refresh / browser-restart recovery step extends the budget.
                     if elapsed >= float(runtime_self_healer.wall_budget_seconds(phase)):
                         stall = {
@@ -3218,8 +3268,10 @@ class FullDummyFillE2EFlow:
                                 reason="no_progress_watchdog_terminal_reproof",
                             )
                         # Legacy/source-audit marker retained for ordering tests: summary = await _execute_phase_once
-                        # The real call is wrapped in asyncio.wait_for so one stuck portal phase cannot run for hours.
-                        summary = await asyncio.wait_for(
+                        # The real call is bounded (formerly asyncio.wait_for) so one stuck portal phase cannot run for
+                        # hours; V243R22: an attempt still verifying new fields earns bounded extra time instead of
+                        # being cancelled mid-form.
+                        summary = await run_with_progress_budget(
                             run_with_progress_watchdog(
                                 _execute_phase_once(phase, phase_ctx, input_path),
                                 phase=phase,
@@ -3233,7 +3285,12 @@ class FullDummyFillE2EFlow:
                                 # HIP_PORTAL_LOADING_STUCK -> refresh -> browser restart.
                                 blocking_wait_seconds=runtime_self_healer.watchdog_blocking_wait_seconds(),
                             ),
-                            timeout=remaining_phase_seconds,
+                            phase=phase,
+                            budget_seconds=remaining_phase_seconds,
+                            marker_provider=lambda: shared_browser.capture_phase_progress_marker(phase),
+                            extend=lambda units: runtime_self_healer.extend_for_progress(
+                                phase, progress_units=units, reason="attempt still verifying new fields at the wall budget"),
+                            evidence_path=phase_dir / f"phase_progress_budget_attempt_{attempt_no:02d}.json",
                         )
                         completion_checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
                         if completion_checkpoint.get("pass") is True:

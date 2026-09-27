@@ -1,3 +1,18 @@
+# V243R22 — Progress-earned phase time, one model per vetted intent, fair champion credit, per-attempt RSI (2026-09-27)
+
+- `phase_progress.run_with_progress_budget` replaces the attempt's hard `asyncio.wait_for`. At the wall budget, an attempt with new progress units (distinct verified fields + committed fills + distinct clicked targets; `capture_phase_progress_marker.progress_units`) is extended through `RuntimeSelfHealController.extend_for_progress`, bounded by `runtime_self_heal.progress_extension_seconds` (600) and `max_progress_extensions` (6). An attempt without progress stops as `HIP_PHASE_NO_PROGRESS_WATCHDOG` (recovery ladder). The mission loop credits progress before the wall-clock stall guard asks a human. `handle_failure` uses the extended wall budget. `publish_executor_progress` records distinct verified nodes.
+- `AutoWebGLMRecoveryBridge.primary_decide(vetted=True)`: one model (strongest or proven champion); every `vetted_intent_challenger_every` (10) adds one least-tried challenger. `BrowserSession._autowebglm_primary_decision` marks its intents vetted.
+- `model_portfolio`:
+  - `decision_key` / `fair_decision_credit`: a model is scored on its decision, not its confidence;
+  - `CREDIT_RULE`: stats and champions stored under the old rule are re-earned once (`previous_role_champions` kept);
+  - `default_text_model()`;
+  - the manifest reports `scored_decisions`.
+- `dummy_fill_e2e._learning_finish`: `close_mission_learning_loop` after every phase attempt (reward = verified share when incomplete), written to `recursive_self_improvement_attempt_NN.json`.
+- Control Center:
+  - the Model Champion tile shows the model answering default calls, with the champion and scored decisions;
+  - Induced Skills adds certified form skills (`runtime.portal_skills`).
+- Tests: `tests/test_v243r22_autonomy_rsi.py` (9).
+
 # V243R21 — Live-gate look-alike controls, strongest model, lean live view (2026-09-26)
 
 - `SemanticActionGate.revalidate(locator=)`: when several controls share the target's fingerprint, the target is re-proven through the executor's own locator. It must be the same fingerprint, and the same row when the row is known (`stable_vetted_locator`). A re-created or moved control is still refused. `BrowserSession._semantic_dispatch_target` passes the locator and keeps it.

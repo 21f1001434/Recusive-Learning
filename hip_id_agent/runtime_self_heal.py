@@ -13,6 +13,7 @@ from .aia_client import AIAClient
 from .safe_io import safe_write_json, compact_path_component
 from .security import mask_sensitive_data, mask_sensitive_string
 from .maximum_observability import MaximumObservabilityCollector
+from .models import utc_now
 
 
 _MUTATING_TOKENS = {
@@ -127,6 +128,9 @@ class RuntimeSelfHealController:
         self.max_repeated_signature = max(1, int(getattr(policy, "max_repeated_failure_signature", 2)))
         self.max_no_progress_repeats = max(1, int(getattr(policy, "max_no_progress_repeats", 3)))
         self.max_phase_wall_seconds = max(60, int(getattr(policy, "max_phase_wall_seconds", 1200)))
+        self.progress_extension_seconds = max(60, int(getattr(policy, "progress_extension_seconds", 600) or 600))
+        self.max_progress_extensions = max(0, int(getattr(policy, "max_progress_extensions", 6) or 0))
+        self._progress_extensions: Dict[str, List[Dict[str, Any]]] = {}
         self.use_aia_advisor = bool(getattr(policy, "use_aia_advisor", True))
         self.aia_advisor_timeout_seconds = max(3, int(getattr(policy, "aia_advisor_timeout_seconds", 20)))
         self.aia_advisor_context_max_chars = max(12000, int(getattr(policy, "aia_advisor_context_max_chars", 64000)))
@@ -721,6 +725,24 @@ class RuntimeSelfHealController:
         """Phase wall-clock budget, extended by each recovery step taken."""
         return float(self.max_phase_wall_seconds) + float(self._wall_extension.get(str(phase), 0.0))
 
+    def progress_extensions_left(self, phase: str) -> int:
+        return max(0, self.max_progress_extensions - len(self._progress_extensions.get(str(phase), [])))
+
+    def extend_for_progress(self, phase: str, *, progress_units: int, reason: str = "") -> Dict[str, Any]:
+        """V243R22: a phase that is still verifying new fields earns more time.
+
+        Returns the extension granted, or ``{"granted": False}`` once the bounded
+        number of extensions is used up (then the stagnation guard applies)."""
+        if self.progress_extensions_left(phase) <= 0:
+            return {"granted": False, "reason": "max_progress_extensions reached"}
+        row = {
+            "granted": True, "seconds": float(self.progress_extension_seconds), "progress_units": int(progress_units),
+            "reason": str(reason or "verified new fields"), "at": utc_now(),
+        }
+        self._progress_extensions.setdefault(str(phase), []).append(row)
+        self._wall_extension[str(phase)] = self._wall_extension.get(str(phase), 0.0) + float(self.progress_extension_seconds)
+        return dict(row, extensions_used=len(self._progress_extensions[str(phase)]), extensions_left=self.progress_extensions_left(phase))
+
     def _ladder_memory_path(self) -> Optional[Path]:
         if not self.learn_recovery_ladder:
             return None
@@ -808,6 +830,7 @@ class RuntimeSelfHealController:
             self._ladder_steps.pop(key, None)
         self._ladder_pending.pop(str(phase), None)
         self._wall_extension.pop(str(phase), None)
+        self._progress_extensions.pop(str(phase), None)
         self._phase_started_monotonic[str(phase)] = time.monotonic()
         # Attempts are counted afresh from the resume on.
         self._attempt_offset[str(phase)] = int(self._last_attempt.get(str(phase), 0))
@@ -1214,7 +1237,8 @@ class RuntimeSelfHealController:
 
         phase_started = self._phase_started_monotonic.setdefault(str(phase), time.monotonic())
         phase_elapsed_seconds = max(0.0, time.monotonic() - phase_started)
-        wall_available = phase_elapsed_seconds < float(self.max_phase_wall_seconds)
+        # V243R22: time earned by verified progress and recovery steps counts too.
+        wall_available = phase_elapsed_seconds < self.wall_budget_seconds(str(phase))
         budget_available = self.enabled and (self.until_complete or self._total_repairs < self.max_total_repairs)
         # Critical safety/accuracy rule: ``until_complete`` may extend useful work,
         # but it can never excuse repeating the same no-progress state forever.

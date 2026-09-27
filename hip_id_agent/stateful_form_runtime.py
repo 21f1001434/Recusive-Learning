@@ -1786,6 +1786,14 @@ def publish_executor_progress(page: Any, *, phase: str, node: Dict[str, Any], st
             "seq": seq, "phase": phase, "field": node.get("field_key"),
             "row_index": node.get("row_index"), "stage": stage, "retry": retry,
         })
+        if stage == "done":
+            # V243R22: distinct fields verified so far -- the phase budget's
+            # measure of real progress (a re-verified field adds nothing).
+            verified = getattr(page, "_hip_verified_nodes", None)
+            if not isinstance(verified, set):
+                verified = set()
+                setattr(page, "_hip_verified_nodes", verified)
+            verified.add(f"{phase}|{node.get('node_id')}")
     except Exception:
         pass
 

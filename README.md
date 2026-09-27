@@ -1,3 +1,19 @@
+## V243R22 — The agent keeps healing while it makes progress; the model champion is earned on results; learning runs every phase (2026-09-27)
+
+- **No more stopping mid-form to ask you.** Document Type was cancelled in the middle of row 3 by a hard 20-minute attempt timeout, then handed to a human, although every field so far was right. Now:
+  - an attempt that is still verifying new fields earns more time (10 minutes at a time, at most 6 times);
+  - a stop without progress first goes through the agent's own recovery (reopen, refresh, restart the browser);
+  - only then does the agent ask you.
+- **Faster:** a field action the executor has already pinned down asks one strong model, not a 4-model vote that waited for the slowest model on every click. Every 10th action also tries a challenger model.
+- **Model Champion from real results.** gpt-oss-20b became champion because models were partly scored on how confident they said they were, and gpt-oss-120b was under-credited even when it chose the same action. Now:
+  - models are scored only on what they decided;
+  - the old biased evidence is re-earned once;
+  - the tile shows the model actually answering (gpt-oss-120b).
+- **Recursive Improvement runs after every phase attempt**, not only after a whole mission. The tile moves during a run.
+- **Induced Skills now also counts the certified form skills.**
+
+See `V243R22_SELF_HEAL_WHILE_PROGRESSING_FAIR_CHAMPION_RSI_20260927.md`. Apply with `APPLY_V243R22_IN_PLACE.ps1`; it includes R13–R21.
+
 ## V243R21 — Derived From and Usage in every row are filled on the live portal; gpt-oss-120b is used (2026-09-26)
 
 - **Row dropdowns and multi-selects are filled.** On the live portal every action passes a safety gate that re-checks the target just before the click. Controls that look alike, such as "Derived From" in every attribute row or every option of Usage, could not be told apart once the page had changed at all, and the gate's own highlight changes it. So every such click was refused: the overlay stayed on SELECTING and the phase repeated cycles.

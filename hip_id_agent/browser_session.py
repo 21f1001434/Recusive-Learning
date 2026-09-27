@@ -3063,6 +3063,13 @@ class BrowserSession:
         signature = hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
         successful_fills = sum(1 for ev in self.action_events if getattr(ev, "type", "") == "fill" and bool(getattr(ev, "success", False)))
         successful_clicks = sum(1 for ev in self.action_events if getattr(ev, "type", "") == "click" and bool(getattr(ev, "success", False)))
+        # V243R22: progress units that a loop cannot inflate -- distinct fields the
+        # executor verified, committed fills, and distinct targets clicked.
+        verified_nodes = getattr(page, "_hip_verified_nodes", None)
+        prefix = f"{phase or self._active_phase_name or ''}|"
+        verified_node_count = len([n for n in verified_nodes if str(n).startswith(prefix)]) if isinstance(verified_nodes, set) else 0
+        distinct_click_targets = len({str(getattr(ev, "target", "")) for ev in self.action_events
+                                      if getattr(ev, "type", "") == "click" and bool(getattr(ev, "success", False))})
         route = ""
         try:
             route = urlparse(str(page.url or "")).path
@@ -3076,6 +3083,9 @@ class BrowserSession:
             "action_count": len(self.action_events),
             "successful_fill_count": successful_fills,
             "successful_click_count": successful_clicks,
+            "verified_node_count": verified_node_count,
+            "distinct_click_target_count": distinct_click_targets,
+            "progress_units": verified_node_count + successful_fills + distinct_click_targets,
             "dom_transition_count": len(self.dom_transition_records),
             # Form-executor heartbeat (field/retry token, no values).
             "executor_progress": str(((getattr(page, "_hip_executor_progress", None) or {}).get("token")) or ""),
@@ -4495,6 +4505,7 @@ class BrowserSession:
                 history=history,
                 learning=str(getattr(self, "replay_policy_mode", "exploration") or "exploration") != "exploitation",
                 complex_task=True,
+                vetted=True,
             )
         except Exception as exc:
             decision = {
