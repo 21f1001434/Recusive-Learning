@@ -151,7 +151,14 @@ The replica is `tests/doctypes_listing_support.py`: the live DDS markup of the D
 
 ## Verification
 
-(filled in below)
+| Check | Result |
+|---|---|
+| Full suite (199 files) | 1,465 passed, 1 skipped. Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
+| R24 tests | 19 passed |
+| R19 operations, R21, R22, R23, R24 together (real browser) | 60 passed |
+| 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
+| Control Center | The page serves "Re-run the model qualification" and the new task-box examples. `/api/model-portfolio` reports `qualification`. `/api/portal-task/plan` for "migrate … from DEV to TEST2" returns navigate → search → open_row_action (row expander: expanded details, environment DEV) → choose_target → commit → verify_listing. |
+| `VERIFY_V243R24_INSTALL.ps1` R24 smoke checks | `R24_LIVE_MODEL_QUALIFICATION_OK`, `R24_ROW_EXPANDER_OPERATIONS_OK`, `R24_DEFAULTS_OK` (and the R23 checks it calls first) |
 
 ## Apply
 
