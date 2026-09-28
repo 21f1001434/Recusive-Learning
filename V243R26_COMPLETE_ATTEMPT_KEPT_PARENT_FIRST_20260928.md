@@ -51,6 +51,17 @@ With all three, and the loader after Transaction Type, the full 5-row Document T
 - real browser: the lower dropdowns are filled only after Data Format Type, and `fill_complete` is reported;
 - real browser: a Data Format Type the portal cleared is selected again before its children (0 empty dropdown openings).
 
+## Verification
+
+| Check | Result |
+|---|---|
+| R26 tests | 8 passed |
+| Closest suites (R14 full Document Type form, R16 watchdog, R18 loader ladder incl. real browser, R20 "+" rows, R21 gate, R22 budget/RSI, stateful Document Type runtime) | 76 passed |
+| Full suite (201 files) | 1,488 passed, 1 skipped. Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
+| Live-like replica, 5 attribute rows, Transaction Type lookup + lower dropdowns empty until Data Format Type + one late reset | PASS in one cycle, every Derived From / Usage / Validation Type correct |
+| 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
+| `VERIFY_V243R26_INSTALL.ps1` R26 smoke checks | `R26_COMPLETE_ATTEMPT_KEPT_OK`, `R26_FAIR_RETRY_AND_PARENT_FIRST_OK` (and the R25 checks it calls first) |
+
 ## Apply
 
 ```powershell
