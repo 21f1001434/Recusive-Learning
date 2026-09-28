@@ -642,6 +642,9 @@ live_runtime_certification:
   require_pyautogui_mcp: false
   latest_certificate_relative_path: ".hip_runtime/live_runtime_certificate.json"
   auto_refresh_on_live_readiness: true
+  # V243R25: the Control Center runs the certification in its own process and
+  # stops it after this many seconds (for example when Dell SSO is never done).
+  job_timeout_seconds: 1800
   auto_refresh_only_when_mission_idle: true
 
 universal_operator:

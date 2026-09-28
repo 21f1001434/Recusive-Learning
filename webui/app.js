@@ -2,10 +2,22 @@ const $ = (id) => document.getElementById(id);
 const state = { sections: [], runtime: null, process: null, preflight: null, liveRuntimeCertification: null, liveReadiness: null, descriptionPlan: null, runs: [], missionTrace: null, agentLiveView: null, agentLiveViewScreenshotUrl: "", worldModel: null, humanAssistance: null, humanSelectedControl: null, modelTests: { text:null, vision:null }, timer: null };
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-  });
+  // V243R25: an optional timeout (status polls) so a slow answer cannot pile up requests.
+  const { timeoutMs, ...fetchOptions } = options;
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  let response;
+  try {
+    response = await fetch(path, {
+      ...fetchOptions,
+      ...(controller ? { signal: controller.signal } : {}),
+      headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
+    });
+  } catch (error) {
+    throw new Error(error?.name === "AbortError" ? `No answer from ${path.split("?")[0]} within ${Math.round(timeoutMs / 1000)} s` : `Cannot reach the backend (${error?.message || error})`);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   const text = await response.text();
   let data = {};
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
@@ -192,11 +204,13 @@ function renderLiveRuntimeCertification(result = null, pending = false) {
   ]);
 }
 
+// V243R25: the certification runs in its own backend process.  Start it, then
+// follow its progress; a failure shows the real reason, never an invented NO_GO.
 async function runLiveRuntimeCertification() {
   const button=$("liveRuntimeCertBtn"); if(button) button.disabled=true;
   renderLiveRuntimeCertification(null,true);
   try {
-    const result=await api("/api/mission/live-runtime-certification", {method:"POST", body:JSON.stringify({
+    const job=await api("/api/mission/live-runtime-certification", {method:"POST", timeoutMs:60000, body:JSON.stringify({
       config:$("configPath").value.trim()||"config.yaml",
       runs_dir:$("runsDir").value.trim()||"./runs",
       target_url:"",
@@ -204,15 +218,66 @@ async function runLiveRuntimeCertification() {
       require_pyautogui_mcp:false,
       requalify_models:!!$("requalifyModels")?.checked,
     })});
+    toast(job.already_running?"A certification is already running — following it":"Windows runtime certification started — complete Dell SSO in the opened browser if asked","good");
+    renderCertificationJob(job);
+    return await followCertificationJob();
+  } catch(error) {
+    renderCertificationProblem(`Could not start the certification: ${error.message}`, "");
+    toast(error.message,"bad");
+    if(button) button.disabled=false;
+    return null;
+  }
+}
+
+async function followCertificationJob() {
+  if (state.certFollowing) return null;
+  state.certFollowing=true;
+  const button=$("liveRuntimeCertBtn"); if(button) button.disabled=true;
+  try {
+    for (;;) {
+      await new Promise(r=>setTimeout(r,3000));
+      let job;
+      try { job=await api("/api/mission/live-runtime-certification/status", {timeoutMs:15000}); }
+      catch { continue; }  // a slow answer is not a result: keep following
+      renderCertificationJob(job);
+      if (job.status!=="running") return job;
+    }
+  } finally { state.certFollowing=false; if(button) button.disabled=false; }
+}
+
+function renderCertificationJob(job) {
+  const badge=$("liveRuntimeCertState"), summary=$("liveRuntimeCertSummary"), tableWrap=$("liveRuntimeCertChecks");
+  if (!badge || !summary || !tableWrap || !job) return;
+  const rows=job.checks||[];
+  const cols=[
+    {key:"label",label:"Live runtime check"},
+    {key:"pass",label:"Status",render:r=>r.pass?'<span class="badge good">PASS</span>':`<span class="badge ${r.severity==="warning"?"info":"bad"}">${r.severity==="warning"?"WARN":"BLOCK"}</span>`},
+    {key:"detail",label:"Detail"},
+  ];
+  if (job.status==="running") {
+    badge.textContent="Running…"; badge.className="badge info";
+    summary.innerHTML=`<div class="kv"><b>Status</b><span>Running for ${esc(Math.round(job.elapsed_seconds||0))} s in its own process (the backend stays responsive)</span><b>Last check</b><span>${esc(job.last_check||"starting the browser…")}</span><b>Note</b><span>Complete Dell SSO in the opened browser window if it asks.</span></div>`;
+    tableWrap.innerHTML=table(rows, cols);
+  } else if (job.status==="done") {
+    const result=job.result||{};
     state.liveRuntimeCertification=result;
     renderLiveRuntimeCertification(result,false);
-    invalidateLiveReadiness("Windows runtime certification changed");
-    toast(result.pass?"Windows runtime certified — now run Live GO/NO-GO":"Windows runtime NO-GO — fix blockers and retry", result.pass?"good":"bad");
-    return result;
-  } catch(error) {
-    const result={pass:false,decision:"NO_GO",checks:[],blocker_count:1,error:error.message};
-    state.liveRuntimeCertification=result; renderLiveRuntimeCertification(result,false); toast(error.message,"bad"); return result;
-  } finally { if(button) button.disabled=false; }
+    if (state.lastCertJob!==job.job_id) {
+      state.lastCertJob=job.job_id;
+      invalidateLiveReadiness("Windows runtime certification changed");
+      toast(result.pass?"Windows runtime certified — now run Live GO/NO-GO":"Windows runtime NO-GO — see the BLOCK rows for the reason", result.pass?"good":"bad");
+    }
+  } else if (job.status==="failed") {
+    renderCertificationProblem(job.error||"The certification did not finish.", job.log_tail||"", rows, cols);
+  }
+}
+
+function renderCertificationProblem(message, logTail, rows=[], cols=null) {
+  const badge=$("liveRuntimeCertState"), summary=$("liveRuntimeCertSummary"), tableWrap=$("liveRuntimeCertChecks");
+  if (!badge || !summary || !tableWrap) return;
+  badge.textContent="Not completed"; badge.className="badge bad";
+  summary.innerHTML=`<div class="kv"><b>Problem</b><span>${esc(message)}</span></div>${logTail?`<pre class="log-tail">${esc(String(logTail).slice(-4000))}</pre>`:""}`;
+  tableWrap.innerHTML=cols?table(rows, cols):"";
 }
 
 function renderLiveReadiness(result = null, pending = false) {
@@ -256,7 +321,9 @@ async function runLiveReadiness({silent=false}={}) {
     if(!silent) toast(result.pass?"Live readiness GO — mission may start":"Live readiness NO-GO — fix blockers first", result.pass?"good":"bad");
     return result;
   } catch(error) {
-    state.liveReadiness={pass:false,decision:"NO_GO",checks:[],blocker_count:1,error:error.message};
+    // V243R25: a request that failed is "not completed" with its reason -- not an invented NO_GO blocker.
+    state.liveReadiness={pass:false,decision:"NOT COMPLETED",checks:[],blocker_count:0,error:error.message,
+      execution_contract:`The readiness check could not complete: ${error.message}`};
     renderLiveReadiness(state.liveReadiness,false); updateButtons(); if(!silent) toast(error.message,"bad"); return state.liveReadiness;
   } finally { if(button) button.disabled=false; }
 }
@@ -534,17 +601,28 @@ function renderMissionTrace(payload) {
 }
 
 async function refreshStatus() {
+  // V243R25: one poll at a time; a slow poll is skipped, not stacked.
+  if (state.refreshing) return;
+  state.refreshing = true;
   try {
     const [runtime, process, runs, tracePayload, liveViewPayload, worldModelPayload] = await Promise.all([
-      api(`/api/runtime/status?config=${encodeURIComponent($("configPath").value || "config.yaml")}`),
-      api("/api/discovery/status"),
+      api(`/api/runtime/status?config=${encodeURIComponent($("configPath").value || "config.yaml")}`, {timeoutMs:20000}),
+      api("/api/discovery/status", {timeoutMs:20000}),
       api(`/api/runs?config=${encodeURIComponent($("configPath").value || "config.yaml")}&runs_dir=${encodeURIComponent($("runsDir").value || "./runs")}&limit=25`).catch(()=>({runs:[],count:0})),
       api(`/api/mission/trace?config=${encodeURIComponent($("configPath").value || "config.yaml")}&runs_dir=${encodeURIComponent($("runsDir").value || "./runs")}`).catch(()=>({found:false,trace:{}})),
       api(`/api/mission/live-view?config=${encodeURIComponent($("configPath").value || "config.yaml")}&runs_dir=${encodeURIComponent($("runsDir").value || "./runs")}`).catch(()=>({found:false,live_view:{},screenshot_url:""})),
       api(`/api/mission/world-model?config=${encodeURIComponent($("configPath").value || "config.yaml")}`).catch(()=>({found:false,summary:{}})),
     ]);
     state.runtime = runtime; state.process = process; state.runs = runs.runs || []; state.missionTrace = tracePayload.trace || null; state.worldModel = worldModelPayload || null;
-    $("backendBadge").textContent = "Backend ready"; $("backendBadge").className = "badge good";
+    state.statusFailures = 0;
+    if (!state.certFollowing) {
+      // A certification started by Live GO/NO-GO (auto refresh) shows its progress too.
+      api("/api/mission/live-runtime-certification/status", {timeoutMs:10000}).then(job=>{
+        if (job?.status==="running") { renderCertificationJob(job); followCertificationJob(); }
+      }).catch(()=>{});
+    }
+    $("backendBadge").textContent = runtime.degraded ? "Backend ready (partial status)" : "Backend ready"; $("backendBadge").className = `badge ${runtime.degraded ? "info" : "good"}`;
+    if ($("backendBadge")) $("backendBadge").title = runtime.status_error || "";
     const ag = runtime.autogen || {};
     $("autogenBadge").textContent = ag.pass ? "AutoGen 0.7.5" : "AutoGen blocked";
     $("autogenBadge").className = `badge ${ag.pass ? "good" : "bad"}`;
@@ -595,8 +673,16 @@ async function refreshStatus() {
     $("processDetails").innerHTML = `<b>Status</b><span>${esc(procText)}</span><b>PID</b><span>${esc(process.pid || "—")}</span><b>Runs dir</b><span>${esc(process.runs_dir || "—")}</span><b>Command</b><span>${esc((process.command || []).join(" "))}</span>`;
     renderRuns(); renderMissionTrace(tracePayload); renderAgentLiveView(liveViewPayload); renderAdaptiveMetric(worldModelPayload?.summary||{}); updateButtons();
   } catch (error) {
-    $("backendBadge").textContent = "Backend offline"; $("backendBadge").className = "badge bad";
-    $("processMetric").textContent = "Offline";
+    // V243R25: "offline" only when the backend is really unreachable or three
+    // polls in a row failed; one slow answer shows "Backend busy".
+    state.statusFailures = (state.statusFailures || 0) + 1;
+    const unreachable = /Cannot reach the backend|backend is unavailable|503/i.test(String(error?.message || ""));
+    const offline = unreachable || state.statusFailures >= 3;
+    $("backendBadge").textContent = offline ? "Backend offline" : "Backend busy"; $("backendBadge").className = `badge ${offline ? "bad" : "info"}`;
+    $("backendBadge").title = String(error?.message || "");
+    if (offline) $("processMetric").textContent = "Offline";
+  } finally {
+    state.refreshing = false;
   }
 }
 
@@ -893,6 +979,11 @@ async function boot() {
   syncWitnessMode();
   try { await loadSections(); } catch(e){ toast(`Could not load sections: ${e.message}`,"bad"); }
   await Promise.all([refreshStatus(), runPreflight(true)]);
+  // V243R25: a certification started before this page (re)loaded is followed again.
+  api("/api/mission/live-runtime-certification/status", {timeoutMs:15000}).then(job=>{
+    if (job?.status==="running") { renderCertificationJob(job); followCertificationJob(); }
+    else if (job?.status==="done" || job?.status==="failed") { state.lastCertJob=job.job_id; renderCertificationJob(job); }
+  }).catch(()=>{});
   loadCapabilities(); loadApis(); loadSkillLibrary(); loadReplayPolicy(); loadModelPortfolio(); loadRecursiveImprovement(); loadHumanAssistance(); loadHumanPhaseReview(); loadInteractiveTeaching();
   clearInterval(state.timer); state.timer=setInterval(()=>{refreshStatus();loadHumanAssistance();loadHumanPhaseReview();loadInteractiveTeaching();},3000);
 }

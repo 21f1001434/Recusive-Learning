@@ -95,6 +95,8 @@ def certify_live_runtime_cmd(
     ttl_seconds: int = typer.Option(0, help="Certificate validity. 0 uses live_runtime_certification.ttl_seconds."),
     require_pyautogui_mcp: bool = typer.Option(False, "--require-pyautogui-mcp/--allow-missing-pyautogui-mcp", help="Require the PyAutoGUI MCP read-only desktop smoke to pass."),
     requalify_models: bool = typer.Option(False, "--requalify-models", help="Run the one-time live model qualification again (normally it runs only once)."),
+    result_json: str = typer.Option("", "--result-json", help="Also write the certificate (or the error) to this file; used by the Control Center job."),
+    progress_json: str = typer.Option("", "--progress-json", help="Write every finished check to this file while the certification runs."),
 ):
     """Certify the actual Windows/Dell runtime without mutating the HIP tenant.
 
@@ -112,14 +114,29 @@ def certify_live_runtime_cmd(
         root = (Path.cwd() / root).resolve()
     live_cfg = getattr(cfg, "live_runtime_certification", None)
     ttl = int(ttl_seconds or getattr(live_cfg, "ttl_seconds", 3600) or 3600)
-    result = asyncio.run(certify_live_runtime(
-        config=cfg,
-        runs_root=root,
-        target_url=target_url or str(cfg.portal.base_url or ""),
-        ttl_seconds=ttl,
-        require_pyautogui_mcp=require_pyautogui_mcp,
-        requalify_models=requalify_models,
-    ))
+    try:
+        result = asyncio.run(certify_live_runtime(
+            config=cfg,
+            runs_root=root,
+            target_url=target_url or str(cfg.portal.base_url or ""),
+            ttl_seconds=ttl,
+            require_pyautogui_mcp=require_pyautogui_mcp,
+            requalify_models=requalify_models,
+            progress_path=progress_json or None,
+        ))
+    except BaseException as exc:
+        # V243R25: the Control Center job reads the real error, never a guess.
+        if result_json:
+            from .safe_io import safe_write_json
+            from .security import mask_sensitive_string
+
+            safe_write_json(Path(result_json), {"pass": False, "decision": "NO_GO", "status": "error", "checks": [],
+                                                "error": mask_sensitive_string(f"{type(exc).__name__}: {exc}")[:2000]})
+        raise
+    if result_json:
+        from .safe_io import safe_write_json
+
+        safe_write_json(Path(result_json), result)
     table = Table(title="HIP Live Runtime Certification")
     table.add_column("Check")
     table.add_column("Status")

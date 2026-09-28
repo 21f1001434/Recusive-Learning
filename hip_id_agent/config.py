@@ -1135,6 +1135,9 @@ class LiveRuntimeCertificationConfig(BaseModel):
     require_pyautogui_mcp: bool = False
     latest_certificate_relative_path: str = ".hip_runtime/live_runtime_certificate.json"
     auto_refresh_on_live_readiness: bool = True
+    # V243R25: the Control Center runs the certification in its own process and
+    # stops it when it has not finished within this time (e.g. SSO never done).
+    job_timeout_seconds: int = 1800
     auto_refresh_only_when_mission_idle: bool = True
 
 

@@ -31,18 +31,26 @@ async function proxy(req, url) {
       headers,
       body: ["GET", "HEAD"].includes(req.method) ? undefined : req.body,
       redirect: "manual",
+      // V243R25: Bun's fetch gives up after ~300 s by default and this proxy then
+      // answered 503 "backend unavailable" for a backend that was still working
+      // (a Windows certification waiting for Dell SSO).  The backend bounds its
+      // own work; the proxy never cuts a request short.
+      timeout: false,
     });
   } catch (error) {
+    const timedOut = /timeout|timed out|abort/i.test(String(error?.name || "") + " " + String(error));
     return Response.json({
-      detail: `HIP backend is unavailable at ${API_BASE}`,
+      detail: timedOut ? `The HIP backend at ${API_BASE} did not answer in time` : `HIP backend is unavailable at ${API_BASE}`,
       error: String(error),
-    }, { status: 503 });
+    }, { status: timedOut ? 504 : 503 });
   }
 }
 
 const server = Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
+  // V243R25: the largest idle time Bun allows (its default is 10 s).
+  idleTimeout: 255,
   async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === "/healthz") {

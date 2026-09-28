@@ -14,10 +14,10 @@ async function backendHealthy() {
 }
 
 let backend = null;
-if (await backendHealthy()) {
-  console.log(`HIP FastAPI already healthy at ${API_BASE}; reusing it.`);
-} else {
-  backend = Bun.spawn([
+let stopped = false;
+
+function spawnBackend() {
+  return Bun.spawn([
     python, "-m", "uvicorn", "backend.app:app",
     "--host", "127.0.0.1", "--port", "8000",
   ], {
@@ -27,6 +27,25 @@ if (await backendHealthy()) {
     stdin: "inherit",
     env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONLEGACYWINDOWSSTDIO: "0" },
   });
+}
+
+// V243R25: a backend this launcher started is restarted if it ever exits, so
+// the Control Center does not stay "Backend offline" after a crash.
+async function superviseBackend() {
+  while (!stopped && backend) {
+    const code = await backend.exited;
+    if (stopped) return;
+    console.error(`HIP FastAPI exited (code ${code}); restarting in 2 s ...`);
+    await Bun.sleep(2000);
+    if (stopped) return;
+    backend = spawnBackend();
+  }
+}
+
+if (await backendHealthy()) {
+  console.log(`HIP FastAPI already healthy at ${API_BASE}; reusing it.`);
+} else {
+  backend = spawnBackend();
 
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   let healthy = false;
@@ -45,9 +64,9 @@ if (await backendHealthy()) {
     throw new Error(`HIP FastAPI did not become healthy at ${HEALTH_URL} within ${STARTUP_TIMEOUT_MS}ms.`);
   }
   console.log(`HIP FastAPI healthy at ${API_BASE}.`);
+  superviseBackend();
 }
 
-let stopped = false;
 async function shutdown() {
   if (stopped) return;
   stopped = true;

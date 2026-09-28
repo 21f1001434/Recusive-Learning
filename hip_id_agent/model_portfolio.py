@@ -297,14 +297,22 @@ class OnPremModelPortfolioRouter:
             return []
         rows: List[Dict[str, Any]] = []
         try:
-            with self.usage_path.open("r", encoding="utf-8") as handle:
-                for line in handle:
-                    try:
-                        row = json.loads(line)
-                        if isinstance(row, dict):
-                            rows.append(row)
-                    except Exception:
-                        continue
+            # V243R25: the ledger grows with every model call; the Control Center
+            # polls this every few seconds, so only the end of the file is read.
+            with self.usage_path.open("rb") as handle:
+                handle.seek(0, os.SEEK_END)
+                size = handle.tell()
+                handle.seek(max(0, size - 4096 * max(1, int(limit or 25))))
+                lines = handle.read().decode("utf-8", errors="replace").splitlines()
+            if size > 4096 * max(1, int(limit or 25)):
+                lines = lines[1:]  # the first line may be cut
+            for line in lines:
+                try:
+                    row = json.loads(line)
+                    if isinstance(row, dict):
+                        rows.append(row)
+                except Exception:
+                    continue
         except Exception:
             return []
         return rows[-max(1, int(limit or 25)):]
@@ -580,7 +588,7 @@ class OnPremModelPortfolioRouter:
 
     def manifest(self) -> Dict[str, Any]:
         roles = sorted(set((self.state.get("role_champions") or {}).keys()) | {"planning", "action_selection", "judge", "recovery"})
-        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "primary_text_model": self.primary_text_model(), "default_text_model": self.default_text_model(), "qualification": self._qualification_summary(), "credit_rule": str(self.state.get("credit_rule") or ""), "scored_decisions": {role: sum(int(((self.state.get("models") or {}).get(m, {}).get("roles") or {}).get(role, {}).get("trials") or 0) for m in (self.state.get("models") or {})) for role in ("planning", "action_selection", "judge", "recovery")}, "min_champion_trials": int(self._cfg("min_champion_trials", 3) or 3), "prefer_strongest_model": self._prefer_strongest(), "model_capability": {m: self.capability(m) for m in self.configured_models("text")}, "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": self.recent_usage(25), "recent_distinct_models": sorted({m for row in self.recent_usage(25) for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
+        return mask_sensitive_data({"enabled": bool(self._cfg("enabled", True)), "on_prem_only": True, "text_models": self.configured_models("text"), "available_text_models": self.available_models("text"), "vision_models": self.configured_models("vision"), "embedding_models": self.configured_models("embedding"), "availability": self.availability(), "role_roster": self.role_roster(), "role_champions": dict(self.state.get("role_champions") or {}), "task_champions": dict(self.state.get("task_champions") or {}), "primary_text_model": self.primary_text_model(), "default_text_model": self.default_text_model(), "qualification": self._qualification_summary(), "credit_rule": str(self.state.get("credit_rule") or ""), "scored_decisions": {role: sum(int(((self.state.get("models") or {}).get(m, {}).get("roles") or {}).get(role, {}).get("trials") or 0) for m in (self.state.get("models") or {})) for role in ("planning", "action_selection", "judge", "recovery")}, "min_champion_trials": int(self._cfg("min_champion_trials", 3) or 3), "prefer_strongest_model": self._prefer_strongest(), "model_capability": {m: self.capability(m) for m in self.configured_models("text")}, "cycle": int(self.state.get("cycle") or 0), "rankings": {role: self.rank(role, kind="text")[:5] for role in roles}, "role_eligible_models": {role: self.available_models("text", role=role) for role in roles}, "state_path": str(self.state_path), "trials_path": str(self.trials_path), "dreams_path": str(self.dreams_path), "usage_path": str(self.usage_path), "availability_path": str(self.availability_path), "recent_usage": (recent := self.recent_usage(25)), "recent_distinct_models": sorted({m for row in recent for m in list(row.get("candidate_models") or [])}), "promotion_requires_downstream_evidence": True, "learning_forces_portfolio": bool(self._cfg("force_multi_model_during_learning", True)), "complex_tasks_force_portfolio": bool(self._cfg("force_multi_model_for_complex_tasks", True)), "values_stored": False, "selectors_stored": False, "coordinates_stored": False})
 
 
 def model_portfolio_from_config(app_config: Any) -> OnPremModelPortfolioRouter:

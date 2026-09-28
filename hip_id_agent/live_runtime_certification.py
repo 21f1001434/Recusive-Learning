@@ -75,13 +75,26 @@ def runtime_environment_fingerprint(config: AppConfig) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _failure_reason(evidence: Any) -> str:
+    """V243R25: a failed check always says why (its probe's error / reason)."""
+    if not isinstance(evidence, dict):
+        return ""
+    for key in ("error", "reason", "detail", "warning", "status"):
+        value = evidence.get(key)
+        if value not in (None, "", False, True):
+            return mask_sensitive_string(str(value))[:400]
+    if "platform" in evidence:
+        return f"platform {evidence.get('platform')}: the certification must run on the Windows HIP workstation"
+    return ""
+
+
 def _check(check_id: str, label: str, passed: bool, *, detail: str = "", evidence: Any = None, blocker: bool = True) -> Dict[str, Any]:
     return {
         "id": check_id,
         "label": label,
         "pass": bool(passed),
         "severity": "blocker" if blocker else "warning",
-        "detail": str(detail or ""),
+        "detail": str(detail or ("" if passed else _failure_reason(evidence))),
         "evidence": mask_sensitive_data(evidence) if evidence is not None else None,
     }
 
@@ -241,6 +254,27 @@ def verify_latest_live_runtime_certificate(config: AppConfig, runs_root: str | P
     }
 
 
+class _ProgressChecks(list):
+    """V243R25: every finished check is written to ``progress_path`` at once, so the
+    Control Center shows the certification as it runs (it runs in its own process)."""
+
+    def __init__(self, path: Optional[str | Path] = None):
+        super().__init__()
+        self.path = Path(path) if path else None
+
+    def append(self, item: Dict[str, Any]) -> None:  # type: ignore[override]
+        super().append(item)
+        if self.path is None:
+            return
+        try:
+            safe_write_json(self.path, mask_sensitive_data({
+                "schema_version": "hip.live-runtime-certification-progress.v1", "updated_at": _utc_now(),
+                "last_check": str(item.get("label") or item.get("id") or ""), "checks": list(self),
+            }))
+        except Exception:
+            pass
+
+
 def _qualification_detail(result: Dict[str, Any]) -> str:
     status = str(result.get("status") or "")
     if result.get("locked"):
@@ -276,6 +310,7 @@ async def certify_live_runtime(
     ttl_seconds: int = 3600,
     require_pyautogui_mcp: bool = False,
     requalify_models: bool = False,
+    progress_path: Optional[str | Path] = None,
 ) -> Dict[str, Any]:
     """Perform a non-mutating certification against the actual Windows HIP runtime.
 
@@ -307,7 +342,7 @@ async def certify_live_runtime(
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = Path(runs_root).expanduser() / "live_runtime_certification" / f"CERT-{stamp}"
     safe_mkdir(run_dir, parents=True, exist_ok=True)
-    checks: List[Dict[str, Any]] = []
+    checks: List[Dict[str, Any]] = _ProgressChecks(progress_path)
     checks.append(_check("windows_desktop", "Windows interactive desktop", _is_windows_interactive()["pass"], evidence=_is_windows_interactive()))
     checks.append(_check("target_url", "HIP target URL configured", bool(target and urlparse(target).scheme in {"http", "https"}), evidence={"target": target.split("?", 1)[0]}))
 

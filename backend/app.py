@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import signal
@@ -14,6 +15,7 @@ import secrets
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Query
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -52,7 +54,7 @@ from hip_id_agent.live_readiness import (
     probe_runs_path,
     readiness_fingerprint,
 )
-from hip_id_agent.live_runtime_certification import certify_live_runtime, verify_latest_live_runtime_certificate
+from hip_id_agent.live_runtime_certification import verify_latest_live_runtime_certificate
 from hip_id_agent.semantic_affordance import status as semantic_affordance_status
 from hip_id_agent.semantic_control import semantic_control_mcp_status
 from hip_id_agent.expert_skills import build_context_budget, expert_skill_catalog, infer_execution_from_description, vet_expert_skills
@@ -76,6 +78,8 @@ UTF8_STDIO_STATUS = configure_utf8_stdio()
 RUNTIME_ENV_STATUS = load_runtime_env(ROOT)
 PROCESS_FILE = ROOT / ".backend_runtime" / "process.json"
 LIVE_READINESS_FILE = ROOT / ".backend_runtime" / "live_readiness.json"
+CERT_JOB_FILE = ROOT / ".backend_runtime" / "live_runtime_certification_job.json"
+CERT_JOBS_DIR = ROOT / ".backend_runtime" / "live_runtime_certification_jobs"
 LIVE_READINESS_TTL_SECONDS = 600
 PROCESS_FILE.parent.mkdir(parents=True, exist_ok=True)
 _LOCK = Lock()
@@ -103,6 +107,21 @@ def _is_running(pid: Any) -> bool:
     if pid_i <= 0:
         return False
     if os.name == "nt":
+        # V243R25: ask the kernel directly; spawning tasklist on every 3-second
+        # poll made the status endpoints slow enough to look offline.
+        try:
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            handle = kernel32.OpenProcess(0x1000, False, pid_i)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if handle:
+                code = ctypes.c_ulong()
+                ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+                kernel32.CloseHandle(handle)
+                if ok:
+                    return code.value == 259  # STILL_ACTIVE
+        except Exception:
+            pass
         try:
             out = subprocess.run(["tasklist", "/FI", f"PID eq {pid_i}", "/FO", "CSV", "/NH"], capture_output=True, text=True, timeout=5, check=False)
             return str(pid_i) in (out.stdout or "")
@@ -112,6 +131,19 @@ def _is_running(pid: Any) -> bool:
         os.kill(pid_i, 0); return True
     except OSError:
         return False
+
+
+def _tail_text(path: Path, max_chars: int = 30000) -> str:
+    """V243R25: the last part of a log without reading the whole file (a long
+    mission log was re-read in full on every 3-second status poll)."""
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(0, size - max_chars * 4))
+            return handle.read().decode("utf-8", errors="replace")[-max_chars:]
+    except Exception:
+        return ""
 
 
 def _process_state() -> Dict[str, Any]:
@@ -258,13 +290,14 @@ async def _run_live_readiness(req: LiveReadinessRequest, phases: list[str]) -> D
     if bool(getattr(req, "witness_mode", False)) and str(getattr(req, "api_mode", "capture") or "capture").lower() == "write":
         raise HTTPException(status_code=422, detail="Live witness readiness cannot be run with API write mode.")
     cfg = _cfg(req.config)
-    static = _preflight_for_phases(req, phases)
+    # V243R25: file and model checks run in the thread pool, never on the event loop.
+    static = await run_in_threadpool(_preflight_for_phases, req, phases)
     fingerprint = _readiness_fingerprint_for(req, phases, api_mode=req.api_mode)
     probe_root = ROOT / ".backend_runtime" / "live_readiness_probe"
     probe_root.mkdir(parents=True, exist_ok=True)
     browser = await probe_browser_launch(cfg)
     mcp = await validate_dual_browser_mcps(cfg, probe_root / "mcp")
-    text_probe = test_text_model(ModelAvailabilityRequest(config=req.config))
+    text_probe = await run_in_threadpool(test_text_model, ModelAvailabilityRequest(config=req.config))
     vision_probe = await test_vision_model(ModelAvailabilityRequest(config=req.config))
     runs_root = _resolve_runs_root(req.config, req.runs_dir)
     path_probe = probe_runs_path(runs_root)
@@ -290,6 +323,7 @@ async def _run_live_readiness(req: LiveReadinessRequest, phases: list[str]) -> D
                 target_url=str(cfg.portal.base_url or ""),
                 ttl_seconds=int(getattr(live_cfg, "ttl_seconds", 3600) or 3600),
                 require_pyautogui_mcp=bool(getattr(live_cfg, "require_pyautogui_mcp", False)),
+                config_path=str(req.config),
             )
             runtime_certificate_probe = verify_latest_live_runtime_certificate(cfg, runs_root)
             runtime_certificate_probe = {
@@ -330,6 +364,139 @@ async def _run_live_readiness(req: LiveReadinessRequest, phases: list[str]) -> D
         "receipt": {k: v for k, v in receipt.items() if k != "token"},
         "static_preflight": static,
     }
+
+
+# --------------------------------------------------------------------------
+# V243R25: the Windows live-runtime certification runs in its own process.
+#
+# It opens the headed browser, waits for Dell SSO, probes the MCP servers and
+# Dell AIA and (once) qualifies the models -- minutes of work, part of it
+# blocking.  Run inside the backend it froze every other request, so the
+# Control Center showed "Backend offline" and its own NO_GO placeholder while
+# the certification was still running.  Now the backend starts
+# ``hip_id_agent.cli certify-live-runtime`` as a child process, returns at once,
+# and reports its progress and result from the files the child writes.
+# --------------------------------------------------------------------------
+_CERT_LOCK = Lock()
+_CERT_PROCS: Dict[str, subprocess.Popen] = {}
+
+
+def _certification_command(req: Any, cfg: Any, runs_root: Path, job_dir: Path) -> list[str]:
+    live_cfg = getattr(cfg, "live_runtime_certification", None)
+    ttl = int(getattr(req, "ttl_seconds", 0) or getattr(live_cfg, "ttl_seconds", 3600) or 3600)
+    require_py = bool(getattr(req, "require_pyautogui_mcp", False) or getattr(live_cfg, "require_pyautogui_mcp", False))
+    command = [
+        sys.executable, "-m", "hip_id_agent.cli", "certify-live-runtime",
+        "--config", str(getattr(req, "config", "config.yaml") or "config.yaml"), "--runs-dir", str(runs_root),
+        "--ttl-seconds", str(ttl), "--require-pyautogui-mcp" if require_py else "--allow-missing-pyautogui-mcp",
+        "--result-json", str(job_dir / "result.json"), "--progress-json", str(job_dir / "progress.json"),
+    ]
+    if str(getattr(req, "target_url", "") or "").strip():
+        command += ["--target-url", str(req.target_url).strip()]
+    if bool(getattr(req, "requalify_models", False)):
+        command.append("--requalify-models")
+    return command
+
+
+def _certification_job_timeout(cfg: Any = None) -> int:
+    return int(getattr(getattr(cfg, "live_runtime_certification", None), "job_timeout_seconds", 1800) or 1800)
+
+
+def _certification_job_state() -> Dict[str, Any]:
+    job = _read_json(CERT_JOB_FILE, {}) or {}
+    if not isinstance(job, dict) or not job.get("job_id"):
+        return {"status": "none"}
+    job_dir = Path(str(job.get("job_dir") or ""))
+    result = _read_json(job_dir / "result.json", None)
+    progress = _read_json(job_dir / "progress.json", {}) or {}
+    proc = _CERT_PROCS.get(str(job["job_id"]))
+    exit_code = proc.poll() if proc is not None else None
+    alive = (exit_code is None) if proc is not None else _is_running(job.get("pid"))
+    elapsed = max(0.0, time.time() - float(job.get("started_epoch") or time.time()))
+    timeout = int(job.get("timeout_seconds") or 1800)
+    if isinstance(result, dict) and result:
+        status = "done"
+    elif alive and elapsed > timeout:
+        _kill_process_tree(int(job.get("pid") or 0))
+        status, alive = "failed", False
+        job["timed_out"] = True
+    elif alive:
+        status = "running"
+    else:
+        status = "failed"
+    out: Dict[str, Any] = {
+        "job_id": job["job_id"], "status": status, "pid": job.get("pid"), "started_at": job.get("started_at"),
+        "elapsed_seconds": round(elapsed, 1), "source": job.get("source"), "requalify_models": bool(job.get("requalify_models")),
+        "checks": list(progress.get("checks") or []), "last_check": progress.get("last_check") or "",
+    }
+    if status == "done":
+        out["result"] = result
+    if status == "failed":
+        tail = _tail_text(job_dir / "certification.log", 6000)
+        out["error"] = (f"The certification did not finish within {timeout} s and was stopped." if job.get("timed_out") else
+                        f"The certification process ended without a result (exit code {exit_code if exit_code is not None else 'unknown'}).")
+        out["log_tail"] = mask_sensitive_string(tail)
+    if status != job.get("status"):
+        job["status"] = status
+        job["finished_epoch"] = time.time()
+        _write_json(CERT_JOB_FILE, job)
+    return out
+
+
+def _kill_process_tree(pid: int) -> None:
+    if pid <= 0:
+        return
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True, timeout=15, check=False)
+        else:
+            os.kill(pid, signal.SIGTERM)
+    except Exception:
+        pass
+
+
+def _start_certification_job(req: Any, *, source: str = "control_center") -> Dict[str, Any]:
+    with _CERT_LOCK:
+        state = _certification_job_state()
+        if state.get("status") == "running":
+            return {**state, "already_running": True}
+        if bool(_process_state().get("running")):
+            raise HTTPException(status_code=409, detail="Stop the active mission before running live runtime certification.")
+        cfg = _cfg(req.config)
+        runs_root = _resolve_runs_root(req.config, req.runs_dir)
+        job_id = "CERT-JOB-" + time.strftime("%Y%m%d-%H%M%S") + f"-{secrets.token_hex(3)}"
+        job_dir = CERT_JOBS_DIR / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        command = _certification_command(req, cfg, runs_root, job_dir)
+        env = os.environ.copy(); env["PYTHONUNBUFFERED"] = "1"; env["PYTHONUTF8"] = "1"; env["PYTHONIOENCODING"] = "utf-8"; env["PYTHONLEGACYWINDOWSSTDIO"] = "0"
+        flags = int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)) if os.name == "nt" else 0
+        with (job_dir / "certification.log").open("a", encoding="utf-8") as log:
+            proc = subprocess.Popen(command, cwd=str(ROOT), stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                    env=env, creationflags=flags, close_fds=(os.name != "nt"))
+        _CERT_PROCS[job_id] = proc
+        _write_json(CERT_JOB_FILE, {
+            "job_id": job_id, "pid": proc.pid, "status": "running", "source": source, "job_dir": str(job_dir),
+            "started_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "started_epoch": time.time(),
+            "timeout_seconds": _certification_job_timeout(cfg), "requalify_models": bool(getattr(req, "requalify_models", False)),
+        })
+        return _certification_job_state()
+
+
+async def certify_live_runtime(
+    *, config: Any = None, runs_root: Any = None, target_url: str = "", ttl_seconds: int = 0, require_pyautogui_mcp: bool = False,
+    requalify_models: bool = False, config_path: str = "config.yaml", source: str = "live_readiness_auto_refresh",
+) -> Dict[str, Any]:
+    """Run the certification as a child process and await it without blocking the backend."""
+    req = LiveRuntimeCertificationRequest(
+        config=config_path, runs_dir=str(runs_root or "./runs"), target_url=target_url or "", ttl_seconds=int(ttl_seconds or 0),
+        require_pyautogui_mcp=bool(require_pyautogui_mcp), requalify_models=bool(requalify_models))
+    state = await run_in_threadpool(_start_certification_job, req, source=source)
+    while state.get("status") == "running":
+        await asyncio.sleep(2.0)
+        state = await run_in_threadpool(_certification_job_state)
+    if state.get("status") == "done":
+        return dict(state.get("result") or {})
+    return {"pass": False, "decision": "NO_GO", "status": "error", "blockers": [], "error": state.get("error"), "log_tail": state.get("log_tail", "")}
 
 
 def _start_cli(command: list[str], *, runs_dir: str = "", extra_environment: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
@@ -756,8 +923,35 @@ async def test_vision_model(req: ModelAvailabilityRequest) -> Dict[str, Any]:
         }
 
 
+_RUNTIME_STATUS_LAST: Dict[str, Dict[str, Any]] = {}
+_RUNTIME_STATUS_LOCK = Lock()
+
+
 @app.get("/api/runtime/status")
 def runtime_status(config: str = "config.yaml") -> Dict[str, Any]:
+    """V243R25: overlapping polls share one computation (a poll that arrives while
+    another is computing gets the last status at once), and an error in one
+    manifest returns a degraded status instead of an HTTP 500 -- both used to
+    turn the Control Center badge into "Backend offline"."""
+    last = _RUNTIME_STATUS_LAST.get(config)
+    if last is None:
+        _RUNTIME_STATUS_LOCK.acquire()
+    elif not _RUNTIME_STATUS_LOCK.acquire(blocking=False):
+        return {**last["payload"], "status_age_seconds": round(time.monotonic() - last["at"], 1), "shared_with_running_poll": True}
+    try:
+        payload = _runtime_status_payload(config)
+        _RUNTIME_STATUS_LAST[config] = {"at": time.monotonic(), "payload": payload}
+        return payload
+    except HTTPException:
+        raise
+    except Exception as exc:
+        base = dict((last or {}).get("payload") or {"process": _process_state()})
+        return {**base, "degraded": True, "status_error": mask_sensitive_string(f"{type(exc).__name__}: {exc}")[:600]}
+    finally:
+        _RUNTIME_STATUS_LOCK.release()
+
+
+def _runtime_status_payload(config: str = "config.yaml") -> Dict[str, Any]:
     # A freshly installed wheel may be launched before the operator has copied a
     # project config beside it.  The Control Center must still boot and explain
     # what is missing rather than converting first-run setup into an HTTP 500.
@@ -808,6 +1002,10 @@ def runtime_status(config: str = "config.yaml") -> Dict[str, Any]:
             },
         }
     latest = latest_certification(cfg.reporting.runs_dir)
+    # Built once per status (each used to be constructed two or three times).
+    portfolio = model_portfolio_from_config(cfg)
+    replay = replay_policy_engine_from_config(cfg)
+    skills = _skill_library(cfg)
     return {
         "runtime_env": {
             "loaded": bool((RUNTIME_ENV_STATUS or {}).get("loaded")),
@@ -819,22 +1017,19 @@ def runtime_status(config: str = "config.yaml") -> Dict[str, Any]:
         "skill_induction": {
             "enabled": bool(cfg.skill_induction.enabled),
             "fast_replay_enabled": bool(cfg.skill_induction.fast_replay_enabled),
-            **_skill_library(cfg).manifest(),
+            **skills.manifest(),
         },
         "replay_policy": {
             "enabled": bool(cfg.replay_policy.enabled),
             "dreaming_enabled": bool(cfg.replay_policy.dreaming_enabled),
-            **replay_policy_engine_from_config(cfg).manifest(),
+            **replay.manifest(),
         },
-        "model_portfolio": model_portfolio_from_config(cfg).manifest(),
+        "model_portfolio": portfolio.manifest(),
         "portal_skills": _portal_skills_totals(cfg),
         "recursive_self_improvement": recursive_improvement_from_config(
-            cfg, replay_policy=replay_policy_engine_from_config(cfg),
-            model_portfolio=model_portfolio_from_config(cfg), skill_library=_skill_library(cfg)
+            cfg, replay_policy=replay, model_portfolio=portfolio, skill_library=skills
         ).manifest(),
-        "trace_self_repair": trace_self_repair_from_config(
-            cfg, model_portfolio=model_portfolio_from_config(cfg)
-        ).manifest(),
+        "trace_self_repair": trace_self_repair_from_config(cfg, model_portfolio=portfolio).manifest(),
         "deterministic_recipe": deterministic_recipe_from_config(cfg).manifest(),
         "human_in_the_loop": human_teaching_from_config(cfg).manifest(),
         "human_phase_review": human_phase_review_from_config(cfg).manifest(),
@@ -1058,22 +1253,29 @@ def mission_description_plan(req: DescriptionPlanRequest) -> Dict[str, Any]:
 
 
 @app.post("/api/mission/live-runtime-certification")
-async def mission_live_runtime_certification(req: LiveRuntimeCertificationRequest) -> Dict[str, Any]:
-    if bool(_process_state().get("running")):
-        raise HTTPException(status_code=409, detail="Stop the active mission before running live runtime certification.")
-    cfg = _cfg(req.config)
-    runs_root = _resolve_runs_root(req.config, req.runs_dir)
-    live_cfg = getattr(cfg, "live_runtime_certification", None)
-    ttl = int(req.ttl_seconds or getattr(live_cfg, "ttl_seconds", 3600) or 3600)
-    require_py = bool(req.require_pyautogui_mcp if req.require_pyautogui_mcp is not None else getattr(live_cfg, "require_pyautogui_mcp", False))
-    return await certify_live_runtime(
-        config=cfg,
-        runs_root=runs_root,
-        target_url=req.target_url or str(cfg.portal.base_url or ""),
-        ttl_seconds=ttl,
-        require_pyautogui_mcp=require_py,
-        requalify_models=bool(req.requalify_models),
-    )
+async def mission_live_runtime_certification(req: LiveRuntimeCertificationRequest, wait: bool = False) -> Dict[str, Any]:
+    """V243R25: starts the certification in its own process and returns at once
+    (``status: running``); poll ``/api/mission/live-runtime-certification/status``.
+    ``wait=true`` awaits the certificate (without blocking the backend)."""
+    state = await run_in_threadpool(_start_certification_job, req)
+    while wait and state.get("status") == "running":
+        await asyncio.sleep(2.0)
+        state = await run_in_threadpool(_certification_job_state)
+    return state
+
+
+@app.get("/api/mission/live-runtime-certification/status")
+def mission_live_runtime_certification_status() -> Dict[str, Any]:
+    return _certification_job_state()
+
+
+@app.post("/api/mission/live-runtime-certification/stop")
+def mission_live_runtime_certification_stop() -> Dict[str, Any]:
+    state = _certification_job_state()
+    if state.get("status") != "running":
+        return {"status": "not_running", "job": state}
+    _kill_process_tree(int(state.get("pid") or 0))
+    return {"status": "stopped", "job_id": state.get("job_id")}
 
 
 @app.post("/api/mission/live-readiness")
@@ -1299,8 +1501,7 @@ def discovery_status() -> Dict[str, Any]:
     log_path = Path(str(state.get("log_path") or ""))
     tail = ""
     if log_path.is_file():
-        try: tail = log_path.read_text(encoding="utf-8", errors="replace")[-30000:]
-        except Exception: pass
+        tail = _tail_text(log_path, 30000)
     return {**state, "console_tail": tail}
 
 

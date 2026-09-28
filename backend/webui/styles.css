@@ -23,3 +23,6 @@
 .decision-timeline{display:grid;gap:7px}.decision-row{display:grid;grid-template-columns:88px 120px 1fr auto;gap:8px;align-items:center;background:#0a1018;border:1px solid #212d3e;border-radius:7px;padding:7px 8px;font-size:10px}.decision-row time{color:#8792a3}.decision-row .decision-event{font-weight:800;text-transform:uppercase;letter-spacing:.05em}.decision-row .decision-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.decision-row .decision-state{font-weight:800}.decision-row.verified{border-color:#24583f}.decision-row.failed{border-color:#6c3441}.decision-row.acting{border-color:#76562c}.decision-row.selecting{border-color:#594071}
 @media(max-width:1350px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.visual-counter-grid{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:760px){.metrics{grid-template-columns:1fr 1fr}.visual-counter-grid{grid-template-columns:repeat(2,1fr)}.adaptive-stats{grid-template-columns:1fr}.decision-row{grid-template-columns:80px 95px 1fr}.decision-row .decision-state{display:none}}
+
+/* V243R25: the certification's own log when it could not complete */
+.log-tail { max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 11px; background: rgba(0,0,0,.25); padding: 8px; border-radius: 6px; margin-top: 8px; }

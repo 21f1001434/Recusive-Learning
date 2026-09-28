@@ -1,3 +1,36 @@
+# V243R25 — Backend stays online; the Windows certification runs in its own process and shows its real result (2026-09-28)
+
+- The NO_GO certification on screen was the Control Center's placeholder for a failed request (`blocker_count: 1`, `checks: []`), not a certification result.
+- `backend.app`:
+  - the certification runs as a child process (`_start_certification_job` → `hip_id_agent.cli certify-live-runtime --result-json --progress-json`);
+  - `POST /api/mission/live-runtime-certification` returns the job at once (`?wait=true` awaits it without blocking);
+  - `GET …/status` (running / done / failed, with checks so far, result, or error and log tail);
+  - `POST …/stop`;
+  - one job at a time;
+  - `live_runtime_certification.job_timeout_seconds` (1800);
+  - the module-level `certify_live_runtime` (used by the Live GO/NO-GO renewal) awaits the child process.
+- `_run_live_readiness`: `test_text_model` and `_preflight_for_phases` run in the thread pool.
+- Status endpoints:
+  - `_tail_text` reads the end of the mission log;
+  - `_is_running` uses `OpenProcess` / `GetExitCodeProcess` on Windows before `tasklist`;
+  - `runtime_status`: overlapping polls share one computation (`shared_with_running_poll`), an exception gives `degraded` + `status_error` (HTTP 200), and the portfolio, replay policy and skill library are built once.
+- `OnPremModelPortfolioRouter.recent_usage` reads the end of the usage ledger.
+- `live_runtime_certification`:
+  - `certify_live_runtime(progress_path=)` writes every finished check (`_ProgressChecks`);
+  - a failed check's detail is its probe's error (`_failure_reason`).
+- `cli certify-live-runtime --result-json --progress-json`: the certificate, or the error, is written to the result file.
+- `webui/server.js`:
+  - the proxy uses `timeout: false` (Bun's default fetch timeout returned 503 after ~290 s);
+  - `idleTimeout: 255`;
+  - a timeout answers 504 "did not answer in time".
+- `webui/platform.js` restarts a backend it started when it exits.
+- `webui/app.js`:
+  - `api(…, {timeoutMs})`;
+  - one status poll at a time; "Backend busy" before "Backend offline" (unreachable, or three failures in a row); partial status shown;
+  - the certification is started, followed (`followCertificationJob`, also after a page reload or an automatic renewal) and rendered with live checks, or "Not completed" with the real error and log;
+  - Live GO/NO-GO failures show "NOT COMPLETED" with the reason.
+- Tests: `tests/test_v243r25_backend_responsive_certification_job.py` (15).
+
 # V243R24 — One-time live model qualification; Edit / Clone / Migrate through the row expander (2026-09-27)
 
 - `model_qualification` (new):

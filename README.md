@@ -1,3 +1,15 @@
+## V243R25 — The backend stays online; the Windows certification shows its real result (2026-09-28)
+
+- **The NO_GO with 1 blocker and "No rows available" was not a real result.** The certification ran inside the backend and froze it, which is why the page said "Backend offline". The web proxy also gave up after about 5 minutes. The page then showed its own NO_GO placeholder.
+- **Now the certification runs in its own process.** The backend answers immediately and stays responsive. The panel shows each check as it finishes, then GO or NO_GO with the reason on every failing row. If it cannot finish, it says why and shows the log.
+- **Steadier status:**
+  - the proxy never cuts a request short;
+  - the backend is restarted automatically if it exits;
+  - status polls are cheaper and never overlap;
+  - one slow answer shows "Backend busy", not "offline".
+
+See `V243R25_BACKEND_RESPONSIVE_CERTIFICATION_JOB_20260928.md`. Apply with `APPLY_V243R25_IN_PLACE.ps1`; it includes R13–R24. Restart `bun run platform` afterwards.
+
 ## V243R24 — The model is chosen once by live task performance; Edit / Clone / Migrate go through the row's expander (2026-09-27)
 
 - **Model selection on a live task, once.** Run **Certify Windows runtime** (Live GO/NO-GO) once:
