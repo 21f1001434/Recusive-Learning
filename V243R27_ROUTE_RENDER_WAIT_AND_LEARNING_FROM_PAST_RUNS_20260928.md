@@ -146,6 +146,7 @@ Settings (`run_history_learning`): `enabled`, `apply_at_mission_start`, `include
 | Full suite (202 files) | 1,504 passed, 1 skipped (before the MLflow environment fix and its test; the R27 and MLflow files were re-run after it: 36 passed). Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
 | 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
 | Dependencies | `mlflow-skinny==3.16.1` with `protobuf` 5.29.6: `pip check` reports no broken requirements (autogen-core 0.7.5 needs ~=5.29.3) |
+| Package `HIP_PORTAL_V243R27_FINAL_FULL_E2E_20260928.zip` | Every tracked file identical to the branch; the three wheels match the source; the R13–R27 install smoke checks (49) pass from the extracted package; 70 tests pass from it (R27, R25, navigation controller, MLflow, self-heal, session, Control Center, input contract incl. the upload assets) |
 | `VERIFY_V243R27_INSTALL.ps1` R27 smoke checks | `R27_ROUTE_RENDER_WAIT_AND_MODEL_KEPT_OK`, `R27_RUN_HISTORY_LEARNING_OK`, `R27_MLFLOW_LOCAL_STORE_OK` (and the R26 checks it calls first) |
 
 ## Apply
