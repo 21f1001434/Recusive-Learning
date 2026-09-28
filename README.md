@@ -1,3 +1,11 @@
+## V243R26 — A filled Document Type is kept, retries get time, the section above is filled first (2026-09-28)
+
+- **A completely filled form is no longer thrown away.** When every field is filled and verified, the attempt gets time to finish its checks. If it is stopped anyway and the live form is exact, the mission goes on to the judges instead of reopening a blank form.
+- **Every retry gets at least 15 minutes**, and its progress is counted on its own. Attempt 4 used to get only the leftovers of the phase budget.
+- **The section above first.** Before a field is filled, the dropdowns it depends on are read back. For the Document Type that is Data Format Type, then Operation, then Derived From. One the portal cleared is selected again first, so the dropdowns below always have their values.
+
+See `V243R26_COMPLETE_ATTEMPT_KEPT_PARENT_FIRST_20260928.md`. Apply with `APPLY_V243R26_IN_PLACE.ps1`; it includes R13–R25.
+
 ## V243R25 — The backend stays online; the Windows certification shows its real result (2026-09-28)
 
 - **The NO_GO with 1 blocker and "No rows available" was not a real result.** The certification ran inside the backend and froze it, which is why the page said "Backend offline". The web proxy also gave up after about 5 minutes. The page then showed its own NO_GO placeholder.

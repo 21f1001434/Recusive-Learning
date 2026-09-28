@@ -2988,6 +2988,32 @@ class BrowserSession:
             pass
         return audit
 
+    def begin_phase_attempt_progress(self, phase: str) -> Dict[str, Any]:
+        """V243R25: progress is measured per attempt.
+
+        Fields verified by an earlier attempt stay in the page's verified set,
+        so an attempt that refilled a reopened form looked like "no new verified
+        field" and was stopped by the phase budget.  Each attempt now starts with
+        its own verified set, fill/click baseline and "form complete" flag.
+        """
+        phase = str(phase or self._active_phase_name or "")
+        cleared = 0
+        for page in {id(p): p for p in [getattr(self, "page", None), *(getattr(getattr(self, "context", None), "pages", []) or [])] if p is not None}.values():
+            verified = getattr(page, "_hip_verified_nodes", None)
+            if isinstance(verified, set):
+                stale = {n for n in verified if str(n).startswith(f"{phase}|")}
+                verified.difference_update(stale)
+                cleared += len(stale)
+            complete = getattr(page, "_hip_fill_complete", None)
+            if isinstance(complete, dict):
+                complete.pop(phase, None)
+        baselines = getattr(self, "_progress_event_baseline", None)
+        if not isinstance(baselines, dict):
+            baselines = {}
+            self._progress_event_baseline = baselines
+        baselines[phase] = len(self.action_events)
+        return {"phase": phase, "cleared_verified_nodes": cleared, "event_baseline": baselines[phase]}
+
     async def capture_phase_progress_marker(self, phase: str = "") -> Dict[str, Any]:
         """Return a value-free structural fingerprint for active no-progress detection.
 
@@ -3061,15 +3087,19 @@ class BrowserSession:
             }
         raw = json.dumps(basis, sort_keys=True, ensure_ascii=False, default=str)
         signature = hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
-        successful_fills = sum(1 for ev in self.action_events if getattr(ev, "type", "") == "fill" and bool(getattr(ev, "success", False)))
-        successful_clicks = sum(1 for ev in self.action_events if getattr(ev, "type", "") == "click" and bool(getattr(ev, "success", False)))
+        # V243R25: counted from this attempt's start (begin_phase_attempt_progress).
+        baseline = int((getattr(self, "_progress_event_baseline", None) or {}).get(str(phase or self._active_phase_name or ""), 0) or 0)
+        attempt_events = self.action_events[baseline:] if baseline <= len(self.action_events) else list(self.action_events)
+        successful_fills = sum(1 for ev in attempt_events if getattr(ev, "type", "") == "fill" and bool(getattr(ev, "success", False)))
+        successful_clicks = sum(1 for ev in attempt_events if getattr(ev, "type", "") == "click" and bool(getattr(ev, "success", False)))
         # V243R22: progress units that a loop cannot inflate -- distinct fields the
         # executor verified, committed fills, and distinct targets clicked.
         verified_nodes = getattr(page, "_hip_verified_nodes", None)
         prefix = f"{phase or self._active_phase_name or ''}|"
         verified_node_count = len([n for n in verified_nodes if str(n).startswith(prefix)]) if isinstance(verified_nodes, set) else 0
-        distinct_click_targets = len({str(getattr(ev, "target", "")) for ev in self.action_events
+        distinct_click_targets = len({str(getattr(ev, "target", "")) for ev in attempt_events
                                       if getattr(ev, "type", "") == "click" and bool(getattr(ev, "success", False))})
+        fill_complete = bool((getattr(page, "_hip_fill_complete", None) or {}).get(str(phase or self._active_phase_name or "")))
         route = ""
         try:
             route = urlparse(str(page.url or "")).path
@@ -3086,6 +3116,8 @@ class BrowserSession:
             "verified_node_count": verified_node_count,
             "distinct_click_target_count": distinct_click_targets,
             "progress_units": verified_node_count + successful_fills + distinct_click_targets,
+            # Every field of the phase is filled and verified: the attempt is finishing.
+            "fill_complete": fill_complete,
             "dom_transition_count": len(self.dom_transition_records),
             # Form-executor heartbeat (field/retry token, no values).
             "executor_progress": str(((getattr(page, "_hip_executor_progress", None) or {}).get("token")) or ""),

@@ -529,6 +529,11 @@ runtime_self_heal:
   # instead of being cancelled mid-form and handed to a human.
   progress_extension_seconds: 900
   max_progress_extensions: 8
+  # V243R25: each retry gets at least 15 minutes; a completely filled form gets
+  # up to 2 x 10 minutes to finish its checks instead of being reopened blank.
+  min_attempt_seconds: 900
+  finalize_grace_seconds: 600
+  max_finalize_extensions: 2
   no_progress_watchdog_seconds: 90
   no_progress_poll_seconds: 5
   no_progress_recent_signature_limit: 12

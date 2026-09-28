@@ -1767,6 +1767,18 @@ def _begin_executor_run(page: Any) -> None:
         pass
 
 
+def _mark_fill_complete(page: Any, phase: str) -> None:
+    """V243R25: every node of the phase is filled and verified on this page."""
+    try:
+        complete = getattr(page, "_hip_fill_complete", None)
+        if not isinstance(complete, dict):
+            complete = {}
+            setattr(page, "_hip_fill_complete", complete)
+        complete[str(phase)] = True
+    except Exception:
+        pass
+
+
 def publish_executor_progress(page: Any, *, phase: str, node: Dict[str, Any], stage: str, retry: int = 0) -> None:
     """Heartbeat for the phase no-progress watchdog.
 
@@ -1800,6 +1812,60 @@ def publish_executor_progress(page: Any, *, phase: str, node: Dict[str, Any], st
 
 def _node_time_budget_seconds(profile: Dict[str, Any]) -> float:
     return max(5.0, float(profile.get("node_time_budget_ms", 75000) or 75000) / 1000.0)
+
+
+async def _restore_reset_parents(
+    page: Page,
+    graph: Dict[str, Any],
+    node: Dict[str, Any],
+    *,
+    phase: str,
+    controls: List[Dict[str, Any]],
+    node_status: Dict[str, bool],
+    node_by_id: Dict[str, Dict[str, Any]],
+    document_type: bool,
+) -> Dict[str, Any]:
+    """V243R25: the section above must be right before the field below is filled.
+
+    On the live Document Type form the lower dropdowns (Operation, Derived From,
+    Usage, Validation Type) list values only while Data Format Type -- and each
+    row's own parent -- holds its value.  A late portal response can clear a
+    parent that was already verified; every child dropdown then opens empty and
+    its retries burn the attempt's time.  Before a node runs, each verified
+    dropdown ancestor is read back from the live form, and one the portal
+    cleared or changed is selected again first (root first).
+    """
+    audit: Dict[str, Any] = {"checked": [], "restored": []}
+    resolver = resolve_document_type_control_diagnostics if document_type else resolve_stateful_control_diagnostics
+    equal = _value_equal if document_type else _stateful_value_equal
+    order = {str(n.get("node_id")): i for i, n in enumerate(graph.get("nodes") or []) if isinstance(n, dict)}
+    ancestors: List[str] = []
+    frontier = [str(x) for x in structural_dependencies(graph, node)]
+    while frontier:
+        pid = frontier.pop()
+        if pid in ancestors or pid not in node_by_id:
+            continue
+        ancestors.append(pid)
+        frontier.extend(str(x) for x in structural_dependencies(graph, node_by_id[pid]))
+    root = None
+    for pid in sorted(ancestors, key=lambda x: order.get(x, 0)):
+        parent = node_by_id.get(pid) or {}
+        if node_status.get(pid) is not True or str(parent.get("action") or "") != "select_single":
+            continue
+        control = (resolver(controls, parent) or {}).get("control")
+        if not isinstance(control, dict):
+            continue
+        audit["checked"].append(pid)
+        if equal(parent, control):
+            continue
+        root = root or await get_active_form_root(page, phase)
+        ok = await select_dds_combobox(page, root, str(control.get("selector") or ""), str(parent.get("expected_value") or ""), phase=phase)
+        audit["restored"].append({"node_id": pid, "field": parent.get("field_key"), "row_index": parent.get("row_index"), "ok": bool(ok)})
+        if ok:
+            await page.wait_for_timeout(300)
+            controls = await (capture_document_type_controls(page) if document_type else capture_stateful_controls(page, phase))
+            controls, _ = _apply_repeatable_row_bindings(controls, graph)
+    return audit
 
 
 async def execute_document_type_state_graph(
@@ -1844,6 +1910,7 @@ async def execute_document_type_state_graph(
     execution_profile = derive_execution_profile(initial_form_model, graph)
     interaction_profile = dict(execution_profile.get("profile") or {})
     completed_node_ids: List[str] = []
+    parent_restorations: List[Dict[str, Any]] = []
     node_by_id = {str(n.get("node_id")): n for n in graph.get("nodes", []) if isinstance(n, dict)}
 
     for order, node in enumerate(graph.get("nodes", []) if isinstance(graph.get("nodes"), list) else [], start=1):
@@ -1875,6 +1942,12 @@ async def execute_document_type_state_graph(
         # Cached controls are evidence only; they are never durable locators.
         before = await capture_document_type_controls(page)
         before, row_binding_before = _apply_repeatable_row_bindings(before, graph)
+        restore = await _restore_reset_parents(
+            page, graph, node, phase=phase, controls=before, node_status=node_status, node_by_id=node_by_id, document_type=True)
+        if restore.get("restored"):
+            parent_restorations.append({"before_node": node.get("node_id"), **restore})
+            before = await capture_document_type_controls(page)
+            before, row_binding_before = _apply_repeatable_row_bindings(before, graph)
         base_binding = resolve_document_type_control_diagnostics(before, node)
         node, action_model_plan, representation_before = await _agentq_plan_node(
             page, phase=phase, node=node, controls=before, binding=base_binding, surface_gate=surface_gate
@@ -2275,6 +2348,8 @@ async def execute_document_type_state_graph(
         "writable_attempt_count": len(writable_attempts),
         "phase_specific_transaction_model": "document_type",
     }
+    if not failed:
+        _mark_fill_complete(page, phase)
     return mask_sensitive_data({
         "schema_version": "hip.stateful-form-execution.v1",
         "phase": phase,
@@ -2289,6 +2364,7 @@ async def execute_document_type_state_graph(
         "observed_dependency_edges": observed_edges,
         "node_status": node_status,
         "ordering_predecessor_failures": ordering_predecessor_failures,
+        "parent_restorations": parent_restorations,
         "initial_form_state_model": initial_form_model,
         "final_form_state_model": final_form_model,
         "initial_repeatable_row_binding": initial_row_binding,
@@ -3234,6 +3310,7 @@ async def execute_phase_state_graph(
     execution_profile = derive_execution_profile(initial_form_model, graph)
     interaction_profile = dict(execution_profile.get("profile") or {})
     node_by_id = {str(n.get("node_id")): n for n in selected_nodes if isinstance(n, dict)}
+    parent_restorations: List[Dict[str, Any]] = []
     current_controls = initial_controls
 
     # v2.2.5: live missions must prove the execution pipeline itself before any
@@ -3399,6 +3476,12 @@ async def execute_phase_state_graph(
         # Cached controls are evidence only; they are never durable locators.
         before = await capture_stateful_controls(page, phase)
         before, row_binding_before = _apply_repeatable_row_bindings(before, graph)
+        restore = await _restore_reset_parents(
+            page, graph, node, phase=phase, controls=before, node_status=node_status, node_by_id=node_by_id, document_type=False)
+        if restore.get("restored"):
+            parent_restorations.append({"before_node": node.get("node_id"), **restore})
+            before = await capture_stateful_controls(page, phase)
+            before, row_binding_before = _apply_repeatable_row_bindings(before, graph)
         base_binding = resolve_stateful_control_diagnostics(before, node)
         node, action_model_plan, representation_before = await _agentq_plan_node(
             page, phase=phase, node=node, controls=before, binding=base_binding, surface_gate=surface_gate
@@ -3864,6 +3947,8 @@ async def execute_phase_state_graph(
     agentq_phase_summary = await _agentq_finalize_phase(
         page, phase=phase, controls=final_controls, success=not failed, surface_gate=surface_gate
     )
+    if not failed and not section:
+        _mark_fill_complete(page, phase)
     return mask_sensitive_data({
         "schema_version": "hip.stateful-form-execution.v2",
         "phase": phase, "section": section or "all", "graph_id": graph.get("graph_id"),
@@ -3872,6 +3957,7 @@ async def execute_phase_state_graph(
         "strict_live_execution": bool(strict_live_execution), "execution_stage_audit": strict_stage_audit,
         "node_status": node_status, "final_controls": final_controls,
         "ordering_predecessor_failures": ordering_predecessor_failures,
+        "parent_restorations": parent_restorations,
         "initial_form_state_model": initial_form_model, "final_form_state_model": final_form_model,
         "completed_node_ids": completed_node_ids,
         "dependency_execution_contract": dependency_contract,

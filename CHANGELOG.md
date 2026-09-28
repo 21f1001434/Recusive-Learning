@@ -1,3 +1,16 @@
+# V243R26 — A filled Document Type is kept, retries get time, the section above is filled first (2026-09-28)
+
+- `phase_progress.run_with_progress_budget(checkpoint_provider=, finalize_seconds=, max_finalize_extensions=)`:
+  - a marker with `fill_complete` earns `finalize_seconds` (`extended_to_finish_verification`);
+  - before any stop, the live form is re-proved read-only; when exact, it raises `HIP_PHASE_EXACT_STATE_POST_COMPLETION_STALL` (the mission's existing no-replay path) instead of `HIP_PHASE_NO_PROGRESS_WATCHDOG`.
+- `BrowserSession.begin_phase_attempt_progress`: per-attempt verified-field set, fill/click baseline and `fill_complete`; `capture_phase_progress_marker` counts from the attempt's baseline and reports `fill_complete`.
+- `stateful_form_runtime`:
+  - `_mark_fill_complete` when an executor passes the whole phase;
+  - `_restore_reset_parents` re-reads every verified dropdown ancestor of a node (root first) and re-selects one the portal cleared, in both the Document Type and the generic executors (`parent_restorations` in the result).
+- `dummy_fill_e2e`: each attempt's budget is at least `runtime_self_heal.min_attempt_seconds` (900); `begin_phase_attempt_progress` runs before each attempt; the budget receives the read-only checkpoint provider and the finalize settings (`finalize_grace_seconds` 600, `max_finalize_extensions` 2).
+- Replica `document_type_full_dds.html`: `__liveOptionsAfterFormat`, `__formatAfterTransaction` / `__transactionRequestMs`, `__formatResetOnceAfterMs`.
+- Tests: `tests/test_v243r26_complete_attempt_kept_parent_first.py` (8).
+
 # V243R25 — Backend stays online; the Windows certification runs in its own process and shows its real result (2026-09-28)
 
 - The NO_GO certification on screen was the Control Center's placeholder for a failed request (`blocker_count: 1`, `checks: []`), not a certification result.

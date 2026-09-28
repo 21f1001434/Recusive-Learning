@@ -227,6 +227,9 @@ async def run_with_progress_budget(
     marker_provider: Callable[[], Awaitable[Dict[str, Any]]],
     extend: Callable[[int], Dict[str, Any]],
     evidence_path: Optional[str | Path] = None,
+    checkpoint_provider: Optional[Callable[[], Any]] = None,
+    finalize_seconds: float = 600.0,
+    max_finalize_extensions: int = 2,
 ) -> Any:
     """``asyncio.wait_for`` for a phase attempt, except progress earns time.
 
@@ -236,14 +239,27 @@ async def run_with_progress_budget(
     is asked for more time (it grants a bounded number of extensions).  With no
     new progress, or no extension left, the attempt is cancelled and
     ``asyncio.TimeoutError`` is raised exactly as before.
+
+    V243R25: an attempt whose form is already completely filled and verified
+    (``fill_complete`` in the marker) is finishing its read-back / evidence work:
+    it gets ``finalize_seconds`` more (at most ``max_finalize_extensions`` times)
+    instead of being cancelled as "no new verified field".  Before any stop, the
+    live form is re-proved read-only (``checkpoint_provider``); when it is exact
+    the stop is reported as ``HIP_PHASE_EXACT_STATE_POST_COMPLETION_STALL`` so the
+    mission continues to the judges instead of reopening a blank form.
     """
     task = asyncio.ensure_future(operation)
+    last_marker: Dict[str, Any] = {}
 
     async def units() -> int:
+        nonlocal last_marker
         try:
-            return progress_units(await marker_provider())
+            last_marker = dict(await marker_provider() or {})
+            return progress_units(last_marker)
         except Exception:
             return -1
+
+    finalize_used: list[Dict[str, Any]] = []
 
     deadline = time.monotonic() + max(1.0, float(budget_seconds or 0.0))
     last_units = await units()
@@ -273,12 +289,39 @@ async def run_with_progress_budget(
                 if evidence_path:
                     safe_write_json(Path(evidence_path), record)
                 continue
+            if bool(last_marker.get("fill_complete")) and len(finalize_used) < max(0, int(max_finalize_extensions)):
+                # Every field is filled and verified: the attempt is finishing
+                # (read-back, judges' evidence) -- let it finish.
+                grant = {"granted": True, "seconds": float(finalize_seconds), "reason": "form complete; finishing verification"}
+                finalize_used.append(grant)
+                last_units = now_units
+                deadline = time.monotonic() + float(finalize_seconds)
+                record.update(decision="extended_to_finish_verification", finalize_extensions=list(finalize_used))
+                if evidence_path:
+                    safe_write_json(Path(evidence_path), record)
+                continue
             record["decision"] = "stopped_no_new_progress" if now_units <= last_units else "stopped_extensions_exhausted"
+            checkpoint: Dict[str, Any] = {}
+            if checkpoint_provider is not None:
+                # Re-prove the live form read-only before giving up on it.
+                try:
+                    maybe = checkpoint_provider()
+                    if inspect.isawaitable(maybe):
+                        maybe = await maybe
+                    checkpoint = dict(maybe or {})
+                except Exception as exc:
+                    checkpoint = {"pass": False, "error": mask_sensitive_string(str(exc))[:300]}
+            record["exact_completion_checkpoint_pass"] = checkpoint.get("pass") is True
             if evidence_path:
                 safe_write_json(Path(evidence_path), record)
             task.cancel()
             with suppress(asyncio.CancelledError, Exception):
                 await task
+            if checkpoint.get("pass") is True:
+                raise asyncio.TimeoutError(
+                    "HIP_PHASE_EXACT_STATE_POST_COMPLETION_STALL: the form is exact (read-only proof) but the attempt "
+                    "did not finish within the phase wall budget; continue to verification without reopening the form"
+                )
             if record["decision"] == "stopped_no_new_progress":
                 # Same recovery class as the structural watchdog: reopen from
                 # input.json, refresh, restart the browser -- then a human.

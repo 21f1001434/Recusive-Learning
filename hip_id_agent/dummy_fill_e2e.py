@@ -3289,7 +3289,16 @@ class FullDummyFillE2EFlow:
                             raise RuntimeError(f"HIP_PHASE_TRANSITION_DESTINATION_NOT_ACKNOWLEDGED: {transition_ack}")
                         await _learning_begin(phase, attempt_no, phase_dir, contract)
                         attempt_stage = "phase_execution"
-                        remaining_phase_seconds = max(1.0, float(runtime_self_healer.wall_budget_seconds(phase)) - (time.monotonic() - phase_loop_started))
+                        # V243R25: a retry gets a fair budget of its own -- attempt 4 used to
+                        # inherit only what attempts 1-3 left of the shared phase budget and
+                        # was stopped almost at once, with the form half filled.
+                        remaining_phase_seconds = max(
+                            float(getattr(self.config.runtime_self_heal, "min_attempt_seconds", 900.0) or 900.0),
+                            float(runtime_self_healer.wall_budget_seconds(phase)) - (time.monotonic() - phase_loop_started),
+                        )
+                        # Progress is measured for this attempt (a reopened form's re-verified
+                        # fields count again).
+                        shared_browser.begin_phase_attempt_progress(phase)
                         async def _watchdog_checkpoint_provider() -> Dict[str, Any]:
                             return await _refresh_live_read_only_checkpoint(
                                 phase, phase_dir, input_path,
@@ -3319,6 +3328,11 @@ class FullDummyFillE2EFlow:
                             extend=lambda units: runtime_self_healer.extend_for_progress(
                                 phase, progress_units=units, reason="attempt still verifying new fields at the wall budget"),
                             evidence_path=phase_dir / f"phase_progress_budget_attempt_{attempt_no:02d}.json",
+                            # V243R25: a completely filled form finishes its checks; a stopped
+                            # attempt whose live form is exact is not thrown away.
+                            checkpoint_provider=_watchdog_checkpoint_provider,
+                            finalize_seconds=float(getattr(self.config.runtime_self_heal, "finalize_grace_seconds", 600.0) or 600.0),
+                            max_finalize_extensions=int(getattr(self.config.runtime_self_heal, "max_finalize_extensions", 2) or 0),
                         )
                         completion_checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
                         if completion_checkpoint.get("pass") is True:

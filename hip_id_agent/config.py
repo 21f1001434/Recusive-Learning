@@ -329,6 +329,13 @@ class RuntimeSelfHealConfig(BaseModel):
     # handed to a human.  An attempt without new verified fields is stopped as before.
     progress_extension_seconds: int = 900
     max_progress_extensions: int = 8
+    # V243R25: every attempt gets at least this long, even when earlier attempts
+    # used up most of the phase budget; a completely filled form gets
+    # finalize_grace_seconds (at most max_finalize_extensions times) to finish its
+    # read-back and evidence instead of being stopped as "no new verified field".
+    min_attempt_seconds: float = 900.0
+    finalize_grace_seconds: float = 600.0
+    max_finalize_extensions: int = 2
     # Active structural watchdog. Unlike failure-signature counting, this runs
     # while the phase coroutine is still alive and interrupts repeated UI cycles.
     no_progress_watchdog_seconds: float = 90.0
