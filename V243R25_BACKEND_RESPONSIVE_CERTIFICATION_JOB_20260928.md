@@ -57,7 +57,9 @@ That NO_GO was **not a certification result**. When the request fails, the Contr
 | Bun proxy with `timeout: false` against a backend that answers after 330 s | HTTP 200 after 330 s (before the fix: 503 after 288 s). |
 | `tests/test_v243r25_backend_responsive_certification_job.py` | 15 passed |
 | Existing certification, readiness-renewal, backend and Control Center tests (`test_v219_live_runtime_certification`, `test_v226_pyautogui_auto_cert_recovery`, `test_hip_platform_backend`, `test_javascript_ui_control_center` …) | passed |
-| Full suite, 7-phase mission UAT, package | see below |
+| Full suite (200 files) | 1,480 passed, 1 skipped. Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
+| 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
+| `VERIFY_V243R25_INSTALL.ps1` R25 smoke checks | `R25_CERTIFICATION_IN_OWN_PROCESS_OK`, `R25_STATUS_POLLS_OK`, `R25_PROXY_AND_UI_OK` (and the R24 checks it calls first) |
 
 ## Apply
 
