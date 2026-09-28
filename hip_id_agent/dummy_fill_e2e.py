@@ -61,6 +61,7 @@ from .phase_transition import MissionTransitionCoordinator
 from .final_mission import FinalMissionConsolidator
 from .mlflow_async import AsyncMLflowTracker
 from .replay_policy import replay_policy_engine_from_config
+from .run_history_learning import apply_lessons, lesson_value, run_history_learner_from_config
 from .mission_learning import close_mission_learning_loop
 from .judge_consensus import MultiModelJudgeConsensus
 from .model_portfolio import model_portfolio_from_config
@@ -2798,6 +2799,31 @@ class FullDummyFillE2EFlow:
             "safe_repair_only": True,
             "judge_required_for_recovery_promotion": True,
         })
+        # V243R27: learn from every past run (run folders and MLflow, each read once)
+        # and apply what they teach: phase / attempt budgets, the no-progress
+        # watchdog per phase and the render wait per HIP module. Lessons only
+        # lengthen a time budget (bounded); checks and the mutation gate are unchanged.
+        run_history_lessons: Dict[str, Any] = {}
+        if bool(getattr(self.config.run_history_learning, "enabled", True)) and bool(
+                getattr(self.config.run_history_learning, "apply_at_mission_start", True)):
+            try:
+                run_history_lessons = await asyncio.to_thread(
+                    run_history_learner_from_config(self.config).learn,
+                    runs_dir=self.config.reporting.runs_dir, exclude_run=root_dir)
+                applied_lessons = apply_lessons(run_history_lessons, healer=runtime_self_healer, browser=shared_browser)
+                run_history_lessons["applied_to_this_mission"] = applied_lessons
+                mlflow_tracker.log_params({
+                    "hip.learned.runs": run_history_lessons.get("runs_learned"),
+                    "hip.learned.lessons": len(run_history_lessons.get("reasons") or []),
+                })
+                mlflow_tracker.log_event("run_history_lessons_applied", {
+                    "runs_learned": run_history_lessons.get("runs_learned"),
+                    "runs_from_mlflow": run_history_lessons.get("runs_from_mlflow"),
+                    "lessons": run_history_lessons.get("reasons"),
+                })
+            except Exception as exc:
+                run_history_lessons = {"status": "error_fail_open", "error": mask_sensitive_string(str(exc))[:500]}
+        safe_write_json(root_dir / "run_history_learning.json", run_history_lessons)
         portal_learning = PortalLearningRuntime(
             config=self.config,
             root_dir=root_dir,
@@ -3293,7 +3319,9 @@ class FullDummyFillE2EFlow:
                         # inherit only what attempts 1-3 left of the shared phase budget and
                         # was stopped almost at once, with the form half filled.
                         remaining_phase_seconds = max(
-                            float(getattr(self.config.runtime_self_heal, "min_attempt_seconds", 900.0) or 900.0),
+                            # V243R27: longer when past runs of this phase needed more.
+                            lesson_value(run_history_lessons, "min_attempt_seconds", phase,
+                                         float(getattr(self.config.runtime_self_heal, "min_attempt_seconds", 900.0) or 900.0)),
                             float(runtime_self_healer.wall_budget_seconds(phase)) - (time.monotonic() - phase_loop_started),
                         )
                         # Progress is measured for this attempt (a reopened form's re-verified
@@ -3315,7 +3343,9 @@ class FullDummyFillE2EFlow:
                                 marker_provider=lambda: shared_browser.capture_phase_progress_marker(phase),
                                 checkpoint_provider=_watchdog_checkpoint_provider,
                                 evidence_path=phase_dir / "phase_no_progress_watchdog.json",
-                                no_progress_seconds=float(getattr(self.config.runtime_self_heal, "no_progress_watchdog_seconds", 90.0) or 90.0),
+                                no_progress_seconds=lesson_value(
+                                    run_history_lessons, "no_progress_watchdog_seconds", phase,
+                                    float(getattr(self.config.runtime_self_heal, "no_progress_watchdog_seconds", 90.0) or 90.0)),
                                 poll_seconds=float(getattr(self.config.runtime_self_heal, "no_progress_poll_seconds", 5.0) or 5.0),
                                 recent_signature_limit=int(getattr(self.config.runtime_self_heal, "no_progress_recent_signature_limit", 12) or 12),
                                 # A blocking portal loader gets the loading budget, then
@@ -3349,6 +3379,15 @@ class FullDummyFillE2EFlow:
                             })
                     except Exception as exc:
                         message = mask_sensitive_string(str(exc))
+                        # V243R27: what stopped the attempt is recorded in MLflow too,
+                        # so later missions (on any machine) learn from it.
+                        try:
+                            mlflow_tracker.log_metrics({
+                                f"phase/{phase}/failure/{code}": 1.0
+                                for code in sorted(set(re.findall(r"\bHIP_[A-Z][A-Z0-9_]{3,}\b", message)))[:4]
+                            }, step=attempt_no)
+                        except Exception:
+                            pass
                         classification = runtime_self_healer.classify_failure(
                             message,
                             failure_kind="execution_exception",
@@ -4978,6 +5017,22 @@ class FullDummyFillE2EFlow:
             aggregate["replay_policy"] = {"status": "error_fail_open", "error": mask_sensitive_string(str(exc))}
         _write_csv_report(root_dir / "phase_verification_report.csv", phase_verifications)
         _write_html_report(root_dir / "FULL_DUMMY_FILL_E2E_REPORT.html", aggregate)
+        try:
+            render_by_module: Dict[str, float] = {}
+            render_rows = root_dir / "mcp_runtime" / "navigation_render_waits.jsonl"
+            if render_rows.is_file():
+                for line in render_rows.read_text(encoding="utf-8").splitlines()[-2000:]:
+                    try:
+                        row = json.loads(line)
+                    except Exception:
+                        continue
+                    if row.get("usable") and row.get("module_key"):
+                        key = str(row["module_key"])
+                        render_by_module[key] = max(render_by_module.get(key, 0.0), float(row.get("seconds") or 0.0))
+            if render_by_module:
+                mlflow_tracker.log_metrics({f"navigation/{k}/render_seconds": v for k, v in render_by_module.items()})
+        except Exception:
+            pass
         mlflow_final = mlflow_tracker.finish(
             status=str(mission_report.get("mission_status") or overall_status),
             application_complete=bool(mission_report.get("application_complete")),

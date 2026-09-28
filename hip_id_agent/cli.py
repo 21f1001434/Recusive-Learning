@@ -151,6 +151,50 @@ def certify_live_runtime_cmd(
         raise typer.Exit(code=2)
 
 
+@app.command("learn-from-runs")
+def learn_from_runs_cmd(
+    config: str = typer.Option("config.yaml", help="Path to config YAML."),
+    runs_dir: str = typer.Option("", help="Run root. Empty uses reporting.runs_dir from config."),
+    show: bool = typer.Option(False, "--show", help="Only print the lessons already learned; read no run."),
+    no_mlflow: bool = typer.Option(False, "--no-mlflow", help="Learn from the run folders only."),
+    as_json: bool = typer.Option(False, "--json", help="Print the lessons as JSON."),
+):
+    """Learn from past runs -- run folders and MLflow -- once per run (V243R27).
+
+    Every mission does this at start; this command shows (or refreshes) what was
+    learned: how long each phase and attempt took, what stopped them, how long
+    each HIP module needed to render, and the time budgets the next mission uses.
+    """
+    from .run_history_learning import run_history_learner_from_config, summary_line
+
+    load_dotenv()
+    cfg = load_config(config)
+    learner = run_history_learner_from_config(cfg)
+    lessons = learner.load_lessons() if show else learner.learn(
+        runs_dir=runs_dir or cfg.reporting.runs_dir, include_mlflow=False if no_mlflow else None)
+    if as_json:
+        console.print_json(json.dumps(lessons, ensure_ascii=False, default=str))
+        return
+    console.print(f"[bold]Learned from past runs:[/bold] {summary_line(lessons)}")
+    if lessons.get("mlflow"):
+        console.print(f"MLflow: {lessons['mlflow'].get('status')} ({lessons['mlflow'].get('new_runs', 0)} new run(s)) "
+                      f"{lessons['mlflow'].get('tracking_uri') or ''}")
+    table = Table(title="Lessons used by the next mission")
+    for column in ("Phase / module", "Lesson", "Value (s)", "Why"):
+        table.add_column(column)
+    for row in lessons.get("reasons") or []:
+        table.add_row(str(row.get("phase") or row.get("module") or ""), str(row.get("lesson")), str(row.get("value")), str(row.get("why")))
+    console.print(table)
+    phases = Table(title="Past runs per phase")
+    for column in ("Phase", "Runs", "Completed", "p90 attempt (s)", "Top stops", "Fields that failed"):
+        phases.add_column(column)
+    for phase, row in (lessons.get("phases") or {}).items():
+        phases.add_row(phase, str(row.get("runs")), str(row.get("completed")), str(row.get("p90_completed_attempt_seconds") or ""),
+                       ", ".join(f"{c} x{n}" for c, n in (row.get("top_failure_codes") or [])[:3]),
+                       ", ".join(f"{f} x{n}" for f, n in (row.get("fields_that_failed") or [])[:3]))
+    console.print(phases)
+
+
 @app.command("qualify-models")
 def qualify_models_cmd(
     config: str = typer.Option("config.yaml", help="Path to config YAML."),

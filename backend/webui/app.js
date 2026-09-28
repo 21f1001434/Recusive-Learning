@@ -664,6 +664,14 @@ async function refreshStatus() {
         ? `selected by live task: ${q.correct||0}/${q.total||0} correct • ${String(q.qualified_at||"").slice(0,10)}${q.in_use&&q.in_use!==q.selected_model?" • fallback "+q.in_use:""}`
         : `not qualified yet (runs on Live certification) • ${champ ? "champion "+champ : "champion: earning"} • ${scored} scored decisions`);
     }
+    if ($("runHistoryMetric")) {
+      // V243R27: what the missions learned from past runs (folders and MLflow).
+      const rh=runtime.run_history_learning||{};
+      $("runHistoryMetric").textContent = rh.enabled===false ? "Off" : (rh.runs_learned ? `${rh.runs_learned} runs` : "Not yet");
+      $("runHistoryDetail").textContent = rh.enabled===false ? "run-history learning disabled" : (rh.runs_learned
+        ? `${rh.lesson_count||0} lessons in use • ${rh.runs_from_mlflow||0} from MLflow`
+        : "learns at the next mission start");
+    }
     if ($("recursiveMetric")) {
       $("recursiveMetric").textContent = !ri.enabled ? "Off" : `Cycle ${ri.cycle||0}`;
       $("recursiveDetail").textContent = ri.enabled ? `best ${Number(ri.best_reward||0).toFixed(3)} • plateau ${ri.plateau_count||0}` : "recursive improvement disabled";
@@ -945,6 +953,31 @@ async function loadRecursiveImprovement() {
   } catch(e){ if($('recursiveImprovementState')) $('recursiveImprovementState').textContent=e.message; }
 }
 
+function renderRunHistory(data) {
+  const summary=data?.summary||{}; const lessons=data?.lessons||{};
+  if ($('runHistorySummary')) {
+    const mf=lessons.mlflow||summary.mlflow||{};
+    $('runHistorySummary').textContent = summary.runs_learned
+      ? `${summary.summary}. MLflow: ${({ok:"read", no_store:"no MLflow runs recorded yet", no_experiment:"no HIP runs in MLflow yet", mlflow_not_installed:"not installed (run folders only)", timeout:"did not answer in time", disabled:"disabled", skipped:"not read"})[mf.status]||mf.status||"not read"}${mf.status==="ok"?` (${mf.new_runs||0} new run(s))`:""}. Learned ${String(lessons.derived_at||summary.derived_at||"").slice(0,19).replace("T"," ")}.`
+      : "Nothing learned yet: the next mission reads the past runs first (or click Learn now).";
+  }
+  const reasons=lessons.reasons||summary.reasons||[];
+  const phases=lessons.phases||{};
+  const rows=reasons.map(r=>`<tr><td>${esc(r.phase||r.module||"")}</td><td>${esc(r.lesson)}</td><td>${esc(r.value)} s</td><td>${esc(r.why)}</td></tr>`).join("");
+  const phaseRows=Object.entries(phases).map(([p,r])=>`<tr><td>${esc(p)}</td><td>${esc(r.completed)}/${esc(r.runs)}</td><td>${esc(r.p90_completed_attempt_seconds??"")}</td><td>${esc((r.top_failure_codes||[]).slice(0,3).map(x=>`${x[0]} ×${x[1]}`).join(", "))}</td><td>${esc((r.fields_that_failed||[]).slice(0,3).map(x=>`${x[0]} ×${x[1]}`).join(", "))}</td></tr>`).join("");
+  if ($('runHistoryTable')) $('runHistoryTable').innerHTML = (rows||phaseRows)
+    ? `<table><thead><tr><th>Phase / module</th><th>Lesson</th><th>Now</th><th>Why</th></tr></thead><tbody>${rows||'<tr><td colspan="4">No budget change needed.</td></tr>'}</tbody></table>`
+      + (phaseRows ? `<table style="margin-top:14px"><thead><tr><th>Phase</th><th>Completed</th><th>p90 attempt (s)</th><th>What stopped it</th><th>Fields that failed</th></tr></thead><tbody>${phaseRows}</tbody></table>` : "")
+    : '<div class="empty">Nothing learned yet.</div>';
+}
+async function loadRunHistory(learn) {
+  try {
+    const qs=new URLSearchParams({config:$('configPath').value||'config.yaml'});
+    const data=learn ? await api(`/api/learning/run-history/refresh?${qs}`,{method:"POST",timeoutMs:120000}) : await api(`/api/learning/run-history?${qs}`);
+    renderRunHistory(data);
+  } catch(e){ if($('runHistorySummary')) $('runHistorySummary').textContent=e.message; }
+}
+
 function changeRequest() { return { task:$("changeText").value.trim(), config:$("configPath").value||"config.yaml", runs_dir:$("runsDir").value||"./runs", allow_adaptive_exploration:true, operator_role:$("operatorRole").value.trim(), approval_id:$("approvalId").value.trim(), allow_portal_mutation:$("allowPortalMutation").checked, confirmation:$("mutationConfirmation").value }; }
 async function changeAction(kind) {
   try { const payload=changeRequest(); if(!payload.task) throw new Error("Describe the change first."); const data=await api(`/api/governed-change/${kind}`,{method:"POST",body:JSON.stringify(payload)}); $("governanceOutput").textContent=JSON.stringify(data,null,2); if(kind==="run") showTab("mission"); }
@@ -970,7 +1003,7 @@ function wire() {
   $("testTextModelBtn").onclick=()=>testModelAvailability("text"); $("testVisionModelBtn").onclick=()=>testModelAvailability("vision");
   $("preflightBtn").onclick=()=>runPreflight(); $("liveRuntimeCertBtn").onclick=()=>runLiveRuntimeCertification(); $("liveReadinessBtn").onclick=()=>runLiveReadiness(); $("startBtn").onclick=startMission; $("pauseBtn").onclick=()=>processAction("pause"); $("resumeBtn").onclick=()=>processAction("resume"); $("stopBtn").onclick=()=>processAction("stop");
   $("refreshBtn").onclick=refreshStatus; $("runsRefresh").onclick=refreshStatus; $("capLoad").onclick=loadCapabilities; $("apiLoad").onclick=loadApis; if($("humanAssistRefresh")) $("humanAssistRefresh").onclick=loadHumanAssistance; if($("humanTeachSubmit")) $("humanTeachSubmit").onclick=submitHumanTeaching; if($("interactiveTeachStart")) $("interactiveTeachStart").onclick=startInteractiveTeaching; if($("interactiveTeachFinish")) $("interactiveTeachFinish").onclick=finishInteractiveTeaching; if($("humanPhaseRefresh")) $("humanPhaseRefresh").onclick=loadHumanPhaseReview; if($("humanPhaseApprove")) $("humanPhaseApprove").onclick=()=>submitHumanPhaseReview('pass'); if($("humanPhaseReject")) $("humanPhaseReject").onclick=()=>submitHumanPhaseReview('needs_correction');
-  $("taskPlan").onclick=()=>taskAction("plan"); $("taskRun").onclick=()=>taskAction("run"); if($("productionDoctor")) $("productionDoctor").onclick=()=>productionAction("doctor"); if($("productionRun")) $("productionRun").onclick=()=>productionAction("start"); if($("skillLibraryLoad")) $("skillLibraryLoad").onclick=loadSkillLibrary; if($("skillLibrarySearch")) $("skillLibrarySearch").addEventListener("input",()=>loadSkillLibrary()); if($("skillLibraryStatus")) $("skillLibraryStatus").addEventListener("change",()=>loadSkillLibrary()); if($("replayPolicyLoad")) $("replayPolicyLoad").onclick=loadReplayPolicy; if($("modelPortfolioLoad")) $("modelPortfolioLoad").onclick=loadModelPortfolio; if($("recursiveImprovementLoad")) $("recursiveImprovementLoad").onclick=loadRecursiveImprovement; $("changePreview").onclick=()=>changeAction("preview"); $("changeRun").onclick=()=>changeAction("run"); $("auditLoad").onclick=loadAudit;
+  $("taskPlan").onclick=()=>taskAction("plan"); $("taskRun").onclick=()=>taskAction("run"); if($("productionDoctor")) $("productionDoctor").onclick=()=>productionAction("doctor"); if($("productionRun")) $("productionRun").onclick=()=>productionAction("start"); if($("skillLibraryLoad")) $("skillLibraryLoad").onclick=loadSkillLibrary; if($("skillLibrarySearch")) $("skillLibrarySearch").addEventListener("input",()=>loadSkillLibrary()); if($("skillLibraryStatus")) $("skillLibraryStatus").addEventListener("change",()=>loadSkillLibrary()); if($("replayPolicyLoad")) $("replayPolicyLoad").onclick=loadReplayPolicy; if($("modelPortfolioLoad")) $("modelPortfolioLoad").onclick=loadModelPortfolio; if($("recursiveImprovementLoad")) $("recursiveImprovementLoad").onclick=loadRecursiveImprovement; if($("runHistoryLoad")) { $("runHistoryLoad").onclick=()=>loadRunHistory(true); loadRunHistory(false); } $("changePreview").onclick=()=>changeAction("preview"); $("changeRun").onclick=()=>changeAction("run"); $("auditLoad").onclick=loadAudit;
   document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 }
 

@@ -1,3 +1,12 @@
+## V243R27 — The model selection survives a slow listing; every mission learns from past runs and MLflow (2026-09-28)
+
+- **The model-selection warning is fixed.** A Document Types listing that is open and signed in but still rendering is now waited for (90 s, or longer when past runs needed it), then reloaded once. It used to fail after about 2 s. A re-run of the qualification that cannot finish keeps the model that passed before.
+- **MLflow records again.** MLflow 3.16.1 refused the local `runs\mlruns` store, so nothing was recorded unless an MLflow server was configured. R27 allows the store and installs MLflow when it is missing.
+- **Every mission first learns from the past runs:** the run folders and MLflow, each run read once. Past runs set how long each phase and attempt gets, the no-progress watchdog per phase and how long each HIP module is waited for. Lessons only lengthen a time budget (bounded); they never shorten one or skip a check.
+- See it in the Control Center tile and panel **"Learned from past runs"**, or with `python -m hip_id_agent.cli learn-from-runs`.
+
+See `V243R27_ROUTE_RENDER_WAIT_AND_LEARNING_FROM_PAST_RUNS_20260928.md`. Apply with `APPLY_V243R27_IN_PLACE.ps1`; it includes R13–R26.
+
 ## V243R26 — A filled Document Type is kept, retries get time, the section above is filled first (2026-09-28)
 
 - **A completely filled form is no longer thrown away.** When every field is filled and verified, the attempt gets time to finish its checks. If it is stopped anyway and the live form is exact, the mission goes on to the judges instead of reopening a blank form.

@@ -1,3 +1,39 @@
+# V243R27 — Model selection survives a slow listing; every mission learns from past runs and MLflow (2026-09-28)
+
+- `BrowserSession._react_ensure_target_surface`:
+  - a committed, authenticated route that is not yet usable is waited for without spending a step (`await_route_render`) for `_navigation_render_budget` (`portal.navigation_render_wait_seconds` 90, or the per-module value learned from past runs, at most `navigation_render_wait_max_seconds` 300);
+  - then `reload_target` once, then half the wait;
+  - `_navigation_usability` gives the reason (`page_not_rendered`, `module_not_rendered`, `login_surface`, `document_loading`), and the observation carries it as `usability`;
+  - every navigation is appended to `mcp_runtime/navigation_render_waits.jsonl`.
+- `live_runtime_certification.qualify_models_on_live_page`:
+  - `_open_qualification_page` opens the listing once more;
+  - on the exact route it qualifies from what is rendered (screen wait 30/60 s);
+  - a failed re-run returns `kept_previous_selection` with `requalify_error`, and the lock is kept;
+  - `_qualification_detail` says "kept: …".
+- `mlflow_async`:
+  - `allow_local_file_store` sets `MLFLOW_ALLOW_FILE_STORE=true` for a `file:` store or a plain path (MLflow 3.x refused the fallback store and the tracker switched itself off);
+  - `local_tracking_uri`.
+- New `hip_id_agent/run_history_learning.py`:
+  - `harvest_run_dir` and `harvest_mlflow`, each run once (`data/hip_memory/run_history/run_facts.json`; a running run is re-read when finished);
+  - `derive_lessons`:
+    - `min_attempt_seconds`, `phase_wall_seconds` and `no_progress_watchdog_seconds` per phase;
+    - `navigation_render_wait_seconds` per module;
+    - reports of failure codes, fields that failed and recoveries;
+  - lessons only lengthen, at most `max_budget_multiplier` × the configured value;
+  - `apply_lessons`, `lesson_value`.
+- `RuntimeSelfHealController.apply_learned_wall_budgets`; `wall_budget_seconds` uses the learned phase budget.
+- `dummy_fill_e2e`:
+  - learns and applies the lessons before the first phase (`run_history_learning.json`, MLflow `hip.learned.*`);
+  - per-phase `min_attempt_seconds` / watchdog;
+  - logs `phase/<p>/failure/<HIP_CODE>` and `navigation/<module>/render_seconds` to MLflow.
+- Config: `portal.navigation_render_wait_seconds` / `navigation_render_wait_max_seconds`; `run_history_learning` section.
+- CLI `learn-from-runs` (`--show`, `--no-mlflow`, `--json`).
+- Backend: `GET /api/learning/run-history`, `POST /api/learning/run-history/refresh`, and `run_history_learning` in `/api/runtime/status`.
+- Control Center: the "Learned from past runs" tile and panel.
+- `requirements.txt`: `mlflow-skinny==3.16.1` (was only in pyproject) and `protobuf>=5.29.5,<5.30` (autogen-core ~=5.29.3; MLflow's databricks-sdk excludes ≤5.29.4). `APPLY_V243R27_IN_PLACE.ps1` installs MLflow when it is missing.
+- Replica `doctypes_listing_support.DocTypesPortal`: `boot_delay_ms`, `stuck_loads`, `live_path`. Fixture `tests/fixtures/doctypes_listing_screen.json`.
+- Tests: `tests/test_v243r27_route_render_wait_and_run_history_learning.py` (16).
+
 # V243R26 — A filled Document Type is kept, retries get time, the section above is filled first (2026-09-28)
 
 - `phase_progress.run_with_progress_budget(checkpoint_provider=, finalize_seconds=, max_finalize_extensions=)`:

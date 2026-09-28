@@ -277,7 +277,15 @@ const search = document.getElementById('tsearch');
 let pending = null;
 search.addEventListener('input', () => { clearTimeout(pending); pending = setTimeout(() => { QUERY = search.value.trim(); render(); }, 250); });
 search.addEventListener('keydown', e => { if (e.key === 'Enter') { QUERY = search.value.trim(); render(); } });
-load();
+if (CFG.bootDelayMs > 0) {
+  // V243R27: the live listing right after SSO: the portal header is there, the
+  // module (heading, table, rows) renders only after the app has booted.
+  const main = document.querySelector('main');
+  main.style.display = 'none';
+  setTimeout(() => { main.style.display = ''; load(); }, CFG.bootDelayMs);
+} else {
+  load();
+}
 </script></body></html>"""
 
 
@@ -314,11 +322,19 @@ def seed_records() -> List[Dict[str, Any]]:
 class DocTypesPortal:
     """HTTP server for the Document Types listing replica."""
 
-    def __init__(self, *, confirm_migrate: bool = True, expand_delay_ms: int = 300, clear_description_on_transaction_type: bool = False) -> None:
+    def __init__(self, *, confirm_migrate: bool = True, expand_delay_ms: int = 300, clear_description_on_transaction_type: bool = False,
+                 boot_delay_ms: int = 0, live_path: bool = False, stuck_loads: int = 0) -> None:
         self.records: List[Dict[str, Any]] = seed_records()
         self.posts: List[Dict[str, Any]] = []
         self.cfg = {"confirmMigrate": bool(confirm_migrate), "expandDelayMs": int(expand_delay_ms),
-                    "clearDescriptionOnTransactionType": bool(clear_description_on_transaction_type)}
+                    "clearDescriptionOnTransactionType": bool(clear_description_on_transaction_type),
+                    "bootDelayMs": int(boot_delay_ms)}
+        # The live route (".../hybrid-integrations/securelink/doctypes") is what the
+        # session's SSO check recognises as an authenticated HIP surface.
+        self.path = "/hybrid-integrations/securelink/doctypes" if live_path else "/securelink/doctypes"
+        # The first ``stuck_loads`` page loads never finish booting (a reload helps).
+        self.stuck_loads = int(stuck_loads)
+        self.page_loads = 0
         self.kit = (FIXTURES / "hip_dds_kit.js").read_text(encoding="utf-8")
         portal = self
 
@@ -336,8 +352,12 @@ class DocTypesPortal:
 
             def do_GET(self) -> None:  # noqa: N802
                 path = urlparse(self.path).path
-                if path == "/securelink/doctypes":
-                    html = _PAGE.replace("__KIT__", portal.kit).replace("__CFG__", json.dumps(portal.cfg))
+                if path == portal.path:
+                    portal.page_loads += 1
+                    cfg = dict(portal.cfg)
+                    if portal.page_loads <= portal.stuck_loads:
+                        cfg["bootDelayMs"] = 10 ** 9
+                    html = _PAGE.replace("__KIT__", portal.kit).replace("__CFG__", json.dumps(cfg))
                     self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
                 elif path == "/api/doctypes":
                     self._send(200, json.dumps(portal.records).encode("utf-8"), "application/json")
@@ -395,7 +415,7 @@ class DocTypesPortal:
 
     @property
     def url(self) -> str:
-        return f"http://127.0.0.1:{self.server.server_address[1]}/securelink/doctypes"
+        return f"http://127.0.0.1:{self.server.server_address[1]}{self.path}"
 
     def __enter__(self) -> "DocTypesPortal":
         self.thread.start()

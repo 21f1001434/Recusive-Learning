@@ -64,6 +64,13 @@ class PortalConfig(BaseModel):
     sso_success_url_patterns: List[str] = Field(default_factory=lambda: ["/hybrid-integrations", "/bizlink", "/portal", "/configuration", "/home", "/dashboard"])
     sso_login_url_keywords: List[str] = Field(default_factory=lambda: ["login", "signin", "sso", "auth", "saml", "oauth", "okta", "ping"])
     sso_positive_texts: List[str] = Field(default_factory=lambda: ["partner", "system", "bizlink", "hybrid integrations", "configuration", "transport profile", "flow"])
+    # V243R27: a route that is committed and authenticated but still rendering
+    # (the Angular listing loads its rows) is waited for, without spending one
+    # of the navigation controller's steps. After this wait the page is reloaded
+    # once. Past runs can raise the wait per module (run-history learning), never
+    # above the maximum.
+    navigation_render_wait_seconds: float = 90.0
+    navigation_render_wait_max_seconds: float = 300.0
 
 
 
@@ -820,6 +827,23 @@ class BrowserUseConfig(BaseModel):
 
 
 
+class RunHistoryLearningConfig(BaseModel):
+    """V243R27: learn from past runs (run folders and MLflow) at mission start.
+
+    Each past run is read once. Lessons only lengthen time budgets, bounded by
+    ``max_budget_multiplier`` x the configured value; they never shorten one.
+    """
+    enabled: bool = True
+    apply_at_mission_start: bool = True
+    include_mlflow: bool = True
+    memory_subdir: str = "run_history"
+    max_runs: int = 300
+    max_mlflow_runs: int = 100
+    mlflow_timeout_seconds: float = 30.0
+    time_margin: float = 1.25
+    max_budget_multiplier: float = 3.0
+
+
 class MLflowConfig(BaseModel):
     """Asynchronous MLflow tracking for agent/mission observability only."""
     enabled: bool = True
@@ -1199,6 +1223,7 @@ class AppConfig(BaseModel):
     vision_runtime: VisionRuntimeConfig = Field(default_factory=VisionRuntimeConfig)
     live_runtime_certification: LiveRuntimeCertificationConfig = Field(default_factory=LiveRuntimeCertificationConfig)
     mlflow: MLflowConfig = Field(default_factory=MLflowConfig)
+    run_history_learning: RunHistoryLearningConfig = Field(default_factory=RunHistoryLearningConfig)
     universal_operator: UniversalOperatorConfig = Field(default_factory=UniversalOperatorConfig)
     skill_induction: SkillInductionConfig = Field(default_factory=SkillInductionConfig)
     replay_policy: ReplayPolicyConfig = Field(default_factory=ReplayPolicyConfig)

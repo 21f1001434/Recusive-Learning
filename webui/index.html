@@ -141,6 +141,7 @@
         <article><span>MLflow Async</span><strong id="mlflowMetric">—</strong><small id="mlflowDetail">observability only</small></article>
         <article><span>Model Champion</span><strong id="modelPortfolioMetric">—</strong><small id="modelPortfolioDetail">On-Prem champion/challenger</small></article>
         <article><span>Recursive Improvement</span><strong id="recursiveMetric">—</strong><small id="recursiveDetail">bounded self-improvement</small></article>
+        <article><span>Learned from past runs</span><strong id="runHistoryMetric">—</strong><small id="runHistoryDetail">run folders + MLflow</small></article>
       </section>
 
       <nav class="tabs" id="tabs">
@@ -318,6 +319,11 @@
           <div class="panel-head"><h2>Recursive self-improvement</h2><button id="recursiveImprovementLoad" class="small-button">Refresh</button></div>
           <p class="muted">Bounded recursive cycles improve replay policy, model routing and skill confidence from verified outcomes. Runtime source-code rewriting is disabled.</p>
           <pre id="recursiveImprovementState" class="json-output">No recursive-improvement state yet.</pre>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Learned from past runs · run folders + MLflow</h2><button id="runHistoryLoad" class="small-button">Learn now</button></div>
+          <p id="runHistorySummary" class="muted">Each mission reads every past run once (its folder and MLflow) and uses what they show: how long each phase and attempt takes, what stopped it and how long each HIP module needs to render. Lessons only lengthen time budgets.</p>
+          <div id="runHistoryTable" class="table-wrap"><div class="empty">Nothing learned yet.</div></div>
         </article>
       </section>
 

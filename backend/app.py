@@ -1025,6 +1025,7 @@ def _runtime_status_payload(config: str = "config.yaml") -> Dict[str, Any]:
             **replay.manifest(),
         },
         "model_portfolio": portfolio.manifest(),
+        "run_history_learning": _run_history_summary(cfg),
         "portal_skills": _portal_skills_totals(cfg),
         "recursive_self_improvement": recursive_improvement_from_config(
             cfg, replay_policy=replay, model_portfolio=portfolio, skill_library=skills
@@ -1625,6 +1626,45 @@ def replay_policy_status(config: str = "config.yaml", limit: int = 100) -> Dict[
         "values_stored": False,
         "live_reproof_required": True,
     }
+
+
+def _run_history_summary(cfg: Any) -> Dict[str, Any]:
+    """V243R27: what past runs taught (read from disk; learning itself runs at mission start)."""
+    from hip_id_agent.run_history_learning import run_history_learner_from_config, summary_line
+
+    try:
+        lessons = run_history_learner_from_config(cfg).load_lessons()
+    except Exception as exc:
+        return {"enabled": bool(cfg.run_history_learning.enabled), "status": "error", "error": mask_sensitive_string(str(exc))[:300]}
+    return {
+        "enabled": bool(cfg.run_history_learning.enabled),
+        "status": "learned" if lessons else "not_learned_yet",
+        "summary": summary_line(lessons),
+        "runs_learned": int(lessons.get("runs_learned") or 0),
+        "runs_from_mlflow": int(lessons.get("runs_from_mlflow") or 0),
+        "lesson_count": len(lessons.get("reasons") or []),
+        "reasons": (lessons.get("reasons") or [])[:12],
+        "derived_at": lessons.get("derived_at"),
+        "mlflow": lessons.get("mlflow") or {},
+    }
+
+
+@app.get("/api/learning/run-history")
+def run_history_learning_status(config: str = "config.yaml") -> Dict[str, Any]:
+    from hip_id_agent.run_history_learning import run_history_learner_from_config
+
+    cfg = _cfg(config)
+    return {"summary": _run_history_summary(cfg), "lessons": run_history_learner_from_config(cfg).load_lessons()}
+
+
+@app.post("/api/learning/run-history/refresh")
+def run_history_learning_refresh(config: str = "config.yaml") -> Dict[str, Any]:
+    """Read the runs not read yet (folders and MLflow) and derive the lessons again."""
+    from hip_id_agent.run_history_learning import run_history_learner_from_config
+
+    cfg = _cfg(config)
+    lessons = run_history_learner_from_config(cfg).learn(runs_dir=cfg.reporting.runs_dir)
+    return {"summary": _run_history_summary(cfg), "lessons": lessons}
 
 
 @app.get("/api/model-portfolio")

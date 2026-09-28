@@ -56,6 +56,10 @@ portal:
     - "system"
     - "bizlink"
     - "hybrid integrations"
+  # V243R27: a committed, authenticated route that is still rendering is waited
+  # for (then reloaded once) instead of failing HIP_ROUTE_NOT_COMMITTED after ~20 s.
+  navigation_render_wait_seconds: 90
+  navigation_render_wait_max_seconds: 300
 
 browser:
   search_timeout_ms: 30000
@@ -835,11 +839,28 @@ production_e2e:
   write_final_summary: true
   final_summary_filename: "production_final_summary.json"
 
+run_history_learning:
+  # V243R27: at mission start the agent reads every past run once (run folders
+  # and MLflow) and learns how long each phase / attempt really takes, what
+  # stopped it and how long each HIP module needs to render. Lessons only
+  # lengthen time budgets, at most max_budget_multiplier x the configured value.
+  enabled: true
+  apply_at_mission_start: true
+  include_mlflow: true
+  max_runs: 300
+  max_mlflow_runs: 100
+  mlflow_timeout_seconds: 30
+  time_margin: 1.25
+  max_budget_multiplier: 3.0
+
 mlflow:
   # Asynchronous observability only. MLflow never authorizes or blocks a HIP action.
   enabled: true
   # Leave blank to use MLFLOW_TRACKING_URI; if neither is set, HIP uses a
-  # local filesystem MLflow store under the run root (runs/mlruns).
+  # local filesystem MLflow store under the run root (runs/mlruns). V243R27:
+  # MLflow 3.x refuses that store unless MLFLOW_ALLOW_FILE_STORE=true, which HIP
+  # now sets for it (before, MLflow switched itself off and recorded nothing).
+  # Past runs in this store (or on the server) are read back by run_history_learning.
   # For a shared server: tracking_uri: "http://mlflow-host:5000"
   tracking_uri: ""
   experiment_name: "HIP Portal Agent"

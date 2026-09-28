@@ -152,6 +152,8 @@ class RuntimeSelfHealController:
         self._ladder_steps: Dict[str, List[str]] = {}
         self._ladder_pending: Dict[str, Dict[str, str]] = {}
         self._wall_extension: Dict[str, float] = {}
+        # V243R27: phase budgets learned from past runs (never below the configured one).
+        self._learned_wall: Dict[str, float] = {}
         self._attempt_offset: Dict[str, int] = {}
         self._last_attempt: Dict[str, int] = {}
         self.golden_references_by_phase = golden_references_by_phase or {}
@@ -722,8 +724,20 @@ class RuntimeSelfHealController:
         return self._loading_budget_seconds() + self.loader_grace_seconds
 
     def wall_budget_seconds(self, phase: str) -> float:
-        """Phase wall-clock budget, extended by each recovery step taken."""
-        return float(self.max_phase_wall_seconds) + float(self._wall_extension.get(str(phase), 0.0))
+        """Phase wall-clock budget (learned from past runs when they needed more), extended by each recovery step taken."""
+        base = max(float(self.max_phase_wall_seconds), float(self._learned_wall.get(str(phase), 0.0)))
+        return base + float(self._wall_extension.get(str(phase), 0.0))
+
+    def apply_learned_wall_budgets(self, budgets: Dict[str, float]) -> Dict[str, float]:
+        """V243R27: past runs of a phase took longer than the configured budget; give it that time."""
+        ceiling = float(self.max_phase_wall_seconds) * 3.0
+        applied: Dict[str, float] = {}
+        for phase, seconds in (budgets or {}).items():
+            value = min(ceiling, float(seconds or 0.0))
+            if value > float(self.max_phase_wall_seconds):
+                self._learned_wall[str(phase)] = value
+                applied[str(phase)] = value
+        return applied
 
     def progress_extensions_left(self, phase: str) -> int:
         return max(0, self.max_progress_extensions - len(self._progress_extensions.get(str(phase), [])))

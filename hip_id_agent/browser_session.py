@@ -427,6 +427,8 @@ class BrowserSession:
         self._start_count = 0
         self._borrow_count = 0
         self._sso_prompt_count = 0
+        # V243R27: per-module render wait learned from past runs (run_history_learning).
+        self._learned_render_wait_seconds: Dict[str, float] = {}
         self._authenticated_once = False
         self._reauth_count = 0
         self._sso_wait_in_progress = False
@@ -2365,14 +2367,18 @@ class BrowserSession:
         Data Maps look usable for Document Types and caused the dual-MCP gate to fail
         before the agent retried navigation. The target path is now mandatory.
         """
+        return bool((await self._navigation_usability(target_url)).get("usable"))
+
+    async def _navigation_usability(self, target_url: str) -> Dict[str, Any]:
+        """The usability decision and why (V243R27: reported with HIP_ROUTE_NOT_COMMITTED)."""
         if not self.page:
-            return False
+            return {"usable": False, "reason": "no_page"}
         try:
             current_url = (self.page.url or "").strip()
         except Exception:
             current_url = ""
         if not self._same_target_path(target_url, current_url):
-            return False
+            return {"usable": False, "reason": "different_path"}
 
         body = ""
         try:
@@ -2380,22 +2386,27 @@ class BrowserSession:
         except Exception:
             body = ""
         if not body or len(body) < 20:
-            return False
+            return {"usable": False, "reason": "page_not_rendered", "body_chars": len(body)}
 
-        ready_ok = False
+        ready_state = ""
         try:
             ready_state = str(await self.page.evaluate("() => document.readyState"))
-            ready_ok = ready_state in {"interactive", "complete"}
         except Exception:
-            ready_ok = False
+            ready_state = ""
+        ready_ok = ready_state in {"interactive", "complete"}
+        details: Dict[str, Any] = {"body_chars": len(body), "ready_state": ready_state}
 
         login_words = ["sign in", "login", "single sign", "password", "authenticator", "verify your identity"]
-        if any(w in body for w in login_words) and not any(p.lower() in body for p in self.config.portal.sso_positive_texts):
-            return False
+        seen_login = [w for w in login_words if w in body]
+        if seen_login and not any(p.lower() in body for p in self.config.portal.sso_positive_texts):
+            return {**details, "usable": False, "reason": "login_surface", "login_words": seen_login}
 
         contract = self._phase_surface_contract(target_url)
         terms = list(contract.get("expected_terms") or [])
-        surface_ok = any(term in body for term in terms) if terms else True
+        seen_terms = [term for term in terms if term in body]
+        details["expected_terms"] = terms
+        details["expected_terms_seen"] = seen_terms
+        surface_ok = bool(seen_terms) if terms else True
         if not surface_ok and ready_ok:
             # V244: Dell Angular route text can lag behind route commit while the
             # actual module is already mounted and interactive. Accept structural
@@ -2408,10 +2419,13 @@ class BrowserSession:
                   const controls=[...document.querySelectorAll('input,select,textarea,button,[role=combobox],[role=button],dds-dropdown')].filter(visible).length;
                   return {roots,controls};
                 }''')
+                details["structural"] = structural
                 surface_ok = int((structural or {}).get("roots") or 0) > 0 and int((structural or {}).get("controls") or 0) >= 2
             except Exception:
                 surface_ok = False
-        return bool(ready_ok and surface_ok)
+        usable = bool(ready_ok and surface_ok)
+        reason = "usable" if usable else ("document_loading" if not ready_ok else "module_not_rendered")
+        return {**details, "usable": usable, "reason": reason}
 
     @staticmethod
     def is_executor_transport_disconnect(message: str) -> bool:
@@ -2762,6 +2776,12 @@ class BrowserSession:
         logged_in = False if sso_transition else await self._looks_logged_in(page)
         target_match = self._surface_url_matches(target_url, current_url)
         target_usable = await self._navigation_page_is_usable(target_url) if target_match else False
+        usability: Dict[str, Any] = {}
+        if target_match and not target_usable:
+            try:
+                usability = await self._navigation_usability(target_url)
+            except Exception as exc:
+                usability = {"reason": "probe_failed", "error": mask_sensitive_string(str(exc))[:200]}
         use_mcp_during_sso = bool(getattr(self.config.mcp, "use_browser_mcp_for_sso", False))
         if (sso_transition or not logged_in) and not use_mcp_during_sso:
             # Dell SSO is owned by the primary persistent Playwright Edge context.
@@ -2793,6 +2813,7 @@ class BrowserSession:
                 "playwright_mcp": dual.get("playwright_mcp"),
             }),
             "kb_contract": self._phase_surface_contract(target_url),
+            **({"usability": usability} if usability else {}),
         }
 
     def _plan_react_navigation_action(self, observation: Dict[str, Any], step: int) -> Dict[str, Any]:
@@ -2856,6 +2877,16 @@ class BrowserSession:
                 state = await self._wait_for_navigation_acceptance(target_url, timeout_seconds=35.0)
                 result.update({"success": state == "target", "navigation_state": state})
                 return result
+            if name == "reload_target":
+                # V243R27: the route is committed and authenticated but did not render
+                # within the render wait: reload it once (a read-only GET of the listing).
+                page = await self._ensure_active_page(target_url)
+                try:
+                    await page.reload(wait_until="domcontentloaded", timeout=45000)
+                except Exception as exc:
+                    result["reload_warning"] = mask_sensitive_string(str(exc))[:300]
+                result["success"] = True
+                return result
             if name == "wait_and_reobserve":
                 await self.wait_for_blocking_overlays_gone(timeout_ms=5000)
                 await self._ensure_page_observers()
@@ -2885,7 +2916,14 @@ class BrowserSession:
             "pass": False,
         }
         trace_path = self.run_dir / "mcp_runtime" / "navigation_react_trace.json"
-        for step in range(max(1, int(max_steps))):
+        loop = asyncio.get_event_loop()
+        render_budget = self._navigation_render_budget(target_url)
+        render: Dict[str, Any] = {"budget_seconds": render_budget, "waits": 0, "waited_seconds": 0.0, "reloaded": False}
+        render_started: Optional[float] = None
+        navigation_started = loop.time()
+        trace["render_wait"] = render
+        step = 0
+        while step < max(1, int(max_steps)):
             observation = await self._observe_react_navigation_state(target_url)
             judge = {
                 "target_committed": bool(observation.get("target_match")),
@@ -2904,13 +2942,47 @@ class BrowserSession:
                 trace["pass"] = True
                 trace["final_url"] = observation.get("current_url")
                 safe_write_json(trace_path, trace)
+                self._record_navigation_render(target_url, render, usable=True, seconds=loop.time() - navigation_started)
                 return trace
             plan = self._plan_react_navigation_action(observation, step)
+            if plan.get("action") == "wait_and_reobserve" and observation.get("logged_in") and render_budget > 0:
+                # V243R27: the route is committed and authenticated; the listing is
+                # still rendering. Waiting for it is not a failed step.
+                now = loop.time()
+                render_started = now if render_started is None else render_started
+                render["waited_seconds"] = round(now - render_started, 1)
+                render["last_usability"] = observation.get("usability") or {}
+                if now - render_started < render_budget:
+                    if render["waits"] == 0:
+                        trace["steps"].append({**row, "plan": {
+                            "action": "await_route_render",
+                            "basis": "requested route committed in the authenticated session; its surface is still rendering",
+                            "expected_effect": "the module's rows/controls render; no navigation step is spent",
+                            "budget_seconds": render_budget,
+                        }})
+                        safe_write_json(trace_path, trace)
+                    render["waits"] += 1
+                    try:
+                        await self.wait_for_blocking_overlays_gone(timeout_ms=2000)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(1.0)
+                    continue
+                if not render["reloaded"]:
+                    render["reloaded"] = True
+                    render_started = None
+                    render_budget = max(min(render_budget, 15.0), render_budget / 2.0)
+                    plan = {
+                        "action": "reload_target",
+                        "basis": f"route committed and authenticated but not usable after {render['waited_seconds']} s",
+                        "expected_effect": "the module renders after one reload",
+                    }
             row["plan"] = plan
             action_result = await self._execute_react_navigation_action(plan, target_url)
             row["action_result"] = mask_sensitive_data(action_result)
             trace["steps"].append(row)
             safe_write_json(trace_path, trace)
+            step += 1
             if action_result.get("status") == "sso_required":
                 trace["status"] = "sso_required"
                 safe_write_json(trace_path, trace)
@@ -2924,10 +2996,40 @@ class BrowserSession:
             else "HIP_ROUTE_NOT_COMMITTED"
         )
         safe_write_json(trace_path, trace)
+        self._record_navigation_render(target_url, render, usable=False, seconds=loop.time() - navigation_started)
         raise RuntimeError(
             f"{trace['error_code']}: ReAct navigation controller could not reach {self._evidence_url(target_url)}; "
             f"final observation={mask_sensitive_data(final_observation)}"
         )
+
+    def _navigation_render_budget(self, target_url: str) -> float:
+        """Render wait for this module: configured, or longer when past runs needed it."""
+        portal = self.config.portal
+        base = max(0.0, float(getattr(portal, "navigation_render_wait_seconds", 90.0) or 0.0))
+        ceiling = max(base, float(getattr(portal, "navigation_render_wait_max_seconds", 300.0) or base))
+        key = str(self._phase_surface_contract(target_url).get("module_key") or "generic")
+        learned = float((getattr(self, "_learned_render_wait_seconds", {}) or {}).get(key) or 0.0)
+        return min(ceiling, max(base, learned)) if base > 0 else 0.0
+
+    def _record_navigation_render(self, target_url: str, render: Mapping[str, Any], *, usable: bool, seconds: float) -> None:
+        """One row per navigation; run-history learning reads these from past runs."""
+        try:
+            contract = self._phase_surface_contract(target_url)
+            row = {
+                "schema_version": "hip.navigation-render.v1", "at": utc_now(),
+                "phase": self._active_phase_name, "module_key": contract.get("module_key"),
+                "target_path": contract.get("target_path"), "usable": bool(usable),
+                "seconds": round(float(seconds), 1), "render_waited_seconds": float(render.get("waited_seconds") or 0.0),
+                "render_waits": int(render.get("waits") or 0), "reloaded": bool(render.get("reloaded")),
+                "budget_seconds": float(render.get("budget_seconds") or 0.0),
+                "reason": str((render.get("last_usability") or {}).get("reason") or ("usable" if usable else "")),
+            }
+            path = self.run_dir / "mcp_runtime" / "navigation_render_waits.jsonl"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def _same_target_path(self, target_url: str, current_url: str) -> bool:
         try:

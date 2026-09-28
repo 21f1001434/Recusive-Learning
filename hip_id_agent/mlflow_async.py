@@ -53,6 +53,28 @@ def _redact(value: Any) -> Any:
 
 
 
+def allow_local_file_store(tracking_uri: str) -> bool:
+    """V243R27: let MLflow 3.x use the local run store HIP falls back to.
+
+    MLflow 3.x refuses a filesystem store (``file:`` URI or plain path) unless
+    ``MLFLOW_ALLOW_FILE_STORE=true``; its SQL backend needs packages that
+    mlflow-skinny does not ship. Without this, the fail-open tracker switched
+    itself off at start and no run was recorded. A server/database URI is left
+    untouched; an operator's own setting of the variable is kept.
+    """
+    uri = str(tracking_uri or "").strip()
+    if uri and (uri.lower().startswith("file:") or "://" not in uri):
+        os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
+        return True
+    return False
+
+
+def local_tracking_uri(runs_dir: str | Path) -> str:
+    """The store the tracker falls back to when no tracking URI is configured."""
+    store = Path(runs_dir).resolve() / "mlruns"
+    return store.as_uri()
+
+
 def _deep_find(mapping: Any, key: str, *, max_depth: int = 8) -> Any:
     def walk(node: Any, depth: int) -> Any:
         if depth > max_depth:
@@ -180,6 +202,7 @@ class AsyncMLflowTracker:
             from mlflow import MlflowClient
 
             self._mlflow = mlflow
+            allow_local_file_store(self.tracking_uri)
             if self.tracking_uri:
                 mlflow.set_tracking_uri(self.tracking_uri)
             if self.async_logging and hasattr(mlflow, "config") and hasattr(mlflow.config, "enable_async_logging"):
@@ -496,4 +519,4 @@ def mlflow_runtime_probe(config: Any) -> Dict[str, Any]:
     return result
 
 
-__all__ = ["AsyncMLflowTracker", "mlflow_runtime_probe"]
+__all__ = ["AsyncMLflowTracker", "allow_local_file_store", "local_tracking_uri", "mlflow_runtime_probe"]

@@ -277,10 +277,44 @@ class _ProgressChecks(list):
 
 def _qualification_detail(result: Dict[str, Any]) -> str:
     status = str(result.get("status") or "")
+    if status == "kept_previous_selection":
+        return (f"kept: {result.get('selected_model')} ({result.get('correct')}/{result.get('total')} live questions correct, "
+                f"{result.get('qualified_at')}); the re-run could not finish: {result.get('requalify_error') or ''}").strip()
     if result.get("locked"):
         prefix = "already qualified" if status == "already_qualified" else "selected now"
         return f"{prefix}: {result.get('selected_model')} ({result.get('correct')}/{result.get('total')} live questions correct, {result.get('qualified_at')})"
     return f"{status}: {result.get('reason') or ''}".strip(": ")
+
+
+async def _open_qualification_page(browser: Any, url: str) -> Dict[str, Any]:
+    """Open the qualification listing read-only; a slow render gets a second chance.
+
+    V243R27: the Dell listing can take longer than the navigation controller's
+    render wait right after SSO (HIP_ROUTE_NOT_COMMITTED with target_match=True,
+    logged_in=True, target_usable=False). The route is opened once more; if it is
+    still not judged usable but the browser is on that exact route, the
+    qualification reads the page anyway: its questions are built only from the
+    controls actually rendered, and too few controls stop it without guessing.
+    """
+    errors = []
+    for attempt in (1, 2):
+        try:
+            await browser.goto_base_and_complete_sso(url)
+            await browser.wait_ready()
+            return {"opened": True, "attempts": attempt, "errors": errors}
+        except Exception as exc:
+            message = mask_sensitive_string(str(exc))
+            errors.append(message[:600])
+            if "HIP_ROUTE_NOT_COMMITTED" not in message and "HIP_MCP_SURFACE_DRIFT" not in message:
+                raise
+    same_route = False
+    try:
+        same_route = bool(browser._same_target_path(url, str(browser.page.url or "")))
+    except Exception:
+        same_route = False
+    if not same_route:
+        raise RuntimeError(errors[-1] if errors else "HIP_ROUTE_NOT_COMMITTED")
+    return {"opened": False, "on_target_route": True, "attempts": 2, "errors": errors}
 
 
 async def qualify_models_on_live_page(cfg: AppConfig, browser: Any, run_dir: Path, *, force: bool = False, source: str = "live_go_live") -> Dict[str, Any]:
@@ -291,15 +325,27 @@ async def qualify_models_on_live_page(cfg: AppConfig, browser: Any, run_dir: Pat
     existing = load_selection(cfg)
     if existing.get("locked") and not force:
         return {**existing, "status": "already_qualified", "ran_now": False}
+    navigation: Dict[str, Any] = {}
     try:
         url = str(PHASE_URLS.get(str(getattr(cfg.model_portfolio, "qualification_page", "") or "source_document_type")) or "")
         if url:
-            await browser.goto_base_and_complete_sso(url)
-            await browser.wait_ready()
+            navigation = await _open_qualification_page(browser, url)
         page = browser.page
-        return await ensure_model_qualification(cfg, page, source=source, run_dir=Path(run_dir) / "model_qualification", force=force)
+        # The listing rows load after the route is usable; capture_screen returns as soon as they are there.
+        wait = 30.0 if navigation.get("opened", True) else 60.0
+        result = await ensure_model_qualification(
+            cfg, page, source=source, run_dir=Path(run_dir) / "model_qualification", force=force, wait_seconds=wait)
     except Exception as exc:
-        return {"status": "error", "locked": False, "reason": mask_sensitive_string(str(exc))[:500]}
+        result = {"status": "error", "locked": False, "reason": mask_sensitive_string(str(exc))[:500]}
+    if navigation:
+        result = {**result, "navigation": navigation}
+    if not result.get("locked") and existing.get("locked"):
+        # A re-run that could not finish never discards a model that passed the
+        # same live task before.
+        return {**existing, "status": "kept_previous_selection", "locked": True, "ran_now": False,
+                "requalify_error": f"{result.get('status')}: {result.get('reason') or ''}".strip(": ")[:500],
+                "navigation": navigation}
+    return result
 
 
 async def certify_live_runtime(
@@ -485,7 +531,7 @@ async def certify_live_runtime(
             bool(qualification.get("locked")),
             blocker=False,
             detail=_qualification_detail(qualification),
-            evidence={k: qualification.get(k) for k in ("status", "selected_model", "accuracy", "correct", "total", "qualified_at", "source", "fallback_order", "reason")}
+            evidence={k: qualification.get(k) for k in ("status", "selected_model", "accuracy", "correct", "total", "qualified_at", "source", "fallback_order", "reason", "requalify_error", "navigation")}
             | {"ranking": [{k: r.get(k) for k in ("model", "accuracy", "correct", "total", "latency_ms", "qualified", "error")} for r in qualification.get("ranking") or []]},
         ))
 

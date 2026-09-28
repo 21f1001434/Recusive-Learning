@@ -1,0 +1,138 @@
+{
+ "url": "https://developer.dell.com/hybrid-integrations/securelink/doctypes",
+ "heading": "Document Types",
+ "controls": [
+  {
+   "id": 0,
+   "role": "button",
+   "name": "Filter",
+   "label": "",
+   "placeholder": "",
+   "row": "",
+   "expanded": null,
+   "popup": false,
+   "expander": false
+  },
+  {
+   "id": 1,
+   "role": "textbox",
+   "name": "Table search",
+   "label": "",
+   "placeholder": "Table search",
+   "row": "",
+   "expanded": null,
+   "popup": false,
+   "expander": false
+  },
+  {
+   "id": 2,
+   "role": "button",
+   "name": "Manage Columns",
+   "label": "",
+   "placeholder": "",
+   "row": "",
+   "expanded": null,
+   "popup": false,
+   "expander": false
+  },
+  {
+   "id": 3,
+   "role": "button",
+   "name": "+ Add",
+   "label": "",
+   "placeholder": "",
+   "row": "",
+   "expanded": null,
+   "popup": false,
+   "expander": false
+  },
+  {
+   "id": 4,
+   "role": "button",
+   "name": "Expand the row",
+   "label": "",
+   "placeholder": "",
+   "row": "a-doc-type-test",
+   "expanded": "false",
+   "popup": false,
+   "expander": true
+  },
+  {
+   "id": 5,
+   "role": "button",
+   "name": "Expand the row",
+   "label": "",
+   "placeholder": "",
+   "row": "Abbvie_997_DocType",
+   "expanded": "false",
+   "popup": false,
+   "expander": true
+  },
+  {
+   "id": 6,
+   "role": "button",
+   "name": "Expand the row",
+   "label": "",
+   "placeholder": "",
+   "row": "Abbvie_SRC_DocType",
+   "expanded": "false",
+   "popup": false,
+   "expander": true
+  },
+  {
+   "id": 7,
+   "role": "button",
+   "name": "Expand the row",
+   "label": "",
+   "placeholder": "",
+   "row": "Abbvie_SRC_DocType_IN",
+   "expanded": "false",
+   "popup": false,
+   "expander": true
+  },
+  {
+   "id": 8,
+   "role": "button",
+   "name": "Expand the row",
+   "label": "",
+   "placeholder": "",
+   "row": "Abbvie_TRGT_Doctype",
+   "expanded": "false",
+   "popup": false,
+   "expander": true
+  },
+  {
+   "id": 9,
+   "role": "button",
+   "name": "Expand the row",
+   "label": "",
+   "placeholder": "",
+   "row": "Abbvie_TRGT_Doctype_IN",
+   "expanded": "false",
+   "popup": false,
+   "expander": true
+  },
+  {
+   "id": 10,
+   "role": "button",
+   "name": "Previous",
+   "label": "",
+   "placeholder": "",
+   "row": "",
+   "expanded": null,
+   "popup": false,
+   "expander": false
+  },
+  {
+   "id": 11,
+   "role": "button",
+   "name": "Next",
+   "label": "",
+   "placeholder": "",
+   "row": "",
+   "expanded": null,
+   "popup": false,
+   "expander": false
+  }
+ ]
+}

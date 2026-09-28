@@ -17,6 +17,10 @@ browser-use==0.13.8
 # LangChain Playwright Browser Toolkit (read-only recovery bridge).
 langchain-community==0.4.2
 psutil>=5.9.0,<8
+# V243R27: MLflow run tracking, read back by run-history learning (pinned as in pyproject.toml).
+mlflow-skinny==3.16.1
+# autogen-core 0.7.5 needs protobuf ~=5.29.3; MLflow's databricks-sdk excludes <=5.29.4.
+protobuf>=5.29.5,<5.30
 
 fastapi>=0.115.0
 uvicorn>=0.30.0
