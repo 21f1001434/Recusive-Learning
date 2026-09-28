@@ -55,6 +55,7 @@ Each navigation is recorded in `mcp_runtime/navigation_render_waits.jsonl` (modu
 **MLflow records again.**
 - The tracker allows the local store (`MLFLOW_ALLOW_FILE_STORE=true`, only for a `file:` store or a plain path; a server URI is untouched).
 - Each failed attempt is logged as `phase/<phase>/failure/<HIP_CODE>`, and each module's render time as `navigation/<module>/render_seconds`.
+- `mlflow.set_tracking_uri` also exports `MLFLOW_TRACKING_URI` to the whole process. The tracker now restores it, so a later mission or learner in the same process no longer takes the previous run root's store as "configured".
 - `APPLY_V243R27_IN_PLACE.ps1` installs `mlflow-skinny==3.16.1` if it is missing. protobuf stays on 5.29, which autogen needs.
 
 **Every mission first learns from the past runs** (`hip_id_agent/run_history_learning.py`), before its first phase:
@@ -100,7 +101,7 @@ Settings (`run_history_learning`): `enabled`, `apply_at_mission_start`, `include
 
 ## Tests
 
-`tests/test_v243r27_route_render_wait_and_run_history_learning.py` (16):
+`tests/test_v243r27_route_render_wait_and_run_history_learning.py` (17):
 
 **Real browser.** The Document Types replica gains `boot_delay_ms` (header first, module later), `stuck_loads` (first loads never boot) and the live route path `/hybrid-integrations/securelink/doctypes`.
 - A listing that renders after 5 s is waited for (`await_route_render`, no step spent) and recorded.
@@ -116,6 +117,7 @@ Settings (`run_history_learning`): `enabled`, `apply_at_mission_start`, `include
 **MLflow:**
 - the tracker records into the local store again (fails before the fix with MLflow's "filesystem tracking backend is in maintenance mode");
 - runs that exist only in MLflow (no run folder) are learned from their metric history and failure metrics, once.
+- one mission's tracker no longer redirects the next one's MLflow store.
 
 **Learning:**
 - run folders like `UHAUL-POASN-20260928-130654` (watchdog, then blocked) and a run completed after a 1500 s attempt give:
@@ -139,9 +141,9 @@ Settings (`run_history_learning`): `enabled`, `apply_at_mission_start`, `include
 | MLflow with the pinned 3.16.1 and no tracking URI | Before: the tracker's start failed ("filesystem tracking backend is in maintenance mode") and nothing was recorded. After: runs are recorded and read back (per-attempt `duration_seconds` history, failure metrics, tags). |
 | Control Center, real backend and browser | The "Learned from past runs" tile shows "2 runs • 3 lessons in use". The panel lists the lessons with their reasons. After a run that exists only in MLflow was added: "3 past run(s) learned (1 from MLflow); 5 lesson(s) in use. MLflow: read (1 new run(s))." |
 | `learn-from-runs` CLI, `/api/learning/run-history`, `/refresh`, `/api/runtime/status` | Lessons and per-phase history shown; HTTP 200 |
-| R27 tests | 16 passed |
+| R27 tests | 17 passed |
 | Closest suites (MLflow, R24 qualification, R25 certification job, R26, navigation controller, live certification, backend, Control Center, self-heal) with MLflow installed | 102 passed |
-| Full suite (202 files) | 1,504 passed, 1 skipped. Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
+| Full suite (202 files) | 1,504 passed, 1 skipped (before the MLflow environment fix and its test; the R27 and MLflow files were re-run after it: 36 passed). Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
 | 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
 | Dependencies | `mlflow-skinny==3.16.1` with `protobuf` 5.29.6: `pip check` reports no broken requirements (autogen-core 0.7.5 needs ~=5.29.3) |
 | `VERIFY_V243R27_INSTALL.ps1` R27 smoke checks | `R27_ROUTE_RENDER_WAIT_AND_MODEL_KEPT_OK`, `R27_RUN_HISTORY_LEARNING_OK`, `R27_MLFLOW_LOCAL_STORE_OK` (and the R26 checks it calls first) |

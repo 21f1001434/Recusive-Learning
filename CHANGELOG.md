@@ -12,7 +12,8 @@
   - `_qualification_detail` says "kept: …".
 - `mlflow_async`:
   - `allow_local_file_store` sets `MLFLOW_ALLOW_FILE_STORE=true` for a `file:` store or a plain path (MLflow 3.x refused the fallback store and the tracker switched itself off);
-  - `local_tracking_uri`.
+  - `local_tracking_uri`;
+  - after `mlflow.set_tracking_uri`, `MLFLOW_TRACKING_URI` is restored (MLflow exported it to the process, so the next tracker took the previous store as configured).
 - New `hip_id_agent/run_history_learning.py`:
   - `harvest_run_dir` and `harvest_mlflow`, each run once (`data/hip_memory/run_history/run_facts.json`; a running run is re-read when finished);
   - `derive_lessons`:
@@ -32,7 +33,7 @@
 - Control Center: the "Learned from past runs" tile and panel.
 - `requirements.txt`: `mlflow-skinny==3.16.1` (was only in pyproject) and `protobuf>=5.29.5,<5.30` (autogen-core ~=5.29.3; MLflow's databricks-sdk excludes ≤5.29.4). `APPLY_V243R27_IN_PLACE.ps1` installs MLflow when it is missing.
 - Replica `doctypes_listing_support.DocTypesPortal`: `boot_delay_ms`, `stuck_loads`, `live_path`. Fixture `tests/fixtures/doctypes_listing_screen.json`.
-- Tests: `tests/test_v243r27_route_render_wait_and_run_history_learning.py` (16).
+- Tests: `tests/test_v243r27_route_render_wait_and_run_history_learning.py` (17).
 
 # V243R26 — A filled Document Type is kept, retries get time, the section above is filled first (2026-09-28)
 

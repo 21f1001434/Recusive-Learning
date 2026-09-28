@@ -204,7 +204,15 @@ class AsyncMLflowTracker:
             self._mlflow = mlflow
             allow_local_file_store(self.tracking_uri)
             if self.tracking_uri:
+                # mlflow.set_tracking_uri also exports MLFLOW_TRACKING_URI to the
+                # process; restore it so a later mission / learner in the same
+                # process does not take this run root's store as "configured".
+                previous_env = os.environ.get("MLFLOW_TRACKING_URI")
                 mlflow.set_tracking_uri(self.tracking_uri)
+                if previous_env is None:
+                    os.environ.pop("MLFLOW_TRACKING_URI", None)
+                else:
+                    os.environ["MLFLOW_TRACKING_URI"] = previous_env
             if self.async_logging and hasattr(mlflow, "config") and hasattr(mlflow.config, "enable_async_logging"):
                 mlflow.config.enable_async_logging(True)
             if bool(getattr(self.config, "system_metrics", False)) and hasattr(mlflow.config, "enable_system_metrics_logging"):

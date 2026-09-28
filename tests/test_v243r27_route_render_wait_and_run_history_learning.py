@@ -338,6 +338,21 @@ def test_mlflow_records_runs_in_the_local_store_again(tmp_path: Path, monkeypatc
     assert (tmp_path / "runs" / "mlruns").is_dir()
 
 
+def test_one_mission_does_not_redirect_the_next_ones_mlflow_store(tmp_path: Path, monkeypatch):
+    pytest.importorskip("mlflow")
+    import os
+
+    from hip_id_agent.mlflow_async import AsyncMLflowTracker
+
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
+    first = AsyncMLflowTracker(AppConfig().mlflow, run_id="A", run_dir=tmp_path / "one" / "A", phases=[PHASE])
+    first.start()
+    first.finish(status="complete", application_complete=True)
+    assert "MLFLOW_TRACKING_URI" not in os.environ  # mlflow.set_tracking_uri exported it before
+    second = AsyncMLflowTracker(AppConfig().mlflow, run_id="B", run_dir=tmp_path / "two" / "B", phases=[PHASE])
+    assert second.tracking_uri_source == "local_file_fallback" and "/two/mlruns" in second.tracking_uri
+
+
 # ------------------------------------------------------- 4. run-history learning
 def _events(rows: List[Dict[str, Any]]) -> str:
     return "\n".join(json.dumps({"event": e, "payload": p}) for e, p in rows) + "\n"
