@@ -850,6 +850,17 @@ production_e2e:
   write_final_summary: true
   final_summary_filename: "production_final_summary.json"
 
+edit_sections:
+  # V243R30: every phase's Edit section (listing -> search -> expand -> Edit) is
+  # read completely (every tab, collapsed section and row), closed unsaved and
+  # remembered in <memory_dir>/edit_sections/<phase>.json (structure only; the
+  # values go to the run folder: edit_values.json and edit_input.json).
+  enabled: true
+  form_wait_seconds: 30
+  capture_on_edit: true
+  block_read_only_changes: true
+  verify_by_reopening_edit: true
+
 run_history_learning:
   # V243R27: at mission start the agent reads every past run once (run folders
   # and MLflow) and learns how long each phase / attempt really takes, what

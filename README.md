@@ -1,3 +1,23 @@
+## V243R30 — Every phase's Edit section learned, read and edited through (2026-09-29)
+
+- **Learn the Edit section.** For the Transport Profile, BizFlow, Data Map, Rule and Document Type, the agent:
+  - opens the listing link, searches the object, clicks the row's expand button and **Edit**;
+  - reads every value of the Edit form: every tab, collapsed section and row, with each field's input.json key, and which fields are read-only in Edit;
+  - closes it with Cancel, so nothing is saved.
+- **Remembered.** `edit_sections/<phase>.json` keeps the knowledge: path, form, fields, Save label, read-only fields. The values go to the run folder, including an input.json-shaped `edit_input.json`.
+- **How to run it:**
+  - ask in the task box ("capture the edit values of transport profile …", or "… same for the BizFlow and all the phases");
+  - `learn-edit-sections`;
+  - a `learn_edit` operation.
+- **Editing uses it:**
+  - a change to a read-only field (a rename) is NEEDS_INPUT before anything is touched;
+  - the learned Save is clicked once, through the mutation gate;
+  - the saved values are read back from the reopened Edit form;
+  - a BizFlow edit is proved and saved in one run.
+- **Fixed:** a HIP page whose URL contained "MAPPING" was taken for a Dell sign-in page (`HIP_AUTH_SESSION_EXPIRED`).
+
+See `V243R30_EDIT_SECTIONS_EVERY_PHASE_20260929.md`. Apply with `APPLY_V243R30_IN_PLACE.ps1`; it includes R13–R29.
+
 ## V243R29 — An exactly filled form completes the phase; every model re-validated, champion chosen (2026-09-29)
 
 - **The live form is the answer.** A fresh read-only proof checks every input.json value, row and upload, counting only committed values. When the form is exact, the phase completes: a model judge's objection is recorded as that model's mistake, a newly learned phase does not wait for a human, and a failed attempt is not replayed over a complete form.

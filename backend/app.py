@@ -1026,6 +1026,7 @@ def _runtime_status_payload(config: str = "config.yaml") -> Dict[str, Any]:
         },
         "model_portfolio": portfolio.manifest(),
         "run_history_learning": _run_history_summary(cfg),
+        "edit_sections": _edit_sections_summary(cfg),
         "portal_skills": _portal_skills_totals(cfg),
         "recursive_self_improvement": recursive_improvement_from_config(
             cfg, replay_policy=replay, model_portfolio=portfolio, skill_library=skills
@@ -1647,6 +1648,31 @@ def _run_history_summary(cfg: Any) -> Dict[str, Any]:
         "derived_at": lessons.get("derived_at"),
         "mlflow": lessons.get("mlflow") or {},
     }
+
+
+def _edit_sections_summary(cfg: Any) -> Dict[str, Any]:
+    """V243R30: which phases' Edit sections the agent knows (read from memory)."""
+    from hip_id_agent.edit_section_learning import EditSectionMemory
+
+    try:
+        summaries = EditSectionMemory(Path(cfg.reporting.memory_dir)).summaries()
+    except Exception as exc:
+        return {"known": 0, "total": 0, "status": "error", "error": mask_sensitive_string(str(exc))[:300]}
+    return {
+        "known": summaries["known"], "total": summaries["total"],
+        "phases": [{k: row.get(k) for k in ("phase", "known", "title", "kind", "tabs", "fields", "mapped", "read_only", "commit_labels", "updated_at")}
+                   for row in summaries["phases"]],
+    }
+
+
+@app.get("/api/learning/edit-sections")
+def edit_sections_status(config: str = "config.yaml") -> Dict[str, Any]:
+    """V243R30: the learned Edit sections (structure only; values stay in the run folders)."""
+    from hip_id_agent.edit_section_learning import ALL_PHASES, EditSectionMemory
+
+    cfg = _cfg(config)
+    memory = EditSectionMemory(Path(cfg.reporting.memory_dir))
+    return {"summary": _edit_sections_summary(cfg), "knowledge": {p: memory.load(p) for p in ALL_PHASES if memory.known(p)}}
 
 
 @app.get("/api/learning/run-history")

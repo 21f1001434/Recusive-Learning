@@ -1909,6 +1909,68 @@ def run_operations_cmd(
         raise typer.Exit(code=3)
 
 
+@app.command("learn-edit-sections")
+def learn_edit_sections_cmd(
+    input_json: str = typer.Argument("", help="input.json naming the objects to open (objects.<phase> names). Empty: the first row of each listing."),
+    phases: str = typer.Option("all", help="all, or a comma list: source_transport_profile,biz_flow,data_map,rule,source_document_type ..."),
+    target: str = typer.Option("", help="Object to open (one phase only). Empty: input.json's name, else the listing's first row."),
+    config: str = typer.Option("config.yaml", help="Path to config YAML."),
+    runs_dir: Optional[str] = typer.Option(None, help="Override run directory."),
+    show: bool = typer.Option(False, "--show", help="Only print what is already known about each Edit section; open nothing."),
+    headless: Optional[bool] = typer.Option(None, "--headless/--headed", help="Override config.portal.headless."),
+):
+    """V243R30: learn each phase's Edit section.
+
+    For every phase: open its listing link, search the object, click the row's
+    expander and Edit, read every field and value of the Edit form (every tab,
+    collapsed section and row), close it with Cancel -- nothing is saved -- and
+    remember the Edit section.  The values are written to the run folder
+    (edit_values.json, and edit_input.json shaped as input.json).
+    """
+    from .edit_section_learning import EditSectionMemory, learn_edit_sections, resolve_phases
+    from .dummy_fill_e2e import read_json_any
+
+    load_dotenv()
+    cfg = load_config(config)
+    if runs_dir:
+        cfg.reporting.runs_dir = runs_dir
+    if headless is not None:
+        cfg.portal.headless = headless
+    wanted = resolve_phases(phases)
+    if not wanted:
+        raise typer.BadParameter(f"no known phase in {phases!r}")
+    memory = EditSectionMemory(Path(cfg.reporting.memory_dir))
+    if show:
+        table = Table(title="Learned Edit sections")
+        for column in ("Phase", "Known", "Form", "Tabs", "Fields", "Mapped keys", "Read-only in Edit", "Save label", "Path"):
+            table.add_column(column)
+        for row in memory.summaries(wanted)["phases"]:
+            table.add_row(row["phase"], "yes" if row.get("known") else "no", f"{row.get('title') or ''} ({row.get('kind') or ''})" if row.get("known") else "",
+                          ", ".join(row.get("tabs") or []), str(row.get("fields") or ""), str(row.get("mapped") or ""),
+                          ", ".join(row.get("read_only") or []), ", ".join(row.get("commit_labels") or []), " > ".join(row.get("path") or []))
+        console.print(table)
+        return
+    payload = read_json_any(input_json) if input_json else {}
+    if not isinstance(payload, dict):
+        payload = {}
+    enforce_required_mcp_profile(cfg)
+    rid = make_run_id("HIP-EDIT-SECTIONS")
+    run_dir = Path(cfg.reporting.runs_dir) / rid
+    run_dir.mkdir(parents=True, exist_ok=True)
+    targets = {wanted[0]: target} if target and len(wanted) == 1 else None
+    report = asyncio.run(learn_edit_sections(cfg, payload, run_dir=run_dir, phases=wanted, targets=targets))
+    table = Table(title="Edit sections learned (nothing saved on the portal)")
+    for column in ("Phase", "Object", "Result", "Fields", "Tabs", "Read-only in Edit", "Values"):
+        table.add_column(column)
+    for row in report.get("summary") or []:
+        table.add_row(str(row.get("phase")), str(row.get("target") or ""), f"{row.get('result')} ({row.get('status')})", str(row.get("fields") or ""),
+                      ", ".join(row.get("tabs") or []), ", ".join(row.get("read_only") or []), str(row.get("values_file") or ""))
+    console.print(table)
+    console.print(f"Report: {run_dir / 'edit_section_learning_report.json'}  Knowledge: {memory.root}")
+    if not report.get("pass"):
+        raise typer.Exit(code=3)
+
+
 @app.command("portal-skills")
 def portal_skills_cmd(
     config: str = typer.Option("config.yaml", help="Path to config YAML."),

@@ -1,3 +1,34 @@
+# V243R30 — Every phase's Edit section learned, read and edited through (2026-09-29)
+
+- New `hip_id_agent/edit_section_learning.py`:
+  - `EditSectionLearner.learn(phase, target)`: listing → search (the exact row; else input.json's name; else the first row) → row expander → Edit (the R24 `open_surface` path) → `wait_for_edit_surface` → `capture` → `close` (Cancel / Close / Back, a "discard?" dialog, Escape, else the listing) → remember;
+  - `capture` reads every tab, opens collapsed sections and keeps only the controls inside the Edit surface, with no search boxes. It reads dropdown options from their own listbox and shown file names;
+  - `build_fields` gives one field per question (radio / checkbox groups), kind, required, read-only; secrets are masked;
+  - `map_fields_to_input` binds with `build_phase_form_state_model` (structurally: disabled controls are not penalised) and infers the keys of extra rows;
+  - `input_json_from_fields`, `compare_requested`;
+  - `EditSectionMemory` (`<memory_dir>/edit_sections/<phase>.json`, value-free: opener path, surface, fields, read-only fields, input keys, portal-only fields, Save / Cancel labels, row groups, fingerprint, verified count);
+  - `learn_edit_sections` for many phases in one browser;
+  - run evidence: `edit_values.json`, `edit_input.json`, `edit_section_learning.json`, `edit_section_learning_report.json`.
+- `portal_operations`:
+  - new operation `learn_edit` (`edit_section_learned` → SUCCESS);
+  - Edit / Clone wait for the Edit surface before reading or filling it;
+  - Edit reads the whole Edit form first (`_capture_edit_section`, knowledge refreshed) and stops a change to a field read-only in Edit with NEEDS_INPUT (`_read_only_changes`);
+  - the learned Save label is tried first;
+  - after a committed Edit whose details do not show every value, `read_back_edit_form` reopens the Edit form (`after.source: edit_form_reopened`); not kept → `committed_values_not_seen`;
+  - `_requested_fields` / `_plan_changes` carry `input_path`;
+  - a BizFlow Edit / Clone is proved in the same operation: reopen and deterministic replay (`learned_then_replayed`).
+- `portal_skills.OPERATION_ALIASES`: `learn_edit` (learn / capture / read / view edit …).
+- `task_operations`:
+  - capture / learn / read + Edit without a change verb → `learn_edit`, for the named phases in the order named, or every phase ("all the phases");
+  - a verb right after "to" / "as" / "=" / ":" is a value, not an operation;
+  - the "proflie" spelling;
+  - the plan steps: capture / close / remember.
+- `browser_session`: SSO keywords are matched as URL words (`_url_words_name_sso`, `HIP_SURFACE_PATH_MARKERS`), in `_is_sso_transition_url` and `_looks_logged_in`. "ping" in "MAPPING" made the BizFlow Edit page an SSO redirect.
+- CLI `learn-edit-sections [input.json] [--phases] [--target] [--show]`.
+- Backend: `runtime.edit_sections` and `GET /api/learning/edit-sections`. Control Center tile "Edit sections known".
+- Config: `edit_sections.form_wait_seconds` / `capture_on_edit` / `block_read_only_changes` / `verify_by_reopening_edit`.
+- Tests: `tests/test_v243r30_edit_sections_every_phase.py` (13), with the new replica `tests/phase_listing_support.py` (Transport Profile / Data Map Edit drawers, Business Flow / Rule Edit pages, filled from stored records, Save kept by the server).
+
 # V243R29 — An exactly filled form completes the phase; every model re-validated, champion chosen (2026-09-29)
 
 - New `hip_id_agent/input_json_authority.py`:

@@ -345,6 +345,9 @@ def _hash_value(value: str | None) -> str | None:
     return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()
 
 
+# V243R30: paths of the HIP portal itself -- never a Dell sign-in page.
+HIP_SURFACE_PATH_MARKERS = ("/hybrid-integrations/", "/securelink/")
+
 class BrowserSession:
     """HIP browser session with dual MCP execution and evidence.
 
@@ -2255,8 +2258,31 @@ class BrowserSession:
         )
         if host in known_auth_hosts or host.startswith("login.") or host.startswith("auth."):
             return True
-        haystack = f"{host}{path}"
-        return any(str(k or "").lower() in haystack for k in self.config.portal.sso_login_url_keywords)
+        return self._url_words_name_sso(host, path)
+
+    # V243R30: the SSO keywords are matched as URL words, not as substrings.  As
+    # substrings "ping" matched every HIP page whose URL carries an object name
+    # such as U-HAUL_PC_856_ANS_MAPPING_OB (a BizFlow's Edit page), "auth"
+    # matched "author", and the agent stopped with HIP_AUTH_SESSION_EXPIRED on a
+    # signed-in page.  A HIP route (/hybrid-integrations/, /securelink/) on the
+    # portal's own host is never a sign-in page.
+    _SSO_WORD_FORMS = frozenset({
+        "authorize", "authorization", "authenticate", "authentication", "signon", "logon", "oauth2", "saml2", "openid",
+    })
+
+    def _url_words_name_sso(self, host: str, path: str) -> bool:
+        host = str(host or "").lower()
+        path = str(path or "").lower()
+        if any(marker in path for marker in HIP_SURFACE_PATH_MARKERS):
+            return False
+        keywords = [str(k or "").strip().lower() for k in self.config.portal.sso_login_url_keywords if str(k or "").strip()]
+        for word in re.findall(r"[a-z0-9]+", f"{host} {path}"):
+            for key in keywords:
+                if word == key or (word.startswith(key) and word[len(key):].isdigit()):
+                    return True
+                if word in self._SSO_WORD_FORMS and word.startswith(key):
+                    return True
+        return False
 
     async def _adopt_best_page_for_url(self, expected_url: str) -> Optional[Page]:
         """Adopt the most relevant local tab after SSO redirects or popup transitions."""
@@ -3546,7 +3572,7 @@ class BrowserSession:
 
     async def _looks_logged_in(self, page: Page) -> bool:
         url = page.url.lower()
-        if any(k.lower() in url for k in self.config.portal.sso_login_url_keywords):
+        if self._is_sso_transition_url(url):
             return False
         if any(p.lower() in url for p in self.config.portal.sso_success_url_patterns):
             return True

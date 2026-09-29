@@ -47,6 +47,9 @@ SCHEMA = "hip.portal-skill-library.v1"
 CHOICE_ACTIONS = {"select_single", "select_multi", "select_radio", "toggle", "select_checkbox_group"}
 STRUCTURE_NOVELTY = {"new_input_field", "new_field_revealed", "unresolved_input", "uncovered_required", "surface_changed"}
 OPERATION_ALIASES: Dict[str, Sequence[str]] = {
+    # V243R30: open the Edit form, read every value, close it unsaved, remember it.
+    "learn_edit": ("learn edit", "learn edit section", "capture edit", "capture", "read edit", "view edit", "edit section",
+                   "learn_edit", "capture edit values", "read edit values"),
     "create": ("create", "add", "new"),
     "edit": ("edit", "update", "modify", "change"),
     "clone": ("clone", "copy", "duplicate"),

@@ -32,7 +32,7 @@ from .portal_skills import COMMIT_LABELS
 _FAMILIES = (
     ("biz_flow", r"\bbiz\s*flows?\b|\bbizflows?\b|\bbusiness\s+flows?\b"),
     ("document_type", r"\bdoc(?:ument)?[\s_-]*types?\b|\bdoctypes?\b"),
-    ("transport_profile", r"\btransport[\s_-]*profiles?\b"),
+    ("transport_profile", r"\btransport[\s_-]*pr?o?f(?:ile|lie|il|ie)?s?\b"),
     ("data_map", r"\bdata[\s_-]*maps?\b|\bdatamaps?\b"),
     ("rule", r"\brules?\b"),
 )
@@ -110,13 +110,79 @@ def _panel(task: str, operation: str) -> Dict[str, str]:
     return panel
 
 
+# V243R30: "open the Transport Profile, expand it, click Edit and capture all the
+# values" -- read the Edit form, change nothing, remember the Edit section.
+_LEARN_EDIT = r"\b(?:captur\w*|learn\w*|read\w*|view\w*|show\w*|record\w*|remember\w*|get|know\w*|inspect\w*|explor\w*)\b"
+# "save it so that it already has knowledge of the Edit section" saves the
+# knowledge, not the object: only a change verb turns the request into an Edit.
+_CHANGE = r"\b(?:chang\w*|set|sets|setting|updat\w*|modif\w*|replac\w*|renam\w*)\b"
+_EVERY_PHASE = r"\b(?:all|every|each)\s+(?:the\s+|of\s+the\s+)?(?:phases?|pashes?|phses?|objects?|forms?|sections?|modules?|pages?)\b"
+
+
+def _phases_in_order(text: str) -> List[str]:
+    """Object families in the order the request names them."""
+    hits = []
+    for family, pattern in _FAMILIES:
+        m = re.search(pattern, str(text or ""), re.I)
+        if m:
+            hits.append((m.start(), family))
+    return [family for _, family in sorted(hits)]
+
+
+def _phase_for_family(text: str, family: str) -> str:
+    if family in {"document_type", "transport_profile"}:
+        return f"target_{family}" if re.search(r"\btarget\b", str(text or ""), re.I) else f"source_{family}"
+    return family
+
+
+def _learn_edit_specs(text: str) -> List[Dict[str, Any]]:
+    if not (re.search(r"\bedit\b", text, re.I) and re.search(_LEARN_EDIT, text, re.I) and not re.search(_CHANGE, text, re.I)):
+        return []
+    from .edit_section_learning import ALL_PHASES
+
+    phase = _phase(text)
+    named = _phases_in_order(text)
+    if re.search(_EVERY_PHASE, text, re.I):
+        # "the Transport Profile ... same for the BizFlow and all the phases": the
+        # named ones first, in the order asked, then every other phase.
+        phases = [p for fam in named for p in ALL_PHASES if p == fam or p.endswith(fam)]
+        phases += [p for p in ALL_PHASES if p not in phases]
+    elif len(named) > 1:
+        phases = [p for fam in named for p in ALL_PHASES if p.endswith(fam) and (p == _phase_for_family(text, fam))]
+    elif phase:
+        phases = [phase]
+        if phase.endswith("transport_profile") and not re.search(r"\b(?:source|target)\b", text, re.I):
+            phases = ["source_transport_profile"]
+    else:
+        return []
+    target = _target(text) if len(phases) == 1 else ""
+    specs = []
+    for p in phases:
+        spec: Dict[str, Any] = {"phase": p, "operation": "learn_edit", "source": "task_box", "commit": False}
+        if target:
+            spec["target"] = target
+        panel = _panel(text, "learn_edit")
+        if panel:
+            spec["panel"] = panel
+        specs.append(spec)
+    return specs
+
+
 def task_operation_specs(task: str, input_data: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
     """Operation specs for a free-text request, or ``[]`` when it is not one."""
     text = str(task or "")
+    learn = _learn_edit_specs(text)
+    if learn:
+        return learn
     phase = _phase(text)
     if not phase:
         return []
-    found = sorted((m.start(), op) for op, pattern in _VERBS for m in [re.search(pattern, text, re.I)] if m)
+    # V243R30: a verb right after "to" / "as" / "=" is a value ("set Post Transfer
+    # Action to Delete"), not a second operation.
+    found = sorted(
+        (m.start(), op) for op, pattern in _VERBS
+        for m in [next((x for x in re.finditer(pattern, text, re.I) if not re.search(r"(?:\bto|\bas|[=:])\s*['\"]?$", text[:x.start()], re.I)), None)]
+        if m)
     operations = list(dict.fromkeys(op for _, op in found))
     save = bool(re.search(_SAVE, text, re.I))
     target = _target(text)
@@ -163,6 +229,15 @@ def plan_task_operations(task: str, input_data: Optional[Mapping[str, Any]] = No
         phase, operation = spec["phase"], spec["operation"]
         url = str(listing_urls.get(phase) or "")
         steps.append({"type": "navigate", "target": url, "risk": "read", "phase": phase})
+        if operation == "learn_edit":
+            steps += [
+                {"type": "search", "target": spec.get("target") or f"objects.{phase} name, else the first row", "risk": "read"},
+                {"type": "open_row_action", "click": ["Expand the row", "Edit"], "exact_row_match": True, "risk": "read"},
+                {"type": "capture", "what": "every field and value of the Edit form: every tab, collapsed section and row", "risk": "read"},
+                {"type": "close", "click": ["Cancel", "Close", "Back"], "saves": False, "risk": "read"},
+                {"type": "remember", "what": f"edit_sections/{phase}.json (structure, value-free); values -> run folder edit_values.json + edit_input.json", "risk": "read"},
+            ]
+            continue
         if operation == "create":
             steps.append({"type": "open", "click": list(ADD_LABELS), "risk": "read"})
         else:

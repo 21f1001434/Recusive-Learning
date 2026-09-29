@@ -830,6 +830,22 @@ class BrowserUseConfig(BaseModel):
 
 
 
+class EditSectionsConfig(BaseModel):
+    """V243R30: each phase's Edit section -- opened from its listing (search,
+    row expander, Edit), read completely (every tab, collapsed section, row),
+    closed unsaved and remembered in ``<memory_dir>/edit_sections``.
+    """
+    enabled: bool = True
+    # How long to wait for the Edit form itself (the portal fills it from the record).
+    form_wait_seconds: float = 30.0
+    # Edit operations read the whole Edit form first and refresh the knowledge.
+    capture_on_edit: bool = True
+    # A requested change to a field that is read-only in Edit stops before anything is touched.
+    block_read_only_changes: bool = True
+    # After a committed Edit, reopen the Edit form to read back what the details do not show.
+    verify_by_reopening_edit: bool = True
+
+
 class RunHistoryLearningConfig(BaseModel):
     """V243R27: learn from past runs (run folders and MLflow) at mission start.
 
@@ -1243,6 +1259,7 @@ class AppConfig(BaseModel):
     live_runtime_certification: LiveRuntimeCertificationConfig = Field(default_factory=LiveRuntimeCertificationConfig)
     mlflow: MLflowConfig = Field(default_factory=MLflowConfig)
     run_history_learning: RunHistoryLearningConfig = Field(default_factory=RunHistoryLearningConfig)
+    edit_sections: EditSectionsConfig = Field(default_factory=EditSectionsConfig)
     universal_operator: UniversalOperatorConfig = Field(default_factory=UniversalOperatorConfig)
     skill_induction: SkillInductionConfig = Field(default_factory=SkillInductionConfig)
     replay_policy: ReplayPolicyConfig = Field(default_factory=ReplayPolicyConfig)

@@ -99,8 +99,10 @@ def test_edit_is_learned_proved_committed_then_replayed_without_model_calls(tmp_
     assert (beta["profileUsage"], beta["interfaceEnvironment"], beta["postTransferAction"]) == ("Sender", "PROD", "Move To Archive")
     # The learning run consulted the per-action model for every field; the
     # certified replay only to search, open the row action, Save and check the
-    # listing -- never for a form field.
-    assert replay_calls <= 6 and learn_calls >= replay_calls + 10, (learn_calls, replay_calls)
+    # listing -- never for a form field.  V243R30: plus the read-back of the saved
+    # values from the reopened Edit form (search, open the row action, Cancel).
+    assert op["after"]["source"] == "edit_form_reopened" and op["after"]["all_seen"] is True
+    assert replay_calls <= 10 and learn_calls >= replay_calls + 10, (learn_calls, replay_calls)
     assert op["fill"]["replay_seconds"] < learn["operations"][0]["fill"]["learn_seconds"]
     skill = next(iter(_skills(tmp_path)["skills"].values()))
     assert skill["status"] == "certified" and skill["commit"] == {"label": "save", "verified": 2}

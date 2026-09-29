@@ -88,6 +88,7 @@ class OperationNeedsInput(Exception):
 RESULTS = {
     "committed_and_verified": "SUCCESS", "committed": "SUCCESS", "filled_not_committed": "SUCCESS",
     "validated_not_committed": "SUCCESS", "already_in_target": "EXISTING", "no_change_needed": "EXISTING",
+    "edit_section_learned": "SUCCESS",
     "needs_input": "NEEDS_INPUT", "blocked_mutation_authorization": "BLOCKED", "commit_not_authorized": "BLOCKED",
     "commit_waiting_for_certified_skill": "BLOCKED",
 }
@@ -474,6 +475,11 @@ class PortalOperationRunner:
         self.effect_timeout = float(getattr(ops_cfg, "commit_effect_timeout_seconds", 20.0) or 20.0)
         # V243R24: an Edit / Clone that changed fields nobody asked for is not saved.
         self.block_unrelated_changes = bool(getattr(ops_cfg, "block_unrelated_changes", True))
+        # V243R30: the Edit section is read first, read-only fields guarded, the save read back.
+        edit_cfg = getattr(config, "edit_sections", None)
+        self.edit_capture = bool(getattr(edit_cfg, "enabled", True)) and bool(getattr(edit_cfg, "capture_on_edit", True))
+        self.block_read_only = bool(getattr(edit_cfg, "block_read_only_changes", True))
+        self.verify_by_edit = bool(getattr(edit_cfg, "verify_by_reopening_edit", True))
 
     # ------------------------------------------------------------------ helpers
     def _listing_url(self, phase: str) -> str:
@@ -711,8 +717,9 @@ class PortalOperationRunner:
             names = [_label_key(x) for x in [*(loc.get("labels") or []), *(loc.get("placeholders") or []), *(loc.get("names") or [])] if str(x).strip()]
             path = str(node.get("input_path") or "")
             top = path.split(".")[3] if path.count(".") == 3 else ""
+            rel = ".".join(path.split(".")[3:]) if path.startswith("$.") and path.count(".") >= 3 else path
             rows.append({"field": str(node.get("field_key") or ""), "labels": list(dict.fromkeys(names)), "row_index": node.get("row_index"),
-                         "requested": node.get("expected_value"), "top_key": top})
+                         "requested": node.get("expected_value"), "top_key": top, "input_path": rel})
         return rows
 
     @staticmethod
@@ -724,7 +731,8 @@ class PortalOperationRunner:
             current = next((before[f"{label}#{index}"] for label in f.get("labels") or [] if f"{label}#{index}" in before), None)
             requested = f.get("requested")
             plan.append({"field": f.get("field"), "current": current, "requested": requested,
-                         "change": current is None or not _same_value(current, requested), "top_key": f.get("top_key")})
+                         "change": current is None or not _same_value(current, requested), "top_key": f.get("top_key"),
+                         "input_path": f.get("input_path")})
         return plan
 
     # ------------------------------------------------------------------ open
@@ -809,6 +817,14 @@ class PortalOperationRunner:
                     action_label=labels[0], allow_compound_menu=True,
                 )
                 audit["path"].append(f"semantic:{operation}")
+        if operation in {"edit", "clone"} and form_phase == phase:
+            # V243R30: the drawer / page the action opened -- filled by the portal
+            # from the record a moment later -- not the listing behind it.
+            from .edit_section_learning import wait_for_edit_surface
+
+            wait = float(getattr(getattr(self.config, "edit_sections", None), "form_wait_seconds", 30.0) or 30.0)
+            surface = await wait_for_edit_surface(await self._page(), timeout_s=wait)
+            audit["edit_surface"] = {k: surface.get(k) for k in ("found", "ready", "kind", "title", "controls")}
         audit["form_visible"] = await self._wait_for_form(form_phase)
         if operation != "create":
             opener = (OPENER_LABELS.get(operation) or (operation.title(),))[0]
@@ -843,7 +859,19 @@ class PortalOperationRunner:
         kwargs: Dict[str, Any] = {"executor": execute_document_type_state_graph} if "document_type" in form_phase and not form_phase.startswith("universal_") else {}
         max_cycles = int(getattr(getattr(self.config, "autonomous_form", None), "max_cycles", 4) or 4)
         if form_phase == "biz_flow":
-            return await self._fill_bizflow(page, graph, payload, out_dir, max_cycles)
+            result = await self._fill_bizflow(page, graph, payload, out_dir, max_cycles)
+            learned = (result.get("skill") or {}).get("outcome") or {}
+            if (payload.get("_operation") in {"edit", "clone"} and reopen is not None and result.get("pass")
+                    and learned.get("status") != "certified"):
+                # V243R30: an Edit / Clone page can be opened again as a whole, so the
+                # tabs' new skills are proved by a replay now instead of on the next
+                # run: reopen the object's form and replay the fill deterministically.
+                await reopen()
+                proof = await self._fill_bizflow(await self._page(), graph, payload, out_dir / "replay_proof", max_cycles)
+                proof["learned_then_replayed"] = True
+                proof["execution_mode"] = "learned_then_certified_by_replay" if (proof.get("skill") or {}).get("outcome", {}).get("status") == "certified" else proof.get("execution_mode")
+                return proof
+            return result
         return await execute_autonomous_phase_goal(
             page=page, graph=graph, phase=form_phase, input_data=payload, config=self.config,
             output_dir=out_dir, max_cycles=max_cycles, repair=True, strict_live_execution=True,
@@ -1120,6 +1148,18 @@ class PortalOperationRunner:
                 return self._needs_input(row, OperationNeedsInput(
                     "name", "a clone needs a new, unique name; the source object's name is taken", observed=target,
                     source=f"objects.{phase}.name (a new name) or the task text"), started, out_dir)
+        if operation == "learn_edit":
+            # V243R30: open the Edit form, read every value, close it unsaved and
+            # remember the Edit section.  Read-only: nothing to authorize.
+            from .edit_section_learning import EditSectionLearner
+
+            learned = await EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls).learn(
+                phase, target=target, input_data=input_data, options=options, out_dir=out_dir)
+            row.update({k: learned.get(k) for k in (
+                "pass", "status", "target", "target_source", "open", "close", "capture", "fields", "input_json", "values_file",
+                "edit_input_file", "knowledge", "knowledge_file", "no_write_requests", "write_requests", "needs_input", "reason", "learned_mode")
+                if k in learned})
+            return self._finish(row, started, out_dir)
         if operation != "create" and _GUARDED.search(opener) and not gate.get("pass"):
             # The row action itself (Deploy, Delete ...) is a portal mutation.
             row.update({"pass": False, "status": "blocked_mutation_authorization",
@@ -1127,6 +1167,7 @@ class PortalOperationRunner:
             return self._finish(row, started, out_dir)
         task_id = f"op-{uuid.uuid4().hex[:10]}"
         fields: List[Dict[str, Any]] = []
+        edit_capture: Dict[str, Any] = {}
         if gate.get("pass") and _GUARDED.search(opener):
             self.browser.set_portal_mutation_authorization(enabled=True, allowed_labels=[opener], task_id=task_id)
         try:
@@ -1142,12 +1183,25 @@ class PortalOperationRunner:
                 return await self._menu_choice(row, values=values, gate=gate, task_id=task_id, target=target, phase=phase,
                                                opener=opener, commit_wanted=commit_wanted, started=started, out_dir=out_dir)
             if operation in {"edit", "clone"} and form_phase == phase and row["open"].get("form_visible"):
+                if operation == "edit" and self.edit_capture:
+                    # V243R30: read the whole Edit form first (every tab, read-only)
+                    # and refresh the learned Edit section with it.
+                    edit_capture = await self._capture_edit_section(phase, input_data, row)
                 # V243R24 EDIT SAFETY: capture the form as it is, compare every
                 # requested value with it, and only change what differs.
                 row["before"] = await self._form_snapshot()
                 fields = self._requested_fields(form_phase, values)
                 row["changes"] = self._plan_changes(fields, row["before"])
                 if operation == "edit" and row["changes"]:
+                    locked = self._read_only_changes(row["changes"], edit_capture) if self.block_read_only else []
+                    if locked:
+                        await self._leave_edit_form(phase, edit_capture)
+                        return self._needs_input(row, OperationNeedsInput(
+                            locked[0]["label"],
+                            f"read-only in {edit_capture.get('title') or 'the Edit form'}: the portal does not let Edit change "
+                            + ", ".join(f"{x['label']!r}" for x in locked) + "; nothing was changed",
+                            observed={x["label"]: x["current"] for x in locked},
+                            source="leave it as it is, or Clone the object to give it a new name"), started, out_dir)
                     if not any(c["change"] for c in row["changes"]):
                         row.update({"pass": True, "status": "no_change_needed",
                                     "reason": "every requested value already equals the current one; nothing was changed"})
@@ -1212,7 +1266,9 @@ class PortalOperationRunner:
         skill_id = str(outcome.get("skill_id") or skill.get("skill_id") or "")
         store = PortalSkillStore.for_run(self.config, await self._page())
         learned = store.commit_label(form_phase, skill_id) if store is not None else ""
-        labels = list(dict.fromkeys([x for x in [learned, *(spec.get("commit_labels") or []), *COMMIT_LABELS.get(operation, ("Save",))] if x]))
+        # V243R30: the Save the Edit form shows (learned: "Update", "Submit" ...) comes first.
+        seen_commit = list(edit_capture.get("commit_labels") or []) if operation == "edit" else []
+        labels = list(dict.fromkeys([x for x in [learned, *(spec.get("commit_labels") or []), *seen_commit, *COMMIT_LABELS.get(operation, ("Save",))] if x]))
         committed = await self.commit(labels=labels, gate=gate, task_id=task_id, entity=target)
         row["commit"] = committed
         if committed.get("pass") and store is not None and skill_id:
@@ -1236,6 +1292,18 @@ class PortalOperationRunner:
             if row["pass"] and "expand row" in (row["open"].get("path") or []) and fields:
                 # V243R24: re-open the object's details and read the requested values back.
                 row["after"] = await self.read_details(phase=phase, target=name, options=options, fields=fields)
+            if row["pass"] and operation == "edit" and fields and self.verify_by_edit and (row.get("after") or {}).get("all_seen") is not True:
+                # V243R30: the details do not show every edited field -- reopen the
+                # Edit form (read-only) and read them there.
+                reread = await self.read_back_edit_form(phase=phase, target=name, options=options, values=values, input_data=input_data)
+                row["after_edit_form"] = reread
+                if reread.get("read"):
+                    row["after"] = {**(row.get("after") or {}), "source": "edit_form_reopened",
+                                    "requested_values_seen": reread.get("requested_values_seen"), "all_seen": reread.get("all_seen")}
+                    if reread.get("all_seen") is False:
+                        row["pass"] = False
+                        row["status"] = "committed_values_not_seen"
+                        row["reason"] = "saved, but the reopened Edit form does not show every requested value"
         else:
             row.update({"pass": True, "status": "committed"})
         return self._finish(row, started, out_dir)
@@ -1290,6 +1358,77 @@ class PortalOperationRunner:
         if row["pass"] and guard.get("retained") and hasattr(self.browser, "resolve_mutation_dispatch_guard"):
             row["reconciliation_by_listing"] = self.browser.resolve_mutation_dispatch_guard({"classification": "committed_verified", "pass": True})
         return self._finish(row, started, out_dir)
+
+    async def _capture_edit_section(self, phase: str, input_data: Mapping[str, Any], row: Dict[str, Any]) -> Dict[str, Any]:
+        """V243R30: the open Edit form, read completely (read-only), remembered."""
+        from .edit_section_learning import EditSectionLearner, EditSectionMemory
+
+        out: Dict[str, Any] = {}
+        try:
+            memory = EditSectionMemory.for_run(self.config, await self._page())
+            known = memory.summary(phase) if memory is not None else {"known": False}
+            capture = await EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls).capture(
+                phase, input_data=input_data)
+            if not capture.get("pass"):
+                row["edit_section"] = {"captured": False, "status": capture.get("status"), "known_before": bool(known.get("known"))}
+                return out
+            surface = capture.get("surface") or {}
+            if memory is not None:
+                memory.record(phase, {**capture, "listing_url": self._listing_url(phase)}, opener=row.get("open"), source="edit_operation")
+            out = {
+                "fields": capture.get("fields") or [], "title": surface.get("title"), "token": capture.get("surface_token"),
+                "commit_labels": [b for b in surface.get("buttons") or [] if re.fullmatch(r"(?i)save|save changes|update|submit", b)],
+            }
+            row["edit_section"] = {
+                "captured": True, "known_before": bool(known.get("known")), "title": surface.get("title"), "kind": surface.get("kind"),
+                "tabs": [t.get("text") for t in surface.get("tabs") or []], "fields": capture.get("field_count"),
+                "read_only": sorted({f["label"] for f in out["fields"] if f.get("read_only")}),
+                "commit_labels": out["commit_labels"],
+            }
+        except Exception as exc:
+            row["edit_section"] = {"captured": False, "error": mask_sensitive_string(str(exc))[:300]}
+        return out
+
+    @staticmethod
+    def _read_only_changes(changes: Sequence[Mapping[str, Any]], capture: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        """Requested changes to fields the Edit form keeps read-only (Profile Name ...)."""
+        by_key = {str(f.get("input_key")): f for f in capture.get("fields") or [] if f.get("input_key")}
+        locked: List[Dict[str, Any]] = []
+        for change in changes:
+            field = by_key.get(str(change.get("input_path") or ""))
+            if change.get("change") and field is not None and field.get("read_only"):
+                locked.append({"label": str(field.get("label") or change.get("field")), "current": field.get("value"),
+                               "requested": change.get("requested")})
+        return locked
+
+    async def _leave_edit_form(self, phase: str, capture: Mapping[str, Any]) -> None:
+        from .edit_section_learning import EditSectionLearner
+
+        try:
+            await EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls).close(
+                str(capture.get("token") or ""), self._listing_url(phase))
+        except Exception:
+            pass
+
+    async def read_back_edit_form(self, *, phase: str, target: str, options: Mapping[str, Any], values: Mapping[str, Any],
+                                  input_data: Mapping[str, Any]) -> Dict[str, Any]:
+        """Reopen the object's Edit form, read the requested values, close it unsaved."""
+        from .edit_section_learning import EditSectionLearner, compare_requested
+
+        learner = EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls)
+        try:
+            opened = await self.open_surface(phase=phase, operation="edit", target=target, form_phase=phase, options=options)
+            if not opened.get("form_visible"):
+                return {"read": False, "reason": "the Edit form did not open again"}
+            capture = await learner.capture(phase, input_data=input_data)
+            closed = await learner.close(str(capture.get("surface_token") or ""), self._listing_url(phase))
+            if not capture.get("pass"):
+                return {"read": False, "reason": str(capture.get("status") or "capture_failed"), "closed": closed}
+            return {"read": True, "closed": closed.get("closed"), **compare_requested(capture.get("fields") or [], values)}
+        except OperationNeedsInput as exc:
+            return {"read": False, "reason": exc.detail.get("reason")}
+        except Exception as exc:
+            return {"read": False, "reason": mask_sensitive_string(str(exc))[:300]}
 
     async def read_details(self, *, phase: str, target: str, options: Mapping[str, Any], fields: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         """Re-open the object's expanded details and check the requested values."""
