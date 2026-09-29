@@ -86,6 +86,7 @@ Reproduced on the Document Type replica. Its lists now break from the second for
 | Closest suites (R26 parent-first, R18 real-browser loader ladder, R14 full Document Type, R15 Transport Profile / Data Map / Rule / BizFlow, R17 variants, self-heal loop, DDS commit layer) | passed |
 | Full suite (203 files) | 1,514 passed, 1 skipped. Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
 | 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
+| Package `HIP_PORTAL_V243R28_FINAL_FULL_E2E_20260929.zip` | Every tracked file identical to the branch; the three wheels match the source; the R13–R28 install smoke checks (51) pass from the extracted package; 69 tests pass from it (R28 incl. the real-browser recovery, R27, self-heal loop, loader ladder, DDS commit layer, input contract incl. the upload assets, Control Center) |
 | `VERIFY_V243R28_INSTALL.ps1` R28 smoke checks | `R28_EMPTY_DROPDOWN_DETECTED_OK`, `R28_RESTART_BROWSER_RECOVERY_OK` (and the R27 checks it calls first) |
 
 ## Apply
