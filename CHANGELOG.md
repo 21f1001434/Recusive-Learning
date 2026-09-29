@@ -1,3 +1,19 @@
+# V243R28 — A dropdown with no values: close and reopen the browser, same page, open the form, fill it (2026-09-29)
+
+- `dds_control_driver`:
+  - the single- and multi-select snapshots drop "No data found"-like placeholders and report `empty_text` / `no_data` / `list_loading`;
+  - `snapshot_options_empty`;
+  - `_confirm_options_empty` closes and re-opens an empty list for up to `page._hip_empty_options_confirm_seconds` (12 s), at least 4 times (re-opens poll 1 s), plus a second window for a list still "Loading…";
+  - `select_dds_combobox` / `select_dds_multiselect` return False with `reason: HIP_DROPDOWN_OPTIONS_EMPTY`, `options_empty`, `empty_text`, and never search/type into an empty list.
+- `stateful_form_runtime._raise_if_dropdown_options_empty`: with every structural parent filled (a cleared one is restored first), both executors raise `HIP_DROPDOWN_OPTIONS_EMPTY: phase=…; the '<Field>' dropdown opened with no values (the portal showed '<text>') …`. It is added to `environment_faults.ENVIRONMENT_FATAL_CODES`, so the attempt ends at once.
+- `runtime_self_heal`:
+  - class `dropdown_options_empty` (checked before the authentication heuristic);
+  - ladder family `lists` = `restart_browser_session` × `runtime_self_heal.empty_options_browser_restarts` (2) per phase; the restart is followed by `goto_base_and_complete_sso(PHASE_URLS[phase])`;
+  - stop reason `HIP_DROPDOWN_OPTIONS_EMPTY_AFTER_RECOVERY`.
+- `dummy_fill_e2e`: holds the phase with that recovery summary.
+- Replicas: `window.__lookupsBrokenFromLoad` / `window.__hipLookupsBrokenNow` in `document_type_full_dds.html` and `hip_dds_kit.js`, and `window.__formatEmptyOpens` (a slow Data Format Type list) ("No data found" from the N-th form load of a browser session until the browser is closed).
+- Tests: `tests/test_v243r28_empty_dropdown_restart_browser.py` (9).
+
 # V243R27 — Model selection survives a slow listing; every mission learns from past runs and MLflow (2026-09-28)
 
 - `BrowserSession._react_ensure_target_surface`:

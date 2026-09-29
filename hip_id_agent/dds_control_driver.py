@@ -857,6 +857,14 @@ async def _dds_single_select_snapshot(page: Page, selector: str) -> Dict[str, An
     const selected=el.getAttribute('aria-selected')==='true' || el.getAttribute('data-selected')==='true' || el.getAttribute('aria-checked')==='true' || cls.contains('dds__dropdown__item-selected') || cls.contains('dds__dropdown__item--selected');
     return {text:clean(el.innerText||el.textContent),selected,disabled:el.getAttribute('aria-disabled')==='true'||!!el.disabled,visible:visible(el),id:el.id||'',aria_posinset:el.getAttribute('aria-posinset')||'',token};
   }).filter(x=>x.text);
+  // V243R28: a list that shows only a placeholder ("No data found", "No results")
+  // has no options, even when the placeholder is rendered as role=option.
+  const noData=/^(no\s+(data|options?|results?|records?|items?|matches|values?|entries)(\s+(found|available|to\s+display))?|nothing\s+(found|to\s+display)|no\s+matching\s+\w+(\s+found)?)\.?$/i;
+  const placeholders=options.filter(x=>noData.test(x.text));
+  const realOptions=options.filter(x=>!noData.test(x.text));
+  const listText=clean((list&&(list.innerText||list.textContent))||'');
+  const loadingText=/^loading\b|please wait/i.test(listText) || !!(list&&list.querySelector('[aria-busy=true],.dds__loading-indicator,[class*=loading]'));
+  options.length=0; realOptions.forEach(x=>options.push(x));
   const selectedOptions=options.filter(x=>x.selected).map(x=>x.text);
   const selectedLabels=[];
   if(dd){
@@ -881,12 +889,74 @@ async def _dds_single_select_snapshot(page: Page, selector: str) -> Dict[str, An
     selected_values:selectedOptions,
     selected_labels:selectedLabels,
     committed_candidates:committed,
+    empty_text:options.length ? '' : (placeholders.length ? placeholders[0].text : listText).slice(0,160),
+    no_data:!options.length && (placeholders.length>0 || noData.test(listText)),
+    list_loading:!options.length && loadingText,
   };
 }
 """, selector)
         return dict(result or {}) if isinstance(result, dict) else {}
     except Exception:
         return {}
+
+
+EMPTY_OPTIONS_CODE = "HIP_DROPDOWN_OPTIONS_EMPTY"
+
+
+def _empty_options_confirm_seconds(page: Page) -> float:
+    """How long a dropdown must keep showing no values before the portal is judged broken."""
+    try:
+        return max(0.0, float(getattr(page, "_hip_empty_options_confirm_seconds", 12.0)))
+    except Exception:
+        return 12.0
+
+
+def snapshot_options_empty(snapshot: Dict[str, Any]) -> bool:
+    """The dropdown opened and lists no value: no options, or only "No data found"-like text."""
+    if not isinstance(snapshot, dict) or not snapshot.get("found") or snapshot.get("options"):
+        return False
+    if snapshot.get("list_loading") or snapshot.get("loading"):
+        return False  # still loading: not (yet) empty
+    return bool(snapshot.get("no_data")) or (bool(snapshot.get("expanded")) and not str(snapshot.get("empty_text") or "").strip())
+
+
+async def _confirm_options_empty(page: Page, selector: str, snapshot_fn: Any, reopen_fn: Any, *, phase: str = "") -> Dict[str, Any]:
+    """V243R28: re-open an empty dropdown over a bounded window before calling the lists broken.
+
+    A lookup that is merely slow fills the list within the window (the fresh
+    snapshot is returned and the normal selection continues); a list that keeps
+    showing no values is reported, so the attempt can end and the browser be
+    closed and reopened instead of searching/typing into an empty list.
+    """
+    window = _empty_options_confirm_seconds(page)
+    started = asyncio.get_running_loop().time()
+    opens = 1
+    last: Dict[str, Any] = {}
+    extended = False
+    # At least this many openings however slow each one is (a list that fills on
+    # a later opening is not empty).
+    min_opens = 4 if window > 0 else 1
+    while True:
+        elapsed = asyncio.get_running_loop().time() - started
+        if elapsed >= window and opens >= min_opens:
+            if not extended and last and (last.get("list_loading") or last.get("loading")):
+                # Still "Loading..." at the end: a slow lookup gets one more window.
+                extended = True
+                window *= 2
+                continue
+            break
+        await close_open_dropdown(page, phase)
+        await page.wait_for_timeout(int(min(1500.0, max(300.0, (window - elapsed) * 1000.0))))
+        last = await reopen_fn()
+        opens += 1
+        if last.get("options") or not last.get("found", True):
+            # Options arrived (or the control is gone -- the caller's normal path decides).
+            return {"empty": False, "snapshot": last, "opens": opens,
+                    "waited_seconds": round(asyncio.get_running_loop().time() - started, 1)}
+    last = last or await snapshot_fn()
+    return {"empty": snapshot_options_empty(last) or not last.get("options"), "snapshot": last, "opens": opens,
+            "waited_seconds": round(asyncio.get_running_loop().time() - started, 1), "extended_for_loading": extended,
+            "empty_text": str(last.get("empty_text") or "")}
 
 
 def _single_select_snapshot_matches(snapshot: Dict[str, Any], variants: List[str]) -> bool:
@@ -967,12 +1037,12 @@ async def _combobox_value_matches(locator: Locator, variants: List[str], *, page
     return False
 
 
-async def _open_owned_single_select(page: Page, selector: str, backend: Any = None, *, phase: str = "") -> Dict[str, Any]:
+async def _open_owned_single_select(page: Page, selector: str, backend: Any = None, *, phase: str = "", poll_seconds: float = 3.2) -> Dict[str, Any]:
     snapshot = await _dds_single_select_snapshot(page, selector)
     if snapshot.get("expanded") and snapshot.get("options"):
         return snapshot
     await _broker_click(page, selector, label="HIP Portal DDS combobox", phase=phase, mutation_risk=False)
-    deadline = asyncio.get_running_loop().time() + 3.2
+    deadline = asyncio.get_running_loop().time() + max(0.2, float(poll_seconds))
     last = snapshot
     while asyncio.get_running_loop().time() < deadline:
         last = await _dds_single_select_snapshot(page, selector)
@@ -1136,6 +1206,27 @@ async def select_dds_combobox(page: Page, root: Locator | None, selector: str, v
 
         # Open this DDS control and inspect only its owned listbox.
         snapshot = await _open_owned_single_select(page, selector, backend, phase=phase)
+        if snapshot_options_empty(snapshot):
+            # V243R28: the list opened with no value ("No data found").  Re-open it
+            # over a bounded window; if it stays empty the portal's lists failed in
+            # this browser session -- do not type search text into it.
+            confirm = await _confirm_options_empty(
+                page, selector,
+                lambda: _dds_single_select_snapshot(page, selector),
+                lambda: _open_owned_single_select(page, selector, backend, phase=phase, poll_seconds=1.0),
+                phase=phase,
+            )
+            audit["empty_options_check"] = {k: v for k, v in confirm.items() if k != "snapshot"}
+            if confirm.get("empty"):
+                await close_open_dropdown(page, phase)
+                audit.update({
+                    "success": False, "reason": EMPTY_OPTIONS_CODE, "options_empty": True,
+                    "empty_text": str(confirm.get("empty_text") or snapshot.get("empty_text") or ""),
+                    "final_snapshot": confirm.get("snapshot") or snapshot,
+                })
+                await _set_single_select_audit(page, audit)
+                return False
+            snapshot = confirm.get("snapshot") or snapshot
         option = _choose_unique_single_option(snapshot, raw_value, variants)
         dynamic_decision: Dict[str, Any] = {}
         if option is None and snapshot.get("options"):
@@ -1413,6 +1504,12 @@ async def _dds_multiselect_snapshot(page: Page, selector: str) -> Dict[str, Any]
       token
     };
   });
+  // V243R28: "No data found"-like placeholders are not options.
+  const noData=/^(no\s+(data|options?|results?|records?|items?|matches|values?|entries)(\s+(found|available|to\s+display))?|nothing\s+(found|to\s+display)|no\s+matching\s+\w+(\s+found)?)\.?$/i;
+  const placeholder=options.find(x=>noData.test(x.text));
+  const placeholderText=placeholder?placeholder.text:'';
+  for(let i=options.length-1;i>=0;i--) if(noData.test(options[i].text)) options.splice(i,1);
+  const listText=clean((list&&(list.innerText||list.textContent))||'');
   const selectedLabels=[];
   for(const el of Array.from(dd.querySelectorAll('.dds__tag,.dds__chip,[class*="selected-value"],[class*="selection__label"]'))){
     const text=clean(el.innerText||el.textContent);
@@ -1441,6 +1538,9 @@ async def _dds_multiselect_snapshot(page: Page, selector: str) -> Dict[str, Any]
     loading,
     declared_set_size:declaredSetSize,
     visible_option_count:options.length,
+    empty_text:options.length?'':(placeholderText||listText).slice(0,160),
+    no_data:!options.length && (!!placeholderText || noData.test(listText)),
+    list_loading:!options.length && (/^loading\b|please wait/i.test(listText)),
     selected_count_summary:countMatch?parseInt(countMatch[1],10):null,
     has_select_all:options.some(x=>clean(x.text).toLowerCase()==='select all')
   };
@@ -1690,6 +1790,21 @@ async def select_dds_multiselect(
         # and the shared semantic resolver has already required selection=multiple.
         initial["selection_mode"] = "multiple"
         initial["selection_mode_inference"] = "multiselect-executor-contract"
+    if snapshot_options_empty(initial):
+        async def _reopen_multi() -> Dict[str, Any]:
+            await _open_dds_multiselect(page, selector, backend, phase=phase)
+            return await _wait_dds_multiselect_snapshot_stable(page, selector)
+        confirm = await _confirm_options_empty(
+            page, selector, lambda: _dds_multiselect_snapshot(page, selector), _reopen_multi, phase=phase)
+        audit["empty_options_check"] = {k: v for k, v in confirm.items() if k != "snapshot"}
+        if confirm.get("empty"):
+            await close_open_dropdown(page, phase)
+            audit.update({"reason": EMPTY_OPTIONS_CODE, "options_empty": True,
+                          "empty_text": str(confirm.get("empty_text") or initial.get("empty_text") or ""),
+                          "initial_snapshot": initial})
+            await _publish_multiselect_audit(page, audit)
+            return False
+        initial = confirm.get("snapshot") or initial
     audit["initial_snapshot"] = initial
     if not initial.get("found") or initial.get("selection_mode") != "multiple":
         audit["reason"] = "target control is not proven to be selection=multiple"

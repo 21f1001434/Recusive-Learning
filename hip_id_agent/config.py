@@ -341,6 +341,9 @@ class RuntimeSelfHealConfig(BaseModel):
     # finalize_grace_seconds (at most max_finalize_extensions times) to finish its
     # read-back and evidence instead of being stopped as "no new verified field".
     min_attempt_seconds: float = 900.0
+    # V243R28: a phase whose dropdowns list no values ("No data found") closes and
+    # reopens the browser, returns to the same page and fills the form again, at most this often.
+    empty_options_browser_restarts: int = 2
     finalize_grace_seconds: float = 600.0
     max_finalize_extensions: int = 2
     # Active structural watchdog. Unlike failure-signature counting, this runs

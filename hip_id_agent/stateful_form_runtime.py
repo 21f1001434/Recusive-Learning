@@ -10,6 +10,7 @@ from pathlib import Path
 from playwright.async_api import Page
 
 from .dds_control_driver import (
+    EMPTY_OPTIONS_CODE,
     close_open_dropdown,
     get_active_form_root,
     assert_active_surface,
@@ -1868,6 +1869,54 @@ async def _restore_reset_parents(
     return audit
 
 
+async def _raise_if_dropdown_options_empty(
+    page: Page,
+    graph: Dict[str, Any],
+    node: Dict[str, Any],
+    *,
+    audit: Dict[str, Any],
+    phase: str,
+    node_status: Dict[str, bool],
+    node_by_id: Dict[str, Dict[str, Any]],
+    document_type: bool,
+) -> None:
+    """V243R28: a dropdown that keeps listing no values ends the attempt.
+
+    Live: a run fills the form correctly, then in the next run a dropdown opens
+    with no value ("No data found") -- at any phase.  Re-opening the form in the
+    same browser does not help; closing and reopening the browser does.  When
+    the driver confirmed the list stays empty (see ``select_dds_combobox``), the
+    fields above it are checked first: a parent the portal cleared is the R26
+    dependency and is selected again (the retry continues).  When every field
+    above holds its value, the attempt ends with ``HIP_DROPDOWN_OPTIONS_EMPTY``
+    so the mission closes and reopens the browser, returns to the same page,
+    opens the form and fills it again.
+    """
+    if not (isinstance(audit, dict) and (audit.get("options_empty") or audit.get("reason") == EMPTY_OPTIONS_CODE)):
+        return
+    deps = [str(d) for d in structural_dependencies(graph, node) if str(d) in node_by_id]
+    if any(node_status.get(d) is not True for d in deps):
+        return  # a field above is not filled yet: its list is expected to be empty
+    controls = await (capture_document_type_controls(page) if document_type else capture_stateful_controls(page, phase))
+    controls, _ = _apply_repeatable_row_bindings(controls, graph)
+    restore = await _restore_reset_parents(
+        page, graph, node, phase=phase, controls=controls, node_status=node_status, node_by_id=node_by_id,
+        document_type=document_type)
+    restored = restore.get("restored") or []
+    if restored and all(r.get("ok") for r in restored):
+        return  # the portal had cleared a field above; it is back, retry this one
+    label = str(node.get("label") or "").strip() or " ".join(
+        w.capitalize() for w in str(node.get("field_key") or "dropdown").replace("-", "_").split("_") if w)
+    row = node.get("row_index")
+    text = str(audit.get("empty_text") or "").strip() or "an empty list"
+    raise RuntimeError(
+        f"{EMPTY_OPTIONS_CODE}: phase={phase}; the '{label}'{f' (row {row})' if row is not None else ''} dropdown opened "
+        f"with no values (the portal showed '{text}') although every field above it holds its value; the portal's "
+        "lists stopped loading in this browser session. Recovery: close and reopen the browser, return to the same "
+        "page, open the form and fill it again."
+    )
+
+
 async def execute_document_type_state_graph(
     page: Page,
     graph: Dict[str, Any],
@@ -2101,6 +2150,10 @@ async def execute_document_type_state_graph(
                 elif action == "select_single":
                     ok = await select_dds_combobox(page, root, selector, str(expected), phase=phase)
                     transaction_proof["single_select_driver_audit"] = await read_last_single_select_audit(page)
+                    if not ok:
+                        await _raise_if_dropdown_options_empty(
+                            page, graph, node, audit=transaction_proof["single_select_driver_audit"], phase=phase,
+                            node_status=node_status, node_by_id=node_by_id, document_type=True)
                     if ok:
                         # A committed DDS value can still leave its popup/focus layer
                         # active.  Blur it before child discovery or the next field;
@@ -2109,6 +2162,10 @@ async def execute_document_type_state_graph(
                         await close_open_dropdown(page, phase)
                 elif action == "select_multi":
                     ok = await select_dds_multiselect(page, root, selector, split_multi_value(expected), phase=phase)
+                    if not ok:
+                        await _raise_if_dropdown_options_empty(
+                            page, graph, node, audit=await read_last_multiselect_audit(page), phase=phase,
+                            node_status=node_status, node_by_id=node_by_id, document_type=True)
                 elif action == "select_radio" and _is_boolean_switch(actual_control):
                     # Dell renders Document Type Status as a DDS switch, not radios.
                     ok = await set_boolean_control(page, root, selector, expected, phase=phase)
@@ -3619,8 +3676,16 @@ async def execute_phase_state_graph(
                         ok = await set_text_control(page, root, selector, str(expected), phase=phase)
                     elif action == "select_single":
                         ok = await select_dds_combobox(page, root, selector, str(expected), phase=phase)
+                        if not ok:
+                            await _raise_if_dropdown_options_empty(
+                                page, graph, node, audit=await read_last_single_select_audit(page), phase=phase,
+                                node_status=node_status, node_by_id=node_by_id, document_type=False)
                     elif action == "select_multi":
                         ok = await select_dds_multiselect(page, root, selector, split_multi_value(expected), phase=phase)
+                        if not ok:
+                            await _raise_if_dropdown_options_empty(
+                                page, graph, node, audit=await read_last_multiselect_audit(page), phase=phase,
+                                node_status=node_status, node_by_id=node_by_id, document_type=False)
                     elif action == "select_radio":
                         if _norm(control.get("role")) in {"switch", "checkbox"} or _norm(control.get("type")) == "checkbox":
                             ok = await set_boolean_control(page, root, selector, expected, phase=phase)

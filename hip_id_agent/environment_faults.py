@@ -14,6 +14,10 @@ ENVIRONMENT_FATAL_CODES = (
     "HIP_PORTAL_STALE_OVERLAY_UNRECOVERED_FORM_PRESERVED",
     "HIP_PORTAL_LOADING_STUCK",
     "HIP_AUTH_SESSION_EXPIRED",
+    # V243R28: a dropdown that keeps listing no values although the fields above
+    # it hold theirs -- the portal's lists failed in this browser session; only
+    # closing and reopening the browser helps.
+    "HIP_DROPDOWN_OPTIONS_EMPTY",
 )
 
 

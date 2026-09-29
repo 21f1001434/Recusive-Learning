@@ -536,6 +536,10 @@ runtime_self_heal:
   # V243R25: each retry gets at least 15 minutes; a completely filled form gets
   # up to 2 x 10 minutes to finish its checks instead of being reopened blank.
   min_attempt_seconds: 900
+  # V243R28: dropdowns that list no values ("No data found") although the fields
+  # above hold theirs: close and reopen the browser, return to the same page, open
+  # the form and fill it again -- at most this many times per phase.
+  empty_options_browser_restarts: 2
   finalize_grace_seconds: 600
   max_finalize_extensions: 2
   no_progress_watchdog_seconds: 90

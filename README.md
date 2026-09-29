@@ -1,3 +1,11 @@
+## V243R28 — A dropdown with no values: close and reopen the browser, same page, open the form, fill it (2026-09-29)
+
+- **An empty dropdown is recognised.** A list that opens with no values, or only "No data found"-like text, is re-opened for up to 12 s; a slow list is waited for, and an empty one is never typed into.
+- **The fields above come first.** A field above that the portal cleared is selected again (R26). When every field above holds its value, the attempt ends at once with `HIP_DROPDOWN_OPTIONS_EMPTY` naming the field and the text the portal showed. It used to be a generic "value mismatch" after about 3 minutes.
+- **Your recovery, at any stage:** the agent closes and reopens the browser, keeping the profile and SSO. It then goes to the same phase link, opens the form as usual and fills it from input.json, at most twice per phase.
+
+See `V243R28_EMPTY_DROPDOWN_RESTART_BROWSER_20260929.md`. Apply with `APPLY_V243R28_IN_PLACE.ps1`; it includes R13–R27.
+
 ## V243R27 — The model selection survives a slow listing; every mission learns from past runs and MLflow (2026-09-28)
 
 - **The model-selection warning is fixed.** A Document Types listing that is open and signed in but still rendering is now waited for (90 s, or longer when past runs needed it), then reloaded once. It used to fail after about 2 s. A re-run of the qualification that cannot finish keeps the model that passed before.

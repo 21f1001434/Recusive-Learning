@@ -3548,7 +3548,7 @@ class FullDummyFillE2EFlow:
                                             pass
                                     continue
                                 hold_reason = message
-                                if str(decision.reason or "").startswith(("HIP_PORTAL_LOADING_STUCK_AFTER_RECOVERY", "HIP_PHASE_STALL_AFTER_RECOVERY")):
+                                if str(decision.reason or "").startswith(("HIP_PORTAL_LOADING_STUCK_AFTER_RECOVERY", "HIP_PHASE_STALL_AFTER_RECOVERY", "HIP_DROPDOWN_OPTIONS_EMPTY_AFTER_RECOVERY")):
                                     hold_reason = f"{decision.reason}\n\nLast error: {message}"
                                 if self.options.hold_browser_on_incomplete_phase:
                                     hold = await _hold_incomplete_phase_for_human(

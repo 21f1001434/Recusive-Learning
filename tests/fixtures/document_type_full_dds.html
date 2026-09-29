@@ -89,6 +89,16 @@
   const needsFormat = () => !!window.__liveOptionsAfterFormat && !formatChosen;
   const needsTransaction = () => !!window.__formatAfterTransaction && !transactionLoaded;
   window.__hipOpenedEmpty = 0;
+  // V243R28 (window.__lookupsBrokenFromLoad = N): from the N-th form load in the
+  // same browser session every dropdown opens with "No data found" (the live
+  // "second run" symptom). Reloading or re-opening the form in the same browser
+  // does not help; closing and reopening the browser does (sessionStorage is
+  // per browser session).
+  let formLoad = 0;
+  try { formLoad = Number(sessionStorage.getItem('hipFormLoads') || 0) + 1; sessionStorage.setItem('hipFormLoads', String(formLoad)); } catch (e) { formLoad = 1; }
+  window.__hipFormLoad = formLoad;
+  const lookupsBroken = () => !!window.__lookupsBrokenFromLoad && formLoad >= window.__lookupsBrokenFromLoad;
+  window.__hipNoDataOpens = 0;
 
   function dropdown({ label, options, multiple = false, onChange, showLabel = true, deferred = null }) {
     const dd = document.createElement('dds-dropdown');
@@ -122,7 +132,11 @@
     const optionItems = Array.from(list.children);
     const open = () => {
       closeAll(dd);
-      if (deferred && deferred() === 'empty') { list.innerHTML = '<li class="dds__dropdown__no-data">No data found</li>'; window.__hipOpenedEmpty += 1; }
+      if (lookupsBroken()) { list.innerHTML = '<li class="dds__dropdown__no-data">No data found</li>'; window.__hipNoDataOpens += 1; }
+      // V243R28 (window.__formatEmptyOpens = N): a slow list -- Data Format Type
+      // shows "No data found" on its first N openings, then its values.
+      else if (label === 'Data Format Type' && (window.__formatEmptyOpens || 0) > 0) { window.__formatEmptyOpens -= 1; list.innerHTML = '<li class="dds__dropdown__no-data">No data found</li>'; window.__hipOpenedEmpty += 1; }
+      else if (deferred && deferred() === 'empty') { list.innerHTML = '<li class="dds__dropdown__no-data">No data found</li>'; window.__hipOpenedEmpty += 1; }
       else if (deferred && deferred()) list.innerHTML = '<li class="dds__dropdown__loading">Loading…</li>';
       else if (!list.contains(optionItems[0])) { list.innerHTML = ''; optionItems.forEach((li) => list.appendChild(li)); }
       popup.classList.remove('dds__dropdown__popup--hidden');

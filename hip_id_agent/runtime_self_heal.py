@@ -77,6 +77,10 @@ class RuntimeSelfHealController:
         "blocking_overlay": ("refresh_page_and_reopen", "restart_browser_session"),
         "portal_loading_stuck": ("refresh_page_and_reopen", "restart_browser_session"),
         "phase_no_progress": ("reopen_phase_from_input", "refresh_page_and_reopen", "restart_browser_session"),
+        # V243R28: dropdowns that list no values although the fields above hold
+        # theirs -- only closing and reopening the browser helps; then the same
+        # phase link is opened, the form opened and filled again.
+        "dropdown_options_empty": ("restart_browser_session",),
         "vision_loading_refresh_replay": ("reopen_phase_from_input", "recover_page_and_route"),
         "active_surface_lost": ("reopen_phase_from_input", "recover_page_and_route"),
         "control_not_found": ("refresh_evidence_and_reopen", "reopen_phase_from_input"),
@@ -148,6 +152,8 @@ class RuntimeSelfHealController:
         self._phase_started_monotonic: Dict[str, float] = {}
         self.loader_grace_seconds = max(0.0, float(getattr(policy, "loader_grace_seconds", 60.0) or 0.0))
         self.max_browser_restarts_per_phase = max(0, int(getattr(policy, "max_browser_restarts_per_phase", 1)))
+        # V243R28: browser restarts a phase may use when its dropdowns list no values.
+        self.empty_options_browser_restarts = max(1, int(getattr(policy, "empty_options_browser_restarts", 2) or 2))
         self.learn_recovery_ladder = bool(getattr(policy, "learn_recovery_ladder", True))
         self._ladder_steps: Dict[str, List[str]] = {}
         self._ladder_pending: Dict[str, Dict[str, str]] = {}
@@ -216,6 +222,8 @@ class RuntimeSelfHealController:
             marker in joined for marker in ("unsafe", "blocked", "forbidden", "final action", "mutation")
         ):
             return "unsafe_or_mutating"
+        if "hip_dropdown_options_empty" in joined:
+            return "dropdown_options_empty"
         if "hip_auth_session_expired" in joined or (
             any(x in joined for x in ("login", "signin", "sso", "saml", "oauth"))
             and any(x in joined for x in ("expired", "redirected", "unauthenticated", "session"))
@@ -708,6 +716,7 @@ class RuntimeSelfHealController:
         "portal_loading_stuck": "loader",
         "vision_loading_refresh_replay": "loader",
         "phase_no_progress": "stall",
+        "dropdown_options_empty": "lists",
     }
     STALL_LADDER: Sequence[str] = ("reopen_phase_from_input", "refresh_page_and_reopen", "restart_browser_session")
 
@@ -811,6 +820,13 @@ class RuntimeSelfHealController:
         """Next unused step of the phase's ladder (learned order, never fewer steps)."""
         family = self.LADDER_FAMILIES[classification]
         steps = list(self._ladder_steps.setdefault(f"{phase}|{family}", []))
+        if family == "lists":
+            ladder = ["restart_browser_session"] * self.empty_options_browser_restarts
+            remaining = list(ladder)
+            for used in steps:
+                if used in remaining:
+                    remaining.remove(used)
+            return remaining[0] if remaining else "stop_fail_closed"
         if family == "loader":
             if classification == "vision_loading_refresh_replay":
                 # The browser session already refreshed the stuck page itself;
@@ -1349,6 +1365,12 @@ class RuntimeSelfHealController:
             reason = (
                 "HIP_PORTAL_LOADING_STUCK_AFTER_RECOVERY: the Dell portal kept showing its loading indicator; "
                 f"automatic recovery already {self.ladder_summary(phase)}. Check the portal/network, then press Resume."
+            )
+        elif family == "lists":
+            reason = (
+                "HIP_DROPDOWN_OPTIONS_EMPTY_AFTER_RECOVERY: the portal's dropdowns kept listing no values; "
+                f"automatic recovery already {self.ladder_summary(phase)} and reopened the form each time. "
+                "Check the portal (its lists / lookups), then press Resume."
             )
         elif family == "stall":
             reason = (

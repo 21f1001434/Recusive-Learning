@@ -16,6 +16,17 @@
   const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
   const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
+  // V243R28: the live "second run" symptom -- every dropdown opens with "No data
+  // found".  window.__lookupsBrokenFromLoad = N breaks the lists from the N-th
+  // page load of this browser session (sessionStorage: a reload or a re-opened
+  // form keeps it, closing and reopening the browser clears it);
+  // window.__hipLookupsBrokenNow = true breaks them at once.
+  let formLoad = 1;
+  try { formLoad = Number(sessionStorage.getItem('hipFormLoads') || 0) + 1; sessionStorage.setItem('hipFormLoads', String(formLoad)); } catch (e) { formLoad = 1; }
+  window.__hipFormLoad = formLoad;
+  window.__hipNoDataOpens = 0;
+  const lookupsBroken = () => window.__hipLookupsBrokenNow === true || (!!window.__lookupsBrokenFromLoad && formLoad >= window.__lookupsBrokenFromLoad);
+
   function closeAll(except) {
     document.querySelectorAll('dds-dropdown').forEach((dd) => { if (dd !== except && dd.__close) dd.__close(); });
   }
@@ -79,7 +90,12 @@
         });
       });
     };
-    const open = () => { if (input.disabled) return; closeAll(dd); render(); popup.classList.remove('dds__dropdown__popup--hidden'); input.setAttribute('aria-expanded', 'true'); };
+    const open = () => {
+      if (input.disabled) return;
+      closeAll(dd); render();
+      if (lookupsBroken()) { list.innerHTML = '<li class="dds__dropdown__no-data">No data found</li>'; window.__hipNoDataOpens += 1; }
+      popup.classList.remove('dds__dropdown__popup--hidden'); input.setAttribute('aria-expanded', 'true');
+    };
     dd.__close = () => {
       popup.classList.add('dds__dropdown__popup--hidden');
       input.setAttribute('aria-expanded', 'false');
