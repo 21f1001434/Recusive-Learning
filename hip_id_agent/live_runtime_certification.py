@@ -277,12 +277,16 @@ class _ProgressChecks(list):
 
 def _qualification_detail(result: Dict[str, Any]) -> str:
     status = str(result.get("status") or "")
+    judged = (f", judged {result.get('judge_correct')}/{result.get('judge_total')} completion checks right"
+              if result.get("judge_total") else "")
     if status == "kept_previous_selection":
-        return (f"kept: {result.get('selected_model')} ({result.get('correct')}/{result.get('total')} live questions correct, "
+        return (f"kept: {result.get('selected_model')} ({result.get('correct')}/{result.get('total')} live questions correct{judged}, "
                 f"{result.get('qualified_at')}); the re-run could not finish: {result.get('requalify_error') or ''}").strip()
     if result.get("locked"):
-        prefix = "already qualified" if status == "already_qualified" else "selected now"
-        return f"{prefix}: {result.get('selected_model')} ({result.get('correct')}/{result.get('total')} live questions correct, {result.get('qualified_at')})"
+        prefix = "already qualified" if status == "already_qualified" else (
+            "re-validated all models, champion" if result.get("revalidation") else "selected now")
+        return (f"{prefix}: {result.get('selected_model')} ({result.get('correct')}/{result.get('total')} live questions correct"
+                f"{judged}, {result.get('qualified_at')})")
     return f"{status}: {result.get('reason') or ''}".strip(": ")
 
 
@@ -320,11 +324,15 @@ async def _open_qualification_page(browser: Any, url: str) -> Dict[str, Any]:
 async def qualify_models_on_live_page(cfg: AppConfig, browser: Any, run_dir: Path, *, force: bool = False, source: str = "live_go_live") -> Dict[str, Any]:
     """Navigate (read-only) to the qualification listing and qualify the models once."""
     from .dummy_fill_e2e import PHASE_URLS
-    from .model_qualification import ensure_model_qualification, load_selection
+    from .model_qualification import ensure_model_qualification, load_selection, revalidation_reason
 
     existing = load_selection(cfg)
-    if existing.get("locked") and not force:
+    revalidate = revalidation_reason(existing, cfg)
+    if existing.get("locked") and not force and not revalidate:
         return {**existing, "status": "already_qualified", "ran_now": False}
+    # V243R29: an outdated or due lock re-validates every model (force keeps it from
+    # returning the old lock early inside ensure_model_qualification).
+    force = bool(force or revalidate)
     navigation: Dict[str, Any] = {}
     try:
         url = str(PHASE_URLS.get(str(getattr(cfg.model_portfolio, "qualification_page", "") or "source_document_type")) or "")
@@ -527,12 +535,14 @@ async def certify_live_runtime(
         qualification = await qualify_models_on_live_page(cfg, browser, run_dir, force=requalify_models)
         checks.append(_check(
             "model_qualification",
-            "Model selected by live task performance (one time)",
+            "Model champion chosen by live task performance (all models validated)",
             bool(qualification.get("locked")),
             blocker=False,
             detail=_qualification_detail(qualification),
-            evidence={k: qualification.get(k) for k in ("status", "selected_model", "accuracy", "correct", "total", "qualified_at", "source", "fallback_order", "reason", "requalify_error", "navigation")}
-            | {"ranking": [{k: r.get(k) for k in ("model", "accuracy", "correct", "total", "latency_ms", "qualified", "error")} for r in qualification.get("ranking") or []]},
+            evidence={k: qualification.get(k) for k in ("status", "selected_model", "accuracy", "correct", "total", "judge_accuracy",
+                                                         "judge_correct", "judge_total", "qualified_at", "source", "fallback_order",
+                                                         "reason", "requalify_error", "navigation", "revalidation", "qualification_version")}
+            | {"ranking": [{k: r.get(k) for k in ("model", "accuracy", "correct", "total", "judge_accuracy", "latency_ms", "qualified", "error")} for r in qualification.get("ranking") or []]},
         ))
 
         mutation_auth_off = not bool((getattr(browser, "_portal_mutation_authorization", {}) or {}).get("enabled")) and not bool(cfg.pyautogui.allow_mutation_clicks)

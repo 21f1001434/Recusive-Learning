@@ -87,6 +87,13 @@ class _Client:
         return json.dumps({"answers": answers})
 
 
+def _answers(screen: Dict[str, Any]) -> Dict[str, Any]:
+    """The right answer of every qualification question (R29: also the completion judgments)."""
+    from hip_id_agent.model_qualification import qualification_questions
+
+    return {q["id"]: (q["expected"][0] if isinstance(q["expected"], list) else q["expected"]) for q in qualification_questions(screen)}
+
+
 def _router(tmp: Path, client: _Client, models: List[str]) -> OnPremModelPortfolioRouter:
     base = AppConfig().model_portfolio.model_dump()
     base.update(text_models=models, availability_probe_enabled=False, record_usage_ledger=False)
@@ -112,8 +119,7 @@ def test_the_questions_are_answered_by_the_page_itself(listing_screen):
 
 
 def test_every_model_gets_the_same_task_and_the_most_accurate_one_is_selected(listing_screen, tmp_path):
-    questions = build_questions(listing_screen)
-    _Client.expected = {q["id"]: q["expected"][0] for q in questions}
+    _Client.expected = _answers(listing_screen)
     client = _Client({"gpt-oss-120b": 1.0, "llama-3-3-70b-instruct": 0.75, "gpt-oss-20b": 0.4, "mistral-small-3-1-24b-instruct-2503": -1})
     router = _router(tmp_path, client, ["gpt-oss-20b", "gpt-oss-120b", "llama-3-3-70b-instruct", "mistral-small-3-1-24b-instruct-2503"])
     result = qualify_models(router, listing_screen, source="test")
@@ -126,7 +132,7 @@ def test_every_model_gets_the_same_task_and_the_most_accurate_one_is_selected(li
 
 
 def test_a_faster_model_wins_a_tie_on_accuracy(listing_screen, tmp_path):
-    _Client.expected = {q["id"]: q["expected"][0] for q in build_questions(listing_screen)}
+    _Client.expected = _answers(listing_screen)
     client = _Client({"gpt-oss-120b": 1.0, "gpt-oss-20b": 1.0}, delay={"gpt-oss-120b": 0.4})
     result = qualify_models(_router(tmp_path, client, ["gpt-oss-120b", "gpt-oss-20b"]), listing_screen, source="test")
     assert result["selected_model"] == "gpt-oss-20b"  # same score, answered faster: chosen by performance
@@ -134,7 +140,7 @@ def test_a_faster_model_wins_a_tie_on_accuracy(listing_screen, tmp_path):
 
 def test_qualification_runs_once_and_the_selection_is_used_for_every_call(listing_screen, tmp_path, monkeypatch):
     monkeypatch.delenv("HIP_MODEL_ROUTER_SELECTED_TEXT", raising=False)
-    _Client.expected = {q["id"]: q["expected"][0] for q in build_questions(listing_screen)}
+    _Client.expected = _answers(listing_screen)
     cfg = AppConfig()
     cfg.reporting.memory_dir = str(tmp_path / "memory")
     client = _Client({"gpt-oss-120b": 0.75, "llama-3-3-70b-instruct": 1.0})

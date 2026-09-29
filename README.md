@@ -1,3 +1,12 @@
+## V243R29 — An exactly filled form completes the phase; every model re-validated, champion chosen (2026-09-29)
+
+- **The live form is the answer.** A fresh read-only proof checks every input.json value, row and upload, counting only committed values. When the form is exact, the phase completes: a model judge's objection is recorded as that model's mistake, a newly learned phase does not wait for a human, and a failed attempt is not replayed over a complete form.
+- **Fixed:** the proof counted a correctly filled Document Type as incomplete (enum values vs dropdown labels, and the portal-owned Version).
+- **Every model re-validated.** All models get the same navigation questions and new completion judgments ("does this live row hold exactly this record?"), with answers read from the page. The champion must judge well too.
+  - This runs once now (your R24 lock is re-validated), then after 30 days, or when the champion keeps judging against the live form.
+
+See `V243R29_INPUT_JSON_EXACT_COMPLETES_PHASE_CHAMPION_REVALIDATED_20260929.md`. Apply with `APPLY_V243R29_IN_PLACE.ps1`; it includes R13–R28.
+
 ## V243R28 — A dropdown with no values: close and reopen the browser, same page, open the form, fill it (2026-09-29)
 
 - **An empty dropdown is recognised.** A list that opens with no values, or only "No data found"-like text, is re-opened for up to 12 s; a slow list is waited for, and an empty one is never typed into.

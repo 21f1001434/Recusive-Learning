@@ -1,3 +1,35 @@
+# V243R29 — An exactly filled form completes the phase; every model re-validated, champion chosen (2026-09-29)
+
+- New `hip_id_agent/input_json_authority.py`:
+  - `prove_input_json_completion` (fresh read-only live proof; open dropdowns closed first, so only committed values count);
+  - `is_authoritative`;
+  - `write_authority` (`<phase>/input_json_completion_authority.json`; an exact proof becomes `phase_live_read_only_reproof.json`);
+  - `accept_exact_phase` / `learning_review_needed`;
+  - `model_judge_verdicts`.
+- `dummy_fill_e2e`:
+  - the proof runs after the section judge: exact → `pass_input_json_exact`, the model panel is skipped and the learning-phase human review is not required (`acceptance_source: input_json_exact_authority`);
+  - a failed attempt (eligible classes) is proven before any reopen; exact → the no-replay path;
+  - an outdated lock re-validates at the first live mission page.
+- `section_judge`:
+  - an enum equals its DDS label (`ELEMENT_IN_PAYLOAD` = "Element In Payload");
+  - a disabled/read-only field's displayed placeholder counts as its value (portal-owned Version);
+  - the text judge records its model.
+- `model_qualification`:
+  - `QUALIFICATION_VERSION` 2;
+  - `SCREEN_JS` reads the table (headers, row cells);
+  - `build_judge_questions` / `qualification_questions`, with judgments scored in `score_answers` (`judge_accuracy`);
+  - a champion needs `qualification_min_judge_accuracy`;
+  - `revalidation_reason` (version, `qualification_max_age_days`, `revalidation_due`);
+  - `ensure_model_qualification` re-validates and keeps the champion when a re-validation cannot finish;
+  - `record_live_judge_truth` scores the champion's text-judge verdicts against the live proof and marks `revalidation_due` after `qualification_revalidate_after_judge_errors` of the last 5.
+- `live_runtime_certification`: re-validates an outdated lock; the check is renamed "Model champion chosen by live task performance (all models validated)" and its detail shows the judgments.
+- CLI `qualify-models` table shows judgment accuracy and the live verdict record.
+- Control Center Model Champion tile: judged j/k, live verdicts, re-validation due.
+- Config:
+  - `human_in_the_loop.input_json_exact_is_authoritative` / `review_learning_phase_even_when_exact`;
+  - `model_portfolio.qualification_judge_questions` / `_min_judge_accuracy` / `_max_age_days` / `_revalidate_after_judge_errors`.
+- Tests: `tests/test_v243r29_input_json_authority_and_champion_revalidation.py` (10). The R24/R27 stand-in models answer the judgments; the screen fixture includes the table.
+
 # V243R28 — A dropdown with no values: close and reopen the browser, same page, open the form, fill it (2026-09-29)
 
 - `dds_control_driver`:

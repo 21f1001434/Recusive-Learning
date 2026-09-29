@@ -134,5 +134,88 @@
    "popup": false,
    "expander": false
   }
+ ],
+ "headers": [
+  "",
+  "Document Type Name",
+  "Data Format Type",
+  "Transaction Type",
+  "Latest Version",
+  "Validation Type",
+  "Available Environments"
+ ],
+ "rows": [
+  {
+   "name": "a-doc-type-test",
+   "cells": [
+    "⌄",
+    "a-doc-type-test",
+    "XML",
+    "payment",
+    "3.0",
+    "Structure",
+    "DEVTEST1TEST2PROD"
+   ]
+  },
+  {
+   "name": "Abbvie_997_DocType",
+   "cells": [
+    "⌄",
+    "Abbvie_997_DocType",
+    "EDIX12",
+    "997",
+    "1.0",
+    "Structure",
+    "DEV"
+   ]
+  },
+  {
+   "name": "Abbvie_SRC_DocType",
+   "cells": [
+    "⌄",
+    "Abbvie_SRC_DocType",
+    "EDIX12",
+    "850",
+    "3.0",
+    "Structure",
+    "DEV"
+   ]
+  },
+  {
+   "name": "Abbvie_SRC_DocType_IN",
+   "cells": [
+    "⌄",
+    "Abbvie_SRC_DocType_IN",
+    "EDIX12",
+    "850",
+    "1.0",
+    "Structure",
+    "DEVTEST1"
+   ]
+  },
+  {
+   "name": "Abbvie_TRGT_Doctype",
+   "cells": [
+    "⌄",
+    "Abbvie_TRGT_Doctype",
+    "XML",
+    "XML",
+    "1.0",
+    "Structure",
+    "DEV"
+   ]
+  },
+  {
+   "name": "Abbvie_TRGT_Doctype_IN",
+   "cells": [
+    "⌄",
+    "Abbvie_TRGT_Doctype_IN",
+    "XML",
+    "XML",
+    "1.0",
+    "Structure",
+    "DEV"
+   ]
+  }
  ]
 }

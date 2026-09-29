@@ -992,6 +992,16 @@ class ModelPortfolioConfig(BaseModel):
     qualification_max_questions: int = 8
     qualification_in_first_live_mission: bool = True
     qualification_page: str = "source_document_type"
+    # V243R29: every model is also asked completion judgments (does the live row
+    # hold exactly the expected record?); a champion must judge at least this well.
+    # A lock is re-validated (all models asked again, champion chosen anew) when it
+    # is from an older qualification version, older than qualification_max_age_days
+    # (0 = never), or after the champion judged against the live form in this many
+    # of its last five phase verdicts.
+    qualification_judge_questions: int = 4
+    qualification_min_judge_accuracy: float = 0.5
+    qualification_max_age_days: float = 30.0
+    qualification_revalidate_after_judge_errors: int = 3
 
 
 class RecursiveSelfImprovementConfig(BaseModel):
@@ -1068,6 +1078,12 @@ class HumanInTheLoopConfig(BaseModel):
     # human can confirm either a PASS or a BLOCKED result. The resolved verdict is
     # persisted as teaching evidence and is not requested again for that run+phase.
     review_newly_learned_phase_once: bool = True
+    # V243R29: when a fresh read-only proof shows every input.json value filled
+    # and committed exactly on the live form, the phase is complete: model judges
+    # that disagree are recorded as their mistakes, and a newly learned phase no
+    # longer waits for a human confirmation (unless the next setting is true).
+    input_json_exact_is_authoritative: bool = True
+    review_learning_phase_even_when_exact: bool = False
     review_on_judge_pass: bool = True
     review_on_judge_block: bool = True
     phase_review_wait_seconds: int = 600

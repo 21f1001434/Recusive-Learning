@@ -211,11 +211,12 @@ def qualify_models_cmd(
     for every later call.  Read-only: nothing on the portal is clicked.
     """
     from .live_runtime_certification import qualify_models_on_live_page
-    from .model_qualification import load_selection
+    from .model_qualification import load_selection, revalidation_reason
 
     load_dotenv()
     cfg = load_config(config)
-    if show or (load_selection(cfg).get("locked") and not force):
+    current = load_selection(cfg)
+    if show or (current.get("locked") and not force and not revalidation_reason(current, cfg)):
         selection = load_selection(cfg)
         if not selection:
             console.print("No model qualified yet. Run: qualify-models (or Live GO/NO-GO).")
@@ -238,15 +239,23 @@ def qualify_models_cmd(
 
 
 def _print_qualification(result: Dict[str, Any]) -> None:
-    table = Table(title="Model qualification on a live task")
-    for column in ("Model", "Correct", "Accuracy", "Latency ms", "Qualified"):
+    table = Table(title="Model qualification on a live task (navigation + completion judgments)")
+    for column in ("Model", "Correct", "Accuracy", "Judgments", "Latency ms", "Qualified"):
         table.add_column(column)
     for row in result.get("ranking") or []:
+        judged = "-" if row.get("judge_accuracy") is None else f"{float(row.get('judge_accuracy') or 0):.0%}"
         table.add_row(str(row.get("model")), f"{row.get('correct')}/{row.get('total')}", f"{float(row.get('accuracy') or 0):.0%}",
-                      str(row.get("latency_ms")), "yes" if row.get("qualified") else ("error" if row.get("error") else "no"))
+                      judged, str(row.get("latency_ms")), "yes" if row.get("qualified") else ("error" if row.get("error") else "no"))
     console.print(table)
-    console.print(f"Status: [bold]{result.get('status')}[/bold]  Selected: [bold]{result.get('selected_model') or '-'}[/bold]  "
+    console.print(f"Status: [bold]{result.get('status')}[/bold]  Champion: [bold]{result.get('selected_model') or '-'}[/bold]  "
                   f"Fallback: {', '.join(result.get('fallback_order') or []) or '-'}")
+    record = result.get("live_judge_record") or {}
+    if record:
+        console.print(f"Champion's judge verdicts against the live form: {record.get('correct', 0)} right, {record.get('wrong', 0)} wrong")
+    from .model_qualification import revalidation_reason
+
+    if revalidation_reason(result):
+        console.print(f"[yellow]Re-validation due ({revalidation_reason(result)}): the next certification or live mission asks every model again.[/yellow]")
     if result.get("reason"):
         console.print(str(result.get("reason")))
 

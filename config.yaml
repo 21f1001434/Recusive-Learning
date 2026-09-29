@@ -766,6 +766,13 @@ model_portfolio:
   qualification_max_questions: 8
   qualification_in_first_live_mission: true
   qualification_page: "source_document_type"   # the listing the questions are asked on
+  # V243R29: all models are re-validated (navigation + completion judgments) and the
+  # champion chosen anew when the lock is from an older version, older than
+  # qualification_max_age_days, or the champion keeps judging against the live form.
+  qualification_judge_questions: 4
+  qualification_min_judge_accuracy: 0.5
+  qualification_max_age_days: 30
+  qualification_revalidate_after_judge_errors: 3
   persist_customer_values: false
   persist_selectors: false
   persist_coordinates: false
@@ -913,6 +920,11 @@ human_in_the_loop:
   verify_taught_binding_with_exact_readback: true
   interactive_wait_seconds: 0
   review_newly_learned_phase_once: true
+  # V243R29: the live form is the answer -- every input.json value filled and
+  # committed exactly -> the phase completes (model judges cannot block it, and a
+  # newly learned phase does not wait for a human unless the next key is true).
+  input_json_exact_is_authoritative: true
+  review_learning_phase_even_when_exact: false
   review_on_judge_pass: true
   review_on_judge_block: true
   phase_review_wait_seconds: 600

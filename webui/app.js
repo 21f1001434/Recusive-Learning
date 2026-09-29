@@ -660,8 +660,10 @@ async function refreshStatus() {
       $("modelPortfolioMetric").textContent = !mp.enabled ? "Off" : (mp.default_text_model||champ||"Learning");
       // V243R24: a model selected once by live task performance is used everywhere.
       const q=mp.qualification||{};
+      // V243R29: all models are re-validated on navigation + completion judgments.
+      const jr=q.live_judge_record||{};
       $("modelPortfolioDetail").textContent = !mp.enabled ? "model portfolio disabled" : (q.locked
-        ? `selected by live task: ${q.correct||0}/${q.total||0} correct • ${String(q.qualified_at||"").slice(0,10)}${q.in_use&&q.in_use!==q.selected_model?" • fallback "+q.in_use:""}`
+        ? `champion by live task: ${q.correct||0}/${q.total||0} correct${q.judge_total?` • judged ${q.judge_correct||0}/${q.judge_total}`:""} • ${String(q.qualified_at||"").slice(0,10)}${q.in_use&&q.in_use!==q.selected_model?" • fallback "+q.in_use:""}${(jr.correct||jr.wrong)?` • live verdicts ${jr.correct||0}✓ ${jr.wrong||0}✗`:""}${q.needs_revalidation?" • re-validation due":""}`
         : `not qualified yet (runs on Live certification) • ${champ ? "champion "+champ : "champion: earning"} • ${scored} scored decisions`);
     }
     if ($("runHistoryMetric")) {

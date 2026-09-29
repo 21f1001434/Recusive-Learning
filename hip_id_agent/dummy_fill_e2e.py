@@ -62,6 +62,10 @@ from .final_mission import FinalMissionConsolidator
 from .mlflow_async import AsyncMLflowTracker
 from .replay_policy import replay_policy_engine_from_config
 from .run_history_learning import apply_lessons, lesson_value, run_history_learner_from_config
+from .input_json_authority import (
+    NOT_ELIGIBLE_CLASSES, accept_exact_phase, learning_review_needed, prove_input_json_completion, write_authority,
+)
+from .model_qualification import record_live_judge_truth
 from .mission_learning import close_mission_learning_loop
 from .judge_consensus import MultiModelJudgeConsensus
 from .model_portfolio import model_portfolio_from_config
@@ -2737,9 +2741,12 @@ class FullDummyFillE2EFlow:
             autonomous_all_form_phases=bool(getattr(self.config.autonomous_form, "apply_to_all_form_phases", True)),
         )
         if self.options.qualify_models_on_first_page:
-            from .model_qualification import load_selection
+            from .model_qualification import load_selection, revalidation_reason
 
-            if not load_selection(self.config).get("locked"):
+            current = load_selection(self.config)
+            # V243R29: also when the lock is from an older qualification version (or is
+            # due): every model is re-validated and the champion chosen again, once.
+            if not current.get("locked") or revalidation_reason(current, self.config):
                 from .live_runtime_certification import qualify_models_on_live_page
 
                 qualification = await qualify_models_on_live_page(self.config, shared_browser, root_dir, source="first_live_mission")
@@ -2749,7 +2756,7 @@ class FullDummyFillE2EFlow:
                         phases[0] if phases else "mission",
                         summary=f"Model qualification on the live page: {qualification.get('status')} {qualification.get('selected_model') or ''}".strip(),
                         source="model_qualification",
-                        details={k: qualification.get(k) for k in ("status", "selected_model", "correct", "total")},
+                        details={k: qualification.get(k) for k in ("status", "selected_model", "correct", "total", "judge_correct", "judge_total")},
                     )
                 except Exception:
                     pass
@@ -3128,6 +3135,58 @@ class FullDummyFillE2EFlow:
                 })
             return phase_exact_completion_checkpoint(phase_name, phase_dir)
 
+        async def _input_json_authority(
+            phase_name: str,
+            phase_dir: Path,
+            phase_input_path: Path,
+            *,
+            reason: str,
+            judge_result: Optional[Dict[str, Any]] = None,
+        ) -> Dict[str, Any]:
+            """V243R29: a fresh read-only proof that the live form holds exactly input.json.
+
+            Exact -> the phase is complete: model judges that disagree are
+            recorded as those models' mistakes (champion scoring), never block.
+            """
+            if not bool(getattr(self.config.human_in_the_loop, "input_json_exact_is_authoritative", True)):
+                return {"pass": False, "status": "disabled"}
+            try:
+                payload = read_json_any(phase_input_path)
+                deterministic_only = phase_judge or DualModelSectionJudge(
+                    SectionJudgePolicy(enabled=True, require_text_model=False, require_vision_model=False,
+                                       max_repairs=0, fail_closed=True)
+                )
+                proof = await prove_input_json_completion(
+                    page=shared_browser.page, phase=phase_name,
+                    phase_input=payload if isinstance(payload, dict) else {}, judge=deterministic_only,
+                )
+            except Exception as exc:
+                proof = {"pass": False, "status": "authority_error", "read_only": True,
+                         "error": mask_sensitive_string(str(exc))[:500]}
+            record = write_authority(phase_dir, proof, reason=reason, judge_result=judge_result)
+            # "Not complete" is the truth only when the recorded exact evidence agrees
+            # (a wizard shows one tab at a time, so its live form can look partial).
+            deterministic = (judge_result or {}).get("deterministic_judge") if isinstance((judge_result or {}).get("deterministic_judge"), dict) else {}
+            known_incomplete = bool(proof.get("missing_fields")) and int(proof.get("actual_control_count") or 0) > 0 \
+                and deterministic.get("pass") is False
+            if judge_result and (record.get("pass") or known_incomplete):
+                try:
+                    record["champion_judge_record"] = record_live_judge_truth(
+                        self.config, judge_result, truth=bool(record.get("pass")), phase=phase_name)
+                except Exception:
+                    pass
+            try:
+                mission_trace.record_observation(
+                    phase_name,
+                    summary=("Every input.json value is filled and committed on the live form" if record.get("pass")
+                             else f"Live form not yet exact: {', '.join((proof.get('missing_fields') or [])[:5]) or proof.get('status')}"),
+                    source="input_json_authority",
+                    details={"pass": bool(record.get("pass")), "matched": record.get("matched_count"), "reason": reason},
+                )
+            except Exception:
+                pass
+            return record
+
         try:
             for phase_index, phase in enumerate(phases):
                 phase_dir = root_dir / phase
@@ -3394,6 +3453,16 @@ class FullDummyFillE2EFlow:
                         )
                         checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
                         no_progress_after_exact = "HIP_PHASE_EXACT_STATE_POST_COMPLETION_STALL" in message
+                        if (checkpoint.get("pass") is not True and classification not in NOT_ELIGIBLE_CLASSES
+                                and "HIP_DROPDOWN_OPTIONS_EMPTY" not in message):
+                            # V243R29: the attempt failed, but the form may already hold
+                            # every input.json value (a late executor/evidence error).
+                            # Prove the live form before anything reopens it.
+                            attempt_authority = await _input_json_authority(
+                                phase, phase_dir, input_path, reason=f"attempt_{attempt_no}_error")
+                            if attempt_authority.get("pass"):
+                                checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
+                                no_progress_after_exact = checkpoint.get("pass") is True
                         recovered_reporting_only = bool(
                             (classification == "reporting_only_failure" or no_progress_after_exact)
                             and checkpoint.get("pass") is True
@@ -3678,6 +3747,15 @@ class FullDummyFillE2EFlow:
                             "verification": verification,
                         }
 
+                    # V243R29: the live form is the answer.  When every input.json
+                    # value is filled and committed exactly, the phase is complete; a
+                    # model judge that disagrees is recorded as its mistake.
+                    input_authority: Dict[str, Any] = await _input_json_authority(
+                        phase, phase_dir, input_path, reason="after_section_judge", judge_result=judge_result)
+                    judge_result, diagnosis, authority_overruled = accept_exact_phase(judge_result, diagnosis, input_authority)
+                    if authority_overruled:
+                        safe_write_json(phase_dir / "section_judge_gate.json", judge_result)
+
                     # Any phase whose exact state graph completed must never
                     # be reopened merely because a parser/model evidence layer
                     # disagrees. Rebuild evidence and rejudge once without touching
@@ -3734,7 +3812,7 @@ class FullDummyFillE2EFlow:
                     # model-only disagreement, but can never override failed exact
                     # browser evidence.
                     model_consensus: Dict[str, Any] = {}
-                    if phase_judge is not None and bool(getattr(self.config.human_in_the_loop, "multi_model_judge_on_disagreement", True)):
+                    if phase_judge is not None and not input_authority.get("pass") and bool(getattr(self.config.human_in_the_loop, "multi_model_judge_on_disagreement", True)):
                         if not completed_phase_checkpoint and (diagnosis or phase in learning_review_phases):
                             completed_phase_checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
                         force_panel = bool(
@@ -3777,8 +3855,22 @@ class FullDummyFillE2EFlow:
                     # human PASS may reconcile only model/evidence disagreement when
                     # exact browser completion is already proven. A human rejection
                     # becomes supervised recovery evidence and permits self-heal.
+                    review_skipped_exact = bool(phase in learning_review_phases) and not learning_review_needed(
+                        learning_phase=phase in learning_review_phases, authority=input_authority,
+                        review_even_when_exact=bool(getattr(self.config.human_in_the_loop, "review_learning_phase_even_when_exact", False)))
+                    if review_skipped_exact:
+                        safe_write_json(phase_dir / "phase_acceptance_commit.json", {
+                            "schema_version": "hip.phase-acceptance-commit.v1",
+                            "phase": phase, "attempt": attempt_no, "status": "accepted", "judge_pass": True,
+                            "acceptance_source": "input_json_exact_authority",
+                            "human_review_required": False,
+                            "reason": "every input.json value is filled and committed exactly on the live form",
+                            "browser_replay_allowed": False,
+                            "next_policy": "commit phase complete and hand off",
+                        })
                     human_review_required = bool(
                         phase in learning_review_phases
+                        and not review_skipped_exact
                         and getattr(self.config.human_in_the_loop, "enabled", True)
                         and getattr(self.config.human_in_the_loop, "review_newly_learned_phase_once", True)
                         and (

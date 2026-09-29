@@ -219,7 +219,8 @@ def _grade_from_page(monkeypatch):
     real = mq.qualify_models
 
     def graded(router, screen, **kwargs):
-        _Client.expected = {q["id"]: q["expected"][0] for q in mq.build_questions(screen)}
+        _Client.expected = {q["id"]: (q["expected"][0] if isinstance(q["expected"], list) else q["expected"])
+                            for q in mq.qualification_questions(screen)}
         return real(router, screen, **kwargs)
 
     monkeypatch.setattr(mq, "qualify_models", graded)

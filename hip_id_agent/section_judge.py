@@ -42,6 +42,9 @@ def _value_variants(value: Any) -> set[str]:
     out.add(raw.replace("enable", "enabled"))
     out.add(raw.replace("enabled", "enable"))
     out.add(raw.replace("dell application", "application"))
+    # V243R29: an input.json enum (ELEMENT_IN_PAYLOAD) is shown by DDS as its label
+    # ("Element In Payload"); the executor already treats both as the same value.
+    out.add(re.sub(r"\s+", " ", raw.replace("_", " ")))
     return {v.strip() for v in out if v.strip()}
 
 
@@ -451,6 +454,11 @@ class DualModelSectionJudge:
             actual_seen = []
             for c in candidates:
                 actual_value = c.get("selected_values") if fact.get("match_mode") == "set" and c.get("selected_values") is not None else c.get("value")
+                if actual_value in (None, "", []) and (c.get("disabled") or c.get("readonly")) and str(c.get("placeholder") or "").strip():
+                    # V243R29: a portal-owned read-only field (the Document Type Version)
+                    # shows its value as the placeholder of a disabled input; the
+                    # executor accepts it for verify-only nodes, so does the judge.
+                    actual_value = str(c.get("placeholder")).strip()
                 if actual_value not in (None, "", []):
                     actual_seen.append(actual_value)
                 if _values_equal(value, actual_value):
@@ -509,7 +517,14 @@ class DualModelSectionJudge:
             decision = self.aia.json_decision(TEXT_JUDGE_SYSTEM, json.dumps(mask_sensitive_data(payload), ensure_ascii=False, default=str)[:50000])
             if not isinstance(decision, dict):
                 return {"status": "error", "pass": False, "error": "non-object text judge response"}
-            return {"status": "ok", **decision}
+            # V243R29: which model judged, so its verdict can be scored against the live form.
+            model = ""
+            try:
+                resolver = getattr(self.aia, "_model", None)
+                model = str(resolver() if callable(resolver) else (resolver or "")) or str(os.getenv("HIP_MODEL_ROUTER_SELECTED_TEXT") or "")
+            except Exception:
+                model = str(os.getenv("HIP_MODEL_ROUTER_SELECTED_TEXT") or "")
+            return {"status": "ok", "model": model, **decision}
         except Exception as exc:
             return {"status": "error", "pass": False, "error": mask_sensitive_string(str(exc))}
 
