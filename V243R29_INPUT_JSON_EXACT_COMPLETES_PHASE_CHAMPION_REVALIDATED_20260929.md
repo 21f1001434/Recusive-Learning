@@ -106,6 +106,7 @@ Updated for the new questions: the R24 and R27 stand-in models also answer the j
 | Judge-related suites (section judge gate, completed-phase reconciliation, R6 judge/HITL, R10 live reproof watchdog, R13, R16, R4 learning review, Data Map judge) | 59 passed with R29 |
 | Full suite (204 files) | 1,524 passed, 1 skipped. Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
 | 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
+| Package `HIP_PORTAL_V243R29_FINAL_FULL_E2E_20260929.zip` | Every tracked file identical to the branch; the three wheels match the source; the R13–R29 install smoke checks (53) pass from the extracted package; 55 tests pass from it (R29, section judge gate, completed-phase reconciliation, R10 live reproof, R13 judge/human accept, self-heal loop, input contract incl. the upload assets, Control Center) |
 | `VERIFY_V243R29_INSTALL.ps1` R29 smoke checks | `R29_INPUT_JSON_EXACT_COMPLETES_PHASE_OK`, `R29_ALL_MODELS_REVALIDATED_CHAMPION_OK` (and the R28 checks it calls first) |
 
 ## Apply
