@@ -147,7 +147,7 @@ Save posts the form; the server keeps it.
 | Closest suites (R19 operations and skills, R23 task operations and save, R24 row-panel operations) | 58 passed. One R19 assertion was updated: a certified Edit replay consulted the per-action model at most 6 times; with R30 it also reads the saved values back from the reopened Edit form (search, open, Cancel), 10 in all. With the read-back switched off the original ≤ 6 holds, and still no call is made for a form field. |
 | Full suite (205 files) | 1,537 passed, 1 skipped. Two cases apply only outside this environment: `test_streamlit_preflight_passes_current_package_and_blocks_missing_golden` needs the gitignored `uploads/*.jar`, which ships in the package; `test_v210_layer1_windows_path_guard.py` runs on Windows only. |
 | 7-phase local mission UAT (`certify-final-mission`) | PASS: 7/7 phases; Edit / Save / Validate / Deploy PASS; final BizFlow status Deployed |
-| Package `HIP_PORTAL_V243R30_FINAL_FULL_E2E_20260929.zip` | see the package verification commit |
+| Package `HIP_PORTAL_V243R30_FINAL_FULL_E2E_20260929.zip` | Every tracked file identical to the branch; the three wheels match the source; the R13–R30 install smoke checks (55) pass from the extracted package; 67 tests pass from it (R30, R29, R23 task operations and save, R24 row-panel operations, input contract incl. the upload assets) |
 | `VERIFY_V243R30_INSTALL.ps1` R30 smoke checks | `R30_EDIT_SECTION_CAPTURE_OK`, `R30_EDIT_OPERATIONS_USE_EDIT_SECTION_OK` (and the R29 checks it calls first) |
 
 ## Apply
