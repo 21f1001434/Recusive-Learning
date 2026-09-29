@@ -679,9 +679,12 @@ async function refreshStatus() {
       const es=runtime.edit_sections||{};
       const known=(es.phases||[]).filter(p=>p.known);
       $("editSectionsMetric").textContent = es.total ? `${es.known||0}/${es.total} phases` : "Not yet";
+      // V243R31: Clone / Deploy / Migrate sections too.
+      const acts=es.actions||{};
+      const actLine=["clone","deploy","migrate"].filter(a=>acts[a]).map(a=>`${a} ${acts[a].known||0}/${acts[a].total||0}`).join(" • ");
       $("editSectionsDetail").textContent = known.length
-        ? known.slice(0,3).map(p=>`${p.title||p.phase}: ${p.fields||0} fields${(p.tabs||[]).length?`, ${p.tabs.length} tabs`:""}`).join(" • ")
-        : "learn-edit-sections, or ask: capture the edit values of <object>";
+        ? known.slice(0,2).map(p=>`${p.title||p.phase}: ${p.fields||0} fields${(p.tabs||[]).length?`, ${p.tabs.length} tabs`:""}`).join(" • ") + (actLine?` • ${actLine}`:"")
+        : (actLine || "learn-action-sections, or ask: capture the edit values of <object>");
     }
     if ($("recursiveMetric")) {
       $("recursiveMetric").textContent = !ri.enabled ? "Off" : `Cycle ${ri.cycle||0}`;

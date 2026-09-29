@@ -135,8 +135,27 @@ def _phase_for_family(text: str, family: str) -> str:
     return family
 
 
+# V243R31: which sections a learning request names ("the deploy and migrate
+# options", "every action": Edit, Clone, Deploy, Migrate).
+_SECTION_WORDS = (
+    ("edit", r"\bedit\b"), ("clone", r"\bclon(?:e|es|ing)\b"), ("deploy", r"\bdeploy(?:s|ment)?\b"),
+    ("migrate", r"\bmigrat(?:e|es|ion)\b"),
+)
+_EVERY_ACTION = r"\b(?:all|every|each)\s+(?:the\s+)?(?:actions?|operations?|sections?|options?)\b"
+
+
+def _learn_actions(text: str) -> List[str]:
+    if not re.search(_LEARN_EDIT, text, re.I) or re.search(_CHANGE, text, re.I) or re.search(_TO_ENV, text, re.I):
+        return []
+    if re.search(_EVERY_ACTION, text, re.I) and not any(re.search(p, text, re.I) for _, p in _SECTION_WORDS):
+        return ["edit", "clone", "deploy", "migrate"]
+    hits = sorted((m.start(), action) for action, pattern in _SECTION_WORDS for m in [re.search(pattern, text, re.I)] if m)
+    return [action for _, action in hits]
+
+
 def _learn_edit_specs(text: str) -> List[Dict[str, Any]]:
-    if not (re.search(r"\bedit\b", text, re.I) and re.search(_LEARN_EDIT, text, re.I) and not re.search(_CHANGE, text, re.I)):
+    actions = _learn_actions(text)
+    if not actions:
         return []
     from .edit_section_learning import ALL_PHASES
 
@@ -158,14 +177,45 @@ def _learn_edit_specs(text: str) -> List[Dict[str, Any]]:
     target = _target(text) if len(phases) == 1 else ""
     specs = []
     for p in phases:
-        spec: Dict[str, Any] = {"phase": p, "operation": "learn_edit", "source": "task_box", "commit": False}
-        if target:
-            spec["target"] = target
-        panel = _panel(text, "learn_edit")
-        if panel:
-            spec["panel"] = panel
-        specs.append(spec)
+        for action in actions:
+            spec: Dict[str, Any] = {"phase": p, "operation": f"learn_{action}", "source": "task_box", "commit": False}
+            if target:
+                spec["target"] = target
+            panel = _panel(text, "learn_edit")
+            if panel:
+                spec["panel"] = panel
+            specs.append(spec)
     return specs
+
+
+# V243R31: "clone transport profile X as Y" -- Y is the clone's name.
+_CLONE_NAME = r"\b(?:as|to|into|named|called|with\s+(?:the\s+)?(?:new\s+)?name)\s+['\"]?([A-Za-z0-9][A-Za-z0-9_.\-]*(?:\(\d+(?:\.\d+)*\))?)"
+
+
+def _clone_names(text: str) -> tuple:
+    """(source, new name) of a clone request, or ("", "")."""
+    m = re.search(r"\bclon\w*\b(.*)", str(text or ""), re.I)
+    if not m:
+        return "", ""
+    rest = m.group(1)
+    new = re.search(_CLONE_NAME, rest, re.I)
+    if not new or not re.search(r"[_\-]", new.group(1)):
+        return "", ""
+    before = rest[:new.start()]
+    source = _target(before)
+    return source, new.group(1).strip(".")
+
+
+def _name_values(phase: str, name: str) -> Dict[str, Any]:
+    from .edit_section_learning import NAME_PATHS
+
+    path = NAME_PATHS.get(phase, "name").split(".")
+    out: Dict[str, Any] = {}
+    cur = out
+    for part in path[:-1]:
+        cur = cur.setdefault(part, {})
+    cur[path[-1]] = name
+    return out
 
 
 def task_operation_specs(task: str, input_data: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
@@ -211,6 +261,11 @@ def task_operation_specs(task: str, input_data: Optional[Mapping[str, Any]] = No
             spec["panel"] = panel
         if operation == "merge" and merge_into:
             spec["values"] = {"merge_into": merge_into}
+        if operation == "clone":
+            source, new_name = _clone_names(text)
+            if new_name:
+                spec["target"] = source or spec.get("target") or ""
+                spec["values"] = _name_values(phase, new_name)
         specs.append(spec)
     return specs
 
@@ -229,6 +284,18 @@ def plan_task_operations(task: str, input_data: Optional[Mapping[str, Any]] = No
         phase, operation = spec["phase"], spec["operation"]
         url = str(listing_urls.get(phase) or "")
         steps.append({"type": "navigate", "target": url, "risk": "read", "phase": phase})
+        if operation.startswith("learn_") and operation != "learn_edit":
+            action = operation[len("learn_"):]
+            steps += [
+                {"type": "search", "target": spec.get("target") or f"objects.{phase} name, else the first row", "risk": "read"},
+                {"type": "open_row_details", "click": ["Expand the row"], "exact_row_match": True, "risk": "read"},
+                ({"type": "capture", "what": "the Clone form: every field, which ones a clone may change", "risk": "read"} if action == "clone" else
+                 {"type": "capture", "what": f"where {action.title()} goes from every environment tab: its menu (read without a click), "
+                  "its confirmation or its dialog; a guarded action is opened only with the mutation gate, nothing is confirmed", "risk": "read"}),
+                {"type": "close", "click": ["Cancel", "Close", "Back", "Escape"], "saves": False, "risk": "read"},
+                {"type": "remember", "what": f"action_sections/{action}/{phase}.json (value-free)", "risk": "read"},
+            ]
+            continue
         if operation == "learn_edit":
             steps += [
                 {"type": "search", "target": spec.get("target") or f"objects.{phase} name, else the first row", "risk": "read"},

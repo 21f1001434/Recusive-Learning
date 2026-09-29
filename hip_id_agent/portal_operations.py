@@ -33,6 +33,7 @@ row actions open their own dialog, which is learned as its own form
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import time
@@ -88,7 +89,9 @@ class OperationNeedsInput(Exception):
 RESULTS = {
     "committed_and_verified": "SUCCESS", "committed": "SUCCESS", "filled_not_committed": "SUCCESS",
     "validated_not_committed": "SUCCESS", "already_in_target": "EXISTING", "no_change_needed": "EXISTING",
-    "edit_section_learned": "SUCCESS",
+    "edit_section_learned": "SUCCESS", "clone_section_learned": "SUCCESS", "deploy_section_learned": "SUCCESS",
+    "migrate_section_learned": "SUCCESS", "deploy_section_learned_partly": "SUCCESS", "migrate_section_learned_partly": "SUCCESS",
+    "deploy_needs_authorized_run": "BLOCKED", "migrate_needs_authorized_run": "BLOCKED",
     "needs_input": "NEEDS_INPUT", "blocked_mutation_authorization": "BLOCKED", "commit_not_authorized": "BLOCKED",
     "commit_waiting_for_certified_skill": "BLOCKED",
 }
@@ -270,8 +273,10 @@ _PANEL_JS = r"""
   const versions = versionHost ? Array.from(versionHost.querySelectorAll('option,[role=option]')).map(o => (o.innerText || o.textContent || '').trim()).filter(Boolean) : [];
   const versionInput = versionHost ? (versionHost.tagName === 'SELECT' ? versionHost : versionHost.querySelector('input')) : null;
   const desc = (panel.innerText.match(/description\s*:\s*([^\n]*)/i) || [])[1] || '';
-  return {found: true, verified_by, expanded, tabs, actions, details: labelled, version: versionInput ? String(versionInput.value || '').trim() : '',
-          versions, description: desc.trim().slice(0, 200)};
+  // V243R31: a Version shown as text ("Version : 1.0") rather than as a dropdown.
+  const shownVersion = versionInput ? String(versionInput.value || '').trim() : ((panel.innerText.match(/\bversion\s*:\s*([0-9][0-9.]*)/i) || [])[1] || '');
+  return {found: true, verified_by, expanded, tabs, actions, details: labelled, version: shownVersion,
+          versions: versions.length ? versions : (shownVersion ? [shownVersion] : []), description: desc.trim().slice(0, 200)};
 }
 """
 
@@ -355,6 +360,36 @@ _MENU_ITEMS_JS = r"""
     if (t && !items.includes(t)) items.push(t);
   }));
   return items;
+}
+"""
+
+# V243R31: what a row action opened -- a menu of choices (Migrate > TEST1), a
+# dialog or drawer with fields (Deploy with a Target Environment), or a
+# confirmation without fields ("Deploy X from DEV to TEST1?").  A popup
+# attribute on the button does not say which: the page after the click does.
+_OPENED_JS = r"""
+({controls}) => {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const visible = el => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const own = controls ? document.getElementById(controls) : null;
+  const menus = own ? [own] : Array.from(document.querySelectorAll('[role=menu],.dds__action-menu'));
+  const items = [];
+  menus.filter(visible).forEach(m => m.querySelectorAll('[role=menuitem],[role=option],button,li').forEach(e => {
+    const t = norm(e.innerText || e.textContent); if (visible(e) && t && !items.includes(t)) items.push(t); }));
+  if (items.length) return {kind: 'menu', items};
+  const dialogs = Array.from(document.querySelectorAll('[role=dialog],[role=alertdialog],.dds__modal,dds-drawer,.dds__drawer')).filter(visible);
+  const top = dialogs[dialogs.length - 1];
+  if (!top) return {kind: 'none'};
+  const text = norm(top.innerText);
+  if (/^loading\b|\bloading\.\.\./i.test(text)) return {kind: 'loading'};
+  if (top.querySelector('input:not([type=hidden]),textarea,select,[role=combobox]')) return {kind: 'form', title: norm(top.getAttribute('aria-label') || '')};
+  const buttons = Array.from(top.querySelectorAll('button,[role=button]')).filter(visible).map(b => norm(b.innerText || b.getAttribute('aria-label'))).filter(Boolean);
+  if (!buttons.length) return {kind: 'loading'};
+  // The question itself, without the dialog's title and button captions.
+  const body = top.querySelector('p,.dds__modal__body,[class*=modal-body],[class*=message]');
+  const question = norm(body ? body.innerText : text);
+  return {kind: 'confirm', text: question.slice(0, 400), buttons, title: norm(top.getAttribute('aria-label') || '')};
 }
 """
 
@@ -604,9 +639,37 @@ class PortalOperationRunner:
             await page.wait_for_timeout(250)
         return await self._panel(token, target)
 
+    def _learned_targets(self, phase: str, operation: str, source_env: str) -> Optional[List[str]]:
+        """V243R31: where this action went from ``source_env`` when it was learned (None: not learned)."""
+        from .edit_section_learning import SectionMemory
+
+        try:
+            memory = SectionMemory.for_run(self.config, getattr(self.browser, "page", None), action=operation)
+            menus = (memory.load(phase).get("menus") or {}) if memory is not None else {}
+        except Exception:
+            return None
+        items = menus.get(str(source_env or "").upper())
+        return [str(x) for x in items] if items is not None else None
+
+    def _route_hint(self, phase: str, source_env: str, target_env: str) -> str:
+        """"PROD is reached through DEV > TEST2 > PROD" from the learned Migrate / Deploy menus."""
+        from .edit_section_learning import SectionMemory
+
+        if not source_env or not target_env:
+            return ""
+        for action in ("migrate", "deploy"):
+            try:
+                memory = SectionMemory.for_run(self.config, getattr(self.browser, "page", None), action=action)
+                route = memory.route(phase, source_env, target_env) if memory is not None else []
+            except Exception:
+                route = []
+            if len(route) > 2:
+                return f"; {target_env} is reached through {' > '.join(route)} ({action} to {route[1]} first)"
+        return ""
+
     async def _open_panel_action(
         self, hit: Mapping[str, Any], *, token: str, target: str, labels: Sequence[str], options: Mapping[str, Any],
-        audit: Dict[str, Any], operation: str,
+        audit: Dict[str, Any], operation: str, phase: str = "",
     ) -> None:
         """V243R24: expand the row, prove the panel is that row's, choose the
         environment tab and version the task names, then click the action."""
@@ -658,6 +721,16 @@ class PortalOperationRunner:
             if existing.get("holds_version"):
                 audit["existing"] = True
                 return
+        source_env = audit["before"]["environment"]
+        if operation in {"migrate", "deploy"} and wanted and _GUARDED.search(str(labels[0])):
+            # V243R31: a guarded action (Deploy) is not even opened for a target it was
+            # learned not to offer from this environment.
+            learned = self._learned_targets(phase, operation, source_env)
+            if learned is not None and not any(_same_value(x, wanted) for x in learned):
+                raise OperationNeedsInput(
+                    "target_environment", f"{wanted} is not offered by {labels[0]} from {source_env} (learned: "
+                    f"{', '.join(learned) or 'nothing'}){self._route_hint(phase, source_env, wanted)}; nothing was clicked",
+                    offered=learned, source="an offered environment, or learn-action-sections again if the portal changed")
         pick = uuid.uuid4().hex[:10]
         action = await page.evaluate(_PANEL_PICK_JS, {"token": token, "kind": "action", "value": list(labels), "pickToken": pick})
         if not action.get("found"):
@@ -667,16 +740,32 @@ class PortalOperationRunner:
         await self._click_token(pick, label, mutation=bool(_GUARDED.search(label)))
         audit["path"].append(label)
         audit["selectors"].append({"role": "button", "name": label.title(), "context": "expanded details of the requested row"})
-        if action.get("menu"):
-            items: List[str] = []
-            for _ in range(12):
-                items = await page.evaluate(_MENU_ITEMS_JS, {"controls": action.get("controls") or ""})
-                if items:
-                    break
-                await page.wait_for_timeout(150)
+        if operation not in PHASE_FORM_OPERATIONS:
+            await self._note_what_opened(audit, controls=str(action.get("controls") or ""))
+
+    async def _note_what_opened(self, audit: Dict[str, Any], *, controls: str = "", timeout_s: float = 4.0) -> Dict[str, Any]:
+        """V243R31: a menu (its choices), a dialog with fields, or a confirmation (its text)."""
+        page = await self._page()
+        deadline = time.monotonic() + timeout_s
+        opened: Dict[str, Any] = {"kind": "none"}
+        while True:
+            try:
+                opened = await page.evaluate(_OPENED_JS, {"controls": controls})
+            except Exception:
+                opened = {"kind": "none"}  # the action navigated to its own page
+            if opened.get("kind") in {"menu", "form", "confirm"} or time.monotonic() >= deadline:
+                break
+            await page.wait_for_timeout(200)
+        audit["opened"] = opened.get("kind")
+        if opened.get("kind") == "menu":
             audit["menu_opened"] = True
-            audit["menu_items"] = items
-            audit["menu_controls"] = action.get("controls") or ""
+            audit["menu_items"] = list(opened.get("items") or [])
+            audit["menu_controls"] = controls
+        elif opened.get("kind") == "confirm":
+            audit["confirm_opened"] = True
+            audit["confirm"] = {"text": mask_sensitive_string(str(opened.get("text") or "")), "buttons": list(opened.get("buttons") or []),
+                                "title": opened.get("title") or ""}
+        return opened
 
     async def _target_holds_version(self, token: str, target: str, env: str, panel: Dict[str, Any]) -> Dict[str, Any]:
         """Does the target environment already hold the selected version?  (Read-only: tab clicks.)"""
@@ -785,17 +874,24 @@ class PortalOperationRunner:
             if not hit.get("found") and target and int(hit.get("rows") or 0) > 0 and not hit.get("matching"):
                 raise OperationNeedsInput("target", f"no row named {target!r} on the listing", source="the exact object name")
             if hit.get("found") == "expander":
-                await self._open_panel_action(hit, token=token, target=target, labels=labels, options=options, audit=audit, operation=operation)
+                await self._open_panel_action(hit, token=token, target=target, labels=labels, options=options, audit=audit, operation=operation,
+                                              phase=phase)
                 if audit.get("menu_opened") and audit.get("menu_items") and store is not None:
                     # The action's menu (Migrate > TEST1 / TEST2) opened: that is where it lives.
                     store.record_opener(phase, operation, path=list(audit["path"]), label=str(audit["path"][-1]),
                                         selectors=audit.get("selectors") or (), expander=True)
-                if audit.get("existing") or audit.get("menu_opened"):
+                if audit.get("existing") or audit.get("menu_opened") or audit.get("confirm_opened"):
+                    await self._settle_guarded_opener(audit, start_net)
                     return audit
             elif hit.get("found") == "row_action":
                 await self._click_token(token, str(hit.get("label") or labels[0]), mutation=bool(_GUARDED.search(labels[0])))
                 audit["path"].append(str(hit.get("label")))
                 audit["selectors"].append({"role": "button", "name": str(hit.get("label") or ""), "context": "row of the requested object"})
+                if operation not in PHASE_FORM_OPERATIONS:
+                    await self._note_what_opened(audit, timeout_s=2.0)
+                    if audit.get("menu_opened") or audit.get("confirm_opened"):
+                        await self._settle_guarded_opener(audit, start_net)
+                        return audit
             elif hit.get("found") == "menu":
                 await self._click_token(token, str(hit.get("label") or "More actions"))
                 audit["path"].append(str(hit.get("label") or "more actions"))
@@ -810,6 +906,11 @@ class PortalOperationRunner:
                     raise RuntimeError(f"HIP_OPERATION_ACTION_NOT_IN_MENU: {operation} for {target!r}")
                 await self._click_token(item_token, str(item.get("label") or labels[0]), mutation=bool(_GUARDED.search(labels[0])))
                 audit["path"].append(str(item.get("label")))
+                if operation not in PHASE_FORM_OPERATIONS:
+                    await self._note_what_opened(audit, timeout_s=2.0)
+                    if audit.get("confirm_opened"):
+                        await self._settle_guarded_opener(audit, start_net)
+                        return audit
             else:
                 # Icon-only or unusual markup: the live semantic resolver (compound menus).
                 await self.browser.click_semantic_affordance(
@@ -1007,6 +1108,13 @@ class PortalOperationRunner:
             await asyncio.sleep(0.3)
         return {"settled": False}
 
+    async def _settle_guarded_opener(self, audit: Dict[str, Any], start_net: int) -> None:
+        """V243R31: a guarded action (Deploy) that only opened a menu or a confirmation
+        wrote nothing: reconcile its click so the real choice can be dispatched."""
+        clicked = [str(x) for x in audit.get("path") or [] if str(x) and ":" not in str(x) and str(x) != "expand row"]
+        if (audit.get("menu_opened") or audit.get("confirm_opened")) and clicked and _GUARDED.search(clicked[-1]):
+            audit["opener_outcome"] = await self._reconcile_opener(start_net, form_visible=True)
+
     async def _reconcile_opener(self, start_net: int, *, form_visible: bool) -> Dict[str, Any]:
         """A guarded row action (Deploy ...) either opened its dialog or acted at once."""
         from .certified_future_task_agent import CertifiedHIPFutureTaskExecutor
@@ -1148,16 +1256,19 @@ class PortalOperationRunner:
                 return self._needs_input(row, OperationNeedsInput(
                     "name", "a clone needs a new, unique name; the source object's name is taken", observed=target,
                     source=f"objects.{phase}.name (a new name) or the task text"), started, out_dir)
-        if operation == "learn_edit":
+        if operation in {"learn_edit", "learn_clone", "learn_deploy", "learn_migrate"}:
             # V243R30: open the Edit form, read every value, close it unsaved and
-            # remember the Edit section.  Read-only: nothing to authorize.
+            # remember the Edit section.  V243R31: the Clone form, and where Deploy /
+            # Migrate go from every environment.  Read-only: nothing is confirmed.
             from .edit_section_learning import EditSectionLearner
 
             learned = await EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls).learn(
-                phase, target=target, input_data=input_data, options=options, out_dir=out_dir)
+                phase, target=target, input_data=input_data, options=options, out_dir=out_dir,
+                action=operation[len("learn_"):], gate=gate)
             row.update({k: learned.get(k) for k in (
                 "pass", "status", "target", "target_source", "open", "close", "capture", "fields", "input_json", "values_file",
-                "edit_input_file", "knowledge", "knowledge_file", "no_write_requests", "write_requests", "needs_input", "reason", "learned_mode")
+                "edit_input_file", "knowledge", "knowledge_file", "no_write_requests", "write_requests", "needs_input", "reason", "learned_mode",
+                "environments", "menus", "section_kind", "confirm", "dialog_fields", "blocked_environments", "action_label")
                 if k in learned})
             return self._finish(row, started, out_dir)
         if operation != "create" and _GUARDED.search(opener) and not gate.get("pass"):
@@ -1182,18 +1293,28 @@ class PortalOperationRunner:
             if row["open"].get("menu_opened"):
                 return await self._menu_choice(row, values=values, gate=gate, task_id=task_id, target=target, phase=phase,
                                                opener=opener, commit_wanted=commit_wanted, started=started, out_dir=out_dir)
+            if row["open"].get("confirm_opened"):
+                return await self._confirm_choice(row, values=values, gate=gate, task_id=task_id, target=target, phase=phase,
+                                                  opener=opener, commit_wanted=commit_wanted, started=started, out_dir=out_dir)
             if operation in {"edit", "clone"} and form_phase == phase and row["open"].get("form_visible"):
-                if operation == "edit" and self.edit_capture:
+                if self.edit_capture:
                     # V243R30: read the whole Edit form first (every tab, read-only)
-                    # and refresh the learned Edit section with it.
-                    edit_capture = await self._capture_edit_section(phase, input_data, row)
+                    # and refresh the learned Edit section with it.  V243R31: the
+                    # Clone form too -- its values are the source's, kept by the clone.
+                    edit_capture = await self._capture_edit_section(phase, input_data, row, action=operation)
                 # V243R24 EDIT SAFETY: capture the form as it is, compare every
                 # requested value with it, and only change what differs.
                 row["before"] = await self._form_snapshot()
                 fields = self._requested_fields(form_phase, values)
                 row["changes"] = self._plan_changes(fields, row["before"])
+                locked = self._read_only_changes(row["changes"], edit_capture) if self.block_read_only and row["changes"] else []
+                if locked and operation == "clone":
+                    await self._leave_edit_form(phase, edit_capture)
+                    return self._needs_input(row, OperationNeedsInput(
+                        locked[0]["label"], f"read-only in {edit_capture.get('title') or 'the Clone form'}: a clone cannot change "
+                        + ", ".join(f"{x['label']!r}" for x in locked) + "; nothing was created",
+                        observed={x["label"]: x["current"] for x in locked}, source="leave it as the source has it"), started, out_dir)
                 if operation == "edit" and row["changes"]:
-                    locked = self._read_only_changes(row["changes"], edit_capture) if self.block_read_only else []
                     if locked:
                         await self._leave_edit_form(phase, edit_capture)
                         return self._needs_input(row, OperationNeedsInput(
@@ -1210,6 +1331,19 @@ class PortalOperationRunner:
                     differ = {c["top_key"] for c in row["changes"] if c["change"] and c["top_key"]}
                     values = {k: v for k, v in values.items() if k not in (same - differ)}
                     fields = [f for f in fields if f.get("top_key") not in (same - differ)]
+            if operation not in PHASE_FORM_OPERATIONS and row["open"].get("opened") == "form" and values:
+                # V243R31: an action's dialog (Deploy > Target Environment): read it first;
+                # a requested value it does not offer is NEEDS_INPUT, never guessed or typed.
+                dialog = await self._capture_action_dialog(phase, operation, form_phase, row)
+                missing = self._not_offered(values, dialog.get("fields") or [])
+                if missing:
+                    await self._leave_edit_form(phase, dialog)
+                    first = missing[0]
+                    return self._needs_input(row, OperationNeedsInput(
+                        first["field"], f"{first['requested']} is not offered by {opener} from "
+                        f"{(row['open'].get('before') or {}).get('environment') or 'this environment'} (the dialog offers {', '.join(first['offered'])})"
+                        + self._route_hint(phase, str((row['open'].get('before') or {}).get('environment') or ''), first["requested"]),
+                        offered=first["offered"], source="one of the offered values"), started, out_dir)
             payload: Dict[str, Any] = {"objects": {form_phase: values}, "_operation": operation}
             for key in ("_upload_assets_dir", "_input_json_path"):
                 if key in input_data:
@@ -1267,7 +1401,7 @@ class PortalOperationRunner:
         store = PortalSkillStore.for_run(self.config, await self._page())
         learned = store.commit_label(form_phase, skill_id) if store is not None else ""
         # V243R30: the Save the Edit form shows (learned: "Update", "Submit" ...) comes first.
-        seen_commit = list(edit_capture.get("commit_labels") or []) if operation == "edit" else []
+        seen_commit = list(edit_capture.get("commit_labels") or []) if operation in {"edit", "clone"} else []
         labels = list(dict.fromkeys([x for x in [learned, *(spec.get("commit_labels") or []), *seen_commit, *COMMIT_LABELS.get(operation, ("Save",))] if x]))
         committed = await self.commit(labels=labels, gate=gate, task_id=task_id, entity=target)
         row["commit"] = committed
@@ -1279,6 +1413,9 @@ class PortalOperationRunner:
         expect = [str(x) for x in (spec.get("expect") or [])] if isinstance(spec.get("expect"), list) else (
             [str(v) for v in (spec.get("expect") or {}).values()] if isinstance(spec.get("expect"), Mapping) else [])
         name = _verify_name(spec, operation, values, target)
+        if operation in {"deploy", "migrate"} and str(values.get("target_environment") or "").strip():
+            # V243R31: a Deploy / Migrate dialog: the object's row must now list the environment.
+            expect = list(dict.fromkeys([*expect, str(values.get("target_environment")).strip().upper()]))
         if self.verify_after_commit:
             row["verification"] = await self.verify_listing(phase=phase, name=name, expect=expect)
             row["pass"] = bool(row["verification"].get("pass"))
@@ -1292,6 +1429,20 @@ class PortalOperationRunner:
             if row["pass"] and "expand row" in (row["open"].get("path") or []) and fields:
                 # V243R24: re-open the object's details and read the requested values back.
                 row["after"] = await self.read_details(phase=phase, target=name, options=options, fields=fields)
+            if row["pass"] and operation == "clone" and self.verify_by_edit:
+                # V243R31: open the new object's Edit form: the requested values, and
+                # everything else as the source had it.
+                reread = await self.read_back_edit_form(phase=phase, target=name, options={}, values=values, input_data=input_data,
+                                                        source_fields=edit_capture.get("fields") or [])
+                row["after_edit_form"] = reread
+                if reread.get("read"):
+                    row["after"] = {**(row.get("after") or {}), "source": "clone_edit_form",
+                                    "requested_values_seen": reread.get("requested_values_seen"), "all_seen": reread.get("all_seen"),
+                                    "kept_from_source": reread.get("kept_from_source"), "differs_from_source": reread.get("differs_from_source")}
+                    if reread.get("all_seen") is False:
+                        row["pass"] = False
+                        row["status"] = "committed_values_not_seen"
+                        row["reason"] = "created, but the new object's Edit form does not show every requested value"
             if row["pass"] and operation == "edit" and fields and self.verify_by_edit and (row.get("after") or {}).get("all_seen") is not True:
                 # V243R30: the details do not show every edited field -- reopen the
                 # Edit form (read-only) and read them there.
@@ -1324,6 +1475,8 @@ class PortalOperationRunner:
                 pass
 
         source_env = str((row["open"].get("before") or {}).get("environment") or "")
+        if source_env and items:
+            self._remember_action(phase, str(row.get("operation") or ""), row, kind="menu", menus={source_env.upper(): items})
         if not want:
             await close_menu()
             return self._needs_input(row, OperationNeedsInput(
@@ -1332,7 +1485,8 @@ class PortalOperationRunner:
         if not match:
             await close_menu()
             return self._needs_input(row, OperationNeedsInput(
-                "target_environment", f"{want} is not offered by {opener} from {source_env or 'this environment'}", offered=items), started, out_dir)
+                "target_environment", f"{want} is not offered by {opener} from {source_env or 'this environment'}"
+                + self._route_hint(phase, source_env, want), offered=items), started, out_dir)
         row["choice"] = match
         if not commit_wanted:
             await close_menu()
@@ -1359,34 +1513,169 @@ class PortalOperationRunner:
             row["reconciliation_by_listing"] = self.browser.resolve_mutation_dispatch_guard({"classification": "committed_verified", "pass": True})
         return self._finish(row, started, out_dir)
 
-    async def _capture_edit_section(self, phase: str, input_data: Mapping[str, Any], row: Dict[str, Any]) -> Dict[str, Any]:
-        """V243R30: the open Edit form, read completely (read-only), remembered."""
-        from .edit_section_learning import EditSectionLearner, EditSectionMemory
+    def _remember_action(self, phase: str, operation: str, row: Mapping[str, Any], *, kind: str,
+                         menus: Optional[Mapping[str, Sequence[str]]] = None, confirm: Optional[Mapping[str, Any]] = None) -> None:
+        """V243R31: what this action opened on this phase's listing -- remembered, value-free."""
+        from .edit_section_learning import SectionMemory
+
+        try:
+            memory = SectionMemory.for_run(self.config, getattr(self.browser, "page", None), action=operation)
+            if memory is not None:
+                memory.record(phase, {"section_kind": kind, "menus": dict(menus or {}), "confirm": dict(confirm or {}),
+                                      "listing_url": self._listing_url(phase)}, opener=row.get("open"), source=f"{operation}_operation")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _confirm_template(text: str, target: str) -> str:
+        """The confirmation's wording without this object's name or version."""
+        out = str(text or "")
+        if target:
+            out = re.sub(re.escape(target), "<object>", out, flags=re.I)
+        return re.sub(r"\b\d+(?:\.\d+)+\b", "<version>", out)[:240]
+
+    async def _cancel_dialog(self) -> bool:
+        page = await self._page()
+        token = uuid.uuid4().hex[:10]
+        hit = await page.evaluate(_CONFIRM_JS, {"labels": ["Cancel", "No", "Close"], "token": token})
+        if hit.get("found"):
+            await self._click_token(token, "Cancel")
+            await page.wait_for_timeout(250)
+            return True
+        try:
+            await page.keyboard.press("Escape")
+        except Exception:
+            pass
+        return False
+
+    async def _confirm_choice(
+        self, row: Dict[str, Any], *, values: Mapping[str, Any], gate: Mapping[str, Any], task_id: str, target: str, phase: str,
+        opener: str, commit_wanted: bool, started: float, out_dir: Path,
+    ) -> Dict[str, Any]:
+        """V243R31: Deploy that asks "Deploy X from DEV to TEST1?" -- the portal names the
+        target; it must be the requested one.  Confirmed once, or cancelled."""
+        confirm = row["open"].get("confirm") or {}
+        text = str(confirm.get("text") or "")
+        envs = re.findall(r"\b(DEV|TEST\d*|PROD|UAT|QA|SIT|STAGE)\b", text.upper())
+        to = (re.search(r"\bTO\s+(DEV|TEST\d*|PROD|UAT|QA|SIT|STAGE)\b", text.upper()) or [None, envs[-1] if envs else ""])[1]
+        source = (re.search(r"\bFROM\s+(DEV|TEST\d*|PROD|UAT|QA|SIT|STAGE)\b", text.upper()) or [None, ""])[1]
+        want = str(values.get("target_environment") or values.get("environment") or values.get("to") or "").strip()
+        row["confirmation"] = {"text": text, "source_environment": source, "target_environment": to}
+        self._remember_action(phase, str(row.get("operation") or ""), row, kind="confirm",
+                              menus={source: [to]} if source and to else {},
+                              confirm={"title": confirm.get("title") or "", "buttons": list(confirm.get("buttons") or []),
+                                       "text": self._confirm_template(text, target), "asks_before_acting": True})
+        if not want or (to and not _same_value(want, to)):
+            await self._cancel_dialog()
+            reason = (f"{opener} from {source or 'this environment'} goes to {to} (the portal asks: {text[:160]!r}); "
+                      + (f"{want} is not where it goes" if want else "name the target to confirm it")
+                      + (self._route_hint(phase, source, want) if want else ""))
+            return self._needs_input(row, OperationNeedsInput("target_environment", reason, offered=[to] if to else [],
+                                                              source="'to <ENV>' in the task"), started, out_dir)
+        row["choice"] = to or want
+        if not commit_wanted:
+            await self._cancel_dialog()
+            row.update({"pass": True, "status": "validated_not_committed"})
+            return self._finish(row, started, out_dir)
+        if not gate.get("pass"):
+            await self._cancel_dialog()
+            row.update({"pass": False, "status": "commit_not_authorized",
+                        "reason": f"{opener} to {row['choice']} is a portal mutation; the three-part gate is closed and nothing was confirmed"})
+            return self._finish(row, started, out_dir)
+        page = await self._page()
+        labels = [x for x in dict.fromkeys([opener, str(opener).title(), "Confirm", "Yes", "OK", "Continue", "Proceed", "Submit"]) if x]
+        token = uuid.uuid4().hex[:10]
+        hit = await page.evaluate(_CONFIRM_JS, {"labels": labels, "token": token})
+        if not hit.get("found"):
+            await self._cancel_dialog()
+            row.update({"pass": False, "status": "commit_control_not_found", "reason": f"no {'/'.join(labels[:3])} in the confirmation"})
+            return self._finish(row, started, out_dir)
+        committed = await self._commit_click(token, str(hit.get("label") or opener), allowed=labels, task_id=task_id, entity=target)
+        row["commit"] = committed
+        if not committed.get("pass"):
+            row.update({"pass": False, "status": committed.get("status") or "commit_failed"})
+            return self._finish(row, started, out_dir)
+        row["verification"] = await self.verify_listing(phase=phase, name=target, expect=[row["choice"]])
+        row["pass"] = bool(row["verification"].get("pass"))
+        row["status"] = "committed_and_verified" if row["pass"] else "committed_verification_failed"
+        row["after"] = {"available_environments_row": row["verification"].get("row_text")}
+        guard = (committed.get("reconciliation") or {}).get("mutation_dispatch_guard") or {}
+        if row["pass"] and guard.get("retained") and hasattr(self.browser, "resolve_mutation_dispatch_guard"):
+            row["reconciliation_by_listing"] = self.browser.resolve_mutation_dispatch_guard({"classification": "committed_verified", "pass": True})
+        return self._finish(row, started, out_dir)
+
+    async def _capture_action_dialog(self, phase: str, operation: str, form_phase: str, row: Dict[str, Any]) -> Dict[str, Any]:
+        """V243R31: the dialog an action opened, read (read-only) and remembered as that action's section."""
+        from .edit_section_learning import EditSectionLearner, SectionMemory
+
+        try:
+            capture = await EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls).capture(
+                form_phase, input_data={})
+        except Exception as exc:
+            row["action_section"] = {"captured": False, "error": mask_sensitive_string(str(exc))[:300]}
+            return {}
+        if not capture.get("pass"):
+            row["action_section"] = {"captured": False, "status": capture.get("status")}
+            return {}
+        memory = SectionMemory.for_run(self.config, await self._page(), action=operation)
+        source_env = str((row.get("open") or {}).get("before", {}).get("environment") or "").upper()
+        env_field = next((f for f in capture.get("fields") or [] if f.get("options") and "environment" in _norm(f.get("label"))), None)
+        menus = {source_env: list(env_field.get("options") or [])} if source_env and env_field else {}
+        if memory is not None:
+            memory.record(phase, {**capture, "listing_url": self._listing_url(phase), "section_kind": "dialog", "menus": menus},
+                          opener=row.get("open"), source=f"{operation}_operation")
+        surface = capture.get("surface") or {}
+        row["action_section"] = {"captured": True, "kind": "dialog", "title": surface.get("title"),
+                                 "fields": [{k: f.get(k) for k in ("label", "kind", "required", "options")} for f in capture.get("fields") or []]}
+        return {"fields": capture.get("fields") or [], "token": capture.get("surface_token"), "title": surface.get("title")}
+
+    @staticmethod
+    def _not_offered(values: Mapping[str, Any], fields: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+        """Requested values a dialog's dropdown / radio group does not offer."""
+        out: List[Dict[str, Any]] = []
+        for key, want in values.items():
+            if not isinstance(want, (str, int, float)) or str(want).strip() == "" or str(key).startswith("_"):
+                continue
+            words = _norm(key)
+            field = next((f for f in fields if f.get("options") and (_norm(f.get("label")) == words or _norm(f.get("input_key")) == words
+                                                                    or (words and words in _norm(f.get("label"))))), None)
+            if field is None:
+                continue
+            offered = [str(o) for o in field.get("options") or []]
+            if not any(_same_value(o, want) for o in offered):
+                out.append({"field": str(key), "label": field.get("label"), "requested": str(want), "offered": offered})
+        return out
+
+    async def _capture_edit_section(self, phase: str, input_data: Mapping[str, Any], row: Dict[str, Any], *, action: str = "edit") -> Dict[str, Any]:
+        """V243R30: the open Edit (V243R31: or Clone) form, read completely (read-only), remembered."""
+        from .edit_section_learning import EditSectionLearner, SectionMemory
 
         out: Dict[str, Any] = {}
+        key = "edit_section" if action == "edit" else f"{action}_section"
         try:
-            memory = EditSectionMemory.for_run(self.config, await self._page())
+            memory = SectionMemory.for_run(self.config, await self._page(), action=action)
             known = memory.summary(phase) if memory is not None else {"known": False}
             capture = await EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls).capture(
                 phase, input_data=input_data)
             if not capture.get("pass"):
-                row["edit_section"] = {"captured": False, "status": capture.get("status"), "known_before": bool(known.get("known"))}
+                row[key] = {"captured": False, "status": capture.get("status"), "known_before": bool(known.get("known"))}
                 return out
             surface = capture.get("surface") or {}
             if memory is not None:
-                memory.record(phase, {**capture, "listing_url": self._listing_url(phase)}, opener=row.get("open"), source="edit_operation")
+                memory.record(phase, {**capture, "listing_url": self._listing_url(phase)}, opener=row.get("open"), source=f"{action}_operation")
+            commit_re = r"(?i)save|save changes|update|submit" + (r"|create|clone" if action == "clone" else "")
             out = {
                 "fields": capture.get("fields") or [], "title": surface.get("title"), "token": capture.get("surface_token"),
-                "commit_labels": [b for b in surface.get("buttons") or [] if re.fullmatch(r"(?i)save|save changes|update|submit", b)],
+                "commit_labels": [b for b in surface.get("buttons") or [] if re.fullmatch(commit_re, b)],
             }
-            row["edit_section"] = {
+            row[key] = {
                 "captured": True, "known_before": bool(known.get("known")), "title": surface.get("title"), "kind": surface.get("kind"),
                 "tabs": [t.get("text") for t in surface.get("tabs") or []], "fields": capture.get("field_count"),
                 "read_only": sorted({f["label"] for f in out["fields"] if f.get("read_only")}),
                 "commit_labels": out["commit_labels"],
             }
         except Exception as exc:
-            row["edit_section"] = {"captured": False, "error": mask_sensitive_string(str(exc))[:300]}
+            row[key] = {"captured": False, "error": mask_sensitive_string(str(exc))[:300]}
         return out
 
     @staticmethod
@@ -1411,11 +1700,19 @@ class PortalOperationRunner:
             pass
 
     async def read_back_edit_form(self, *, phase: str, target: str, options: Mapping[str, Any], values: Mapping[str, Any],
-                                  input_data: Mapping[str, Any]) -> Dict[str, Any]:
-        """Reopen the object's Edit form, read the requested values, close it unsaved."""
+                                  input_data: Mapping[str, Any], source_fields: Sequence[Mapping[str, Any]] = ()) -> Dict[str, Any]:
+        """Reopen the object's Edit form, read the requested values, close it unsaved.
+
+        V243R31: with ``source_fields`` (a clone's source form), also which of the
+        source's other values the new object kept.
+        """
         from .edit_section_learning import EditSectionLearner, compare_requested
 
         learner = EditSectionLearner(self.config, self.browser, self.run_dir, listing_urls=self.listing_urls)
+        # V243R31: compare with what the form was filled with -- the values after the
+        # phase's own policies (a legacy SFTP-HAFT Deployment Group becomes the
+        # portal's current one), not the raw request.
+        values = self._effective_requested(phase, values)
         try:
             opened = await self.open_surface(phase=phase, operation="edit", target=target, form_phase=phase, options=options)
             if not opened.get("form_visible"):
@@ -1424,11 +1721,42 @@ class PortalOperationRunner:
             closed = await learner.close(str(capture.get("surface_token") or ""), self._listing_url(phase))
             if not capture.get("pass"):
                 return {"read": False, "reason": str(capture.get("status") or "capture_failed"), "closed": closed}
-            return {"read": True, "closed": closed.get("closed"), **compare_requested(capture.get("fields") or [], values)}
+            result = {"read": True, "closed": closed.get("closed"), **compare_requested(capture.get("fields") or [], values)}
+            if source_fields:
+                result.update(self._kept_from_source(source_fields, capture.get("fields") or [], values))
+            return result
         except OperationNeedsInput as exc:
             return {"read": False, "reason": exc.detail.get("reason")}
         except Exception as exc:
             return {"read": False, "reason": mask_sensitive_string(str(exc))[:300]}
+
+    def _effective_requested(self, phase: str, values: Mapping[str, Any]) -> Dict[str, Any]:
+        """``{input path: value}`` as the phase compiler resolved them for the fill."""
+        try:
+            rows = self._requested_fields(phase, values)
+        except Exception:
+            rows = []
+        resolved = {str(r["input_path"]): r.get("requested") for r in rows
+                    if r.get("input_path") and r.get("requested") not in (None, "", [])}
+        return resolved or dict(values)
+
+    @staticmethod
+    def _kept_from_source(source: Sequence[Mapping[str, Any]], cloned: Sequence[Mapping[str, Any]], requested: Mapping[str, Any]) -> Dict[str, Any]:
+        """A clone keeps the source's values except the requested ones (and what the portal owns)."""
+        from .edit_section_learning import compare_requested
+
+        asked = set((compare_requested(source, requested).get("requested_values_seen") or {}).keys())
+        mine = {str(f.get("input_key")): f for f in cloned if f.get("input_key")}
+        same, differs = 0, []
+        for field in source:
+            key = str(field.get("input_key") or "")
+            if not key or key in asked or field.get("read_only") or field.get("sensitive") or key not in mine:
+                continue
+            if _same_value(json.dumps(field.get("value"), sort_keys=True, default=str), json.dumps(mine[key].get("value"), sort_keys=True, default=str)):
+                same += 1
+            else:
+                differs.append({"field": key, "source": field.get("value"), "clone": mine[key].get("value")})
+        return {"kept_from_source": same, "differs_from_source": differs[:20]}
 
     async def read_details(self, *, phase: str, target: str, options: Mapping[str, Any], fields: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         """Re-open the object's expanded details and check the requested values."""

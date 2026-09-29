@@ -1654,14 +1654,21 @@ def _edit_sections_summary(cfg: Any) -> Dict[str, Any]:
     """V243R30: which phases' Edit sections the agent knows (read from memory)."""
     from hip_id_agent.edit_section_learning import EditSectionMemory
 
+    from hip_id_agent.edit_section_learning import action_summaries
+
     try:
         summaries = EditSectionMemory(Path(cfg.reporting.memory_dir)).summaries()
+        per_action = action_summaries(Path(cfg.reporting.memory_dir))
     except Exception as exc:
         return {"known": 0, "total": 0, "status": "error", "error": mask_sensitive_string(str(exc))[:300]}
     return {
         "known": summaries["known"], "total": summaries["total"],
         "phases": [{k: row.get(k) for k in ("phase", "known", "title", "kind", "tabs", "fields", "mapped", "read_only", "commit_labels", "updated_at")}
                    for row in summaries["phases"]],
+        # V243R31: Clone / Deploy / Migrate too.
+        "actions": {action: {"known": data["known"], "total": data["total"],
+                             "phases": [{k: row.get(k) for k in ("phase", "known", "title", "section_kind", "menus", "fields")} for row in data["phases"]]}
+                    for action, data in per_action.items()},
     }
 
 
@@ -1670,9 +1677,13 @@ def edit_sections_status(config: str = "config.yaml") -> Dict[str, Any]:
     """V243R30: the learned Edit sections (structure only; values stay in the run folders)."""
     from hip_id_agent.edit_section_learning import ALL_PHASES, EditSectionMemory
 
+    from hip_id_agent.edit_section_learning import SectionMemory
+
     cfg = _cfg(config)
     memory = EditSectionMemory(Path(cfg.reporting.memory_dir))
-    return {"summary": _edit_sections_summary(cfg), "knowledge": {p: memory.load(p) for p in ALL_PHASES if memory.known(p)}}
+    actions = {a: SectionMemory(Path(cfg.reporting.memory_dir), a) for a in ("clone", "deploy", "migrate")}
+    return {"summary": _edit_sections_summary(cfg), "knowledge": {p: memory.load(p) for p in ALL_PHASES if memory.known(p)},
+            "action_knowledge": {a: {p: m.load(p) for p in ALL_PHASES if m.known(p)} for a, m in actions.items()}}
 
 
 @app.get("/api/learning/run-history")

@@ -196,6 +196,17 @@ _INSIDE_JS = r"""
 }
 """
 
+# V243R31: a menu the page already holds (hidden until its button is clicked):
+# read without clicking anything.
+_HIDDEN_MENU_JS = r"""
+({controls}) => {
+  const el = controls ? document.getElementById(controls) : null;
+  if (!el || !(el.getAttribute('role') === 'menu' || /action-menu|dropdown-menu/.test(String(el.className || '')))) return [];
+  return Array.from(el.querySelectorAll('[role=menuitem],[role=option],button,li'))
+    .map(e => String(e.textContent || '').replace(/\s+/g, ' ').trim()).filter((t, i, a) => t && a.indexOf(t) === i);
+}
+"""
+
 _SURFACE_GONE_JS = r"""
 ({token}) => {
   const el = document.querySelector(`[data-hip-edit-surface="${token}"]`);
@@ -511,18 +522,27 @@ def compare_requested(fields: Sequence[Mapping[str, Any]], requested: Mapping[st
 
 
 # ---------------------------------------------------------------- memory
-class EditSectionMemory:
-    """``<memory_dir>/edit_sections/<phase>.json`` -- value-free Edit section knowledge."""
+class SectionMemory:
+    """Value-free knowledge of an action's section per phase.
 
-    def __init__(self, memory_dir: Path):
-        self.root = Path(memory_dir) / "edit_sections"
+    Edit: ``<memory_dir>/edit_sections/<phase>.json`` (V243R30).  V243R31: Clone,
+    Deploy, Migrate ...: ``<memory_dir>/action_sections/<action>/<phase>.json`` --
+    the form or dialog (fields, options), the menu of target environments per
+    source environment, or the confirmation the action asks.
+    """
+
+    def __init__(self, memory_dir: Path, action: str = "edit"):
+        self.action = str(action or "edit")
+        self.root = Path(memory_dir) / "edit_sections" if self.action == "edit" else Path(memory_dir) / "action_sections" / self.action
 
     @classmethod
-    def for_run(cls, config: Any = None, page: Any = None) -> Optional["EditSectionMemory"]:
+    def for_run(cls, config: Any = None, page: Any = None, *, action: str = "edit") -> Optional["SectionMemory"]:
         from .form_structure_memory import resolve_memory_dir
 
         memory_dir = resolve_memory_dir(config, page)
-        return cls(memory_dir) if memory_dir is not None else None
+        if memory_dir is None:
+            return None
+        return EditSectionMemory(memory_dir) if action == "edit" else cls(memory_dir, action)
 
     def file(self, phase: str) -> Path:
         return self.root / f"{re.sub(r'[^a-z0-9_]+', '_', str(phase or 'unknown').lower())}.json"
@@ -537,7 +557,8 @@ class EditSectionMemory:
         return data
 
     def known(self, phase: str) -> bool:
-        return bool(self.load(phase).get("fields"))
+        data = self.load(phase)
+        return bool(data.get("fields") or data.get("menus") or data.get("confirm"))
 
     def record(self, phase: str, capture: Mapping[str, Any], *, opener: Optional[Mapping[str, Any]] = None,
                source: str = "learn_edit") -> Dict[str, Any]:
@@ -556,12 +577,21 @@ class EditSectionMemory:
             if f.get("row_kind") and f.get("row_index") is not None:
                 rows[str(f["row_kind"])] = max(rows.get(str(f["row_kind"]), 0), int(f["row_index"]) + 1)
         surface = dict(capture.get("surface") or {})
+        menus = dict(previous.get("menus") or {})
+        for env, items in dict(capture.get("menus") or {}).items():
+            menus[str(env)] = [str(x) for x in items][:20]
+        confirm = dict(capture.get("confirm") or previous.get("confirm") or {})
         structure = sorted(f"{f.get('tab')}|{_norm(f.get('section'))}|{_norm(f.get('label'))}|{f.get('kind')}" for f in fields)
+        structure += sorted(f"menu|{env}|{'/'.join(items)}" for env, items in menus.items())
         fingerprint = hashlib.sha256(json.dumps(structure).encode("utf-8")).hexdigest()[:16]
         changed = bool(previous) and previous.get("structure_fingerprint") != fingerprint
         data = {
             "schema_version": SCHEMA,
             "phase": phase,
+            "action": self.action,
+            "section_kind": str(capture.get("section_kind") or previous.get("section_kind") or "form"),
+            "menus": menus,
+            "confirm": confirm,
             "listing_url": str(capture.get("listing_url") or previous.get("listing_url") or ""),
             "opener": {k: (opener or {}).get(k) for k in ("path", "selectors", "learned_opener_labels")} if opener else previous.get("opener") or {},
             "surface": {
@@ -599,7 +629,8 @@ class EditSectionMemory:
             return {"phase": phase, "known": False}
         surface = data.get("surface") or {}
         return {
-            "phase": phase, "known": True, "title": surface.get("title"), "kind": surface.get("kind"),
+            "phase": phase, "action": self.action, "known": True, "title": surface.get("title") or (data.get("confirm") or {}).get("title"),
+            "kind": surface.get("kind"), "section_kind": data.get("section_kind"), "menus": data.get("menus") or {},
             "tabs": surface.get("tabs") or [], "fields": data.get("field_count"), "mapped": len(data.get("input_keys") or []),
             "read_only": data.get("read_only_fields") or [], "portal_only": len(data.get("portal_only_fields") or []),
             "commit_labels": surface.get("commit_labels") or [], "path": (data.get("opener") or {}).get("path") or [],
@@ -609,6 +640,47 @@ class EditSectionMemory:
     def summaries(self, phases: Sequence[str] = ALL_PHASES) -> Dict[str, Any]:
         rows = [self.summary(p) for p in phases]
         return {"known": sum(1 for r in rows if r.get("known")), "total": len(rows), "phases": rows}
+
+    def next_environments(self, phase: str, source: str) -> List[str]:
+        """Where this action goes from ``source`` (learned from its menus)."""
+        menus = self.load(phase).get("menus") or {}
+        return [str(x) for x in menus.get(str(source or "").upper()) or []]
+
+    def route(self, phase: str, source: str, target: str) -> List[str]:
+        """Environments to go through from ``source`` to ``target`` (DEV > TEST2 > PROD), learned."""
+        menus = {k.upper(): [str(x).upper() for x in v] for k, v in (self.load(phase).get("menus") or {}).items()}
+        start, goal = str(source or "").upper(), str(target or "").upper()
+        paths, seen = [[start]], {start}
+        while paths:
+            path = paths.pop(0)
+            for nxt in menus.get(path[-1], []):
+                if nxt == goal:
+                    return path + [nxt]
+                if nxt not in seen:
+                    seen.add(nxt)
+                    paths.append(path + [nxt])
+        return []
+
+
+class EditSectionMemory(SectionMemory):
+    """``<memory_dir>/edit_sections/<phase>.json`` -- value-free Edit section knowledge (V243R30)."""
+
+    def __init__(self, memory_dir: Path):
+        super().__init__(memory_dir, "edit")
+
+    @classmethod
+    def for_run(cls, config: Any = None, page: Any = None, *, action: str = "edit") -> Optional["SectionMemory"]:
+        return SectionMemory.for_run(config, page, action=action)
+
+
+def action_summaries(memory_dir: Path, actions: Sequence[str] = ("edit", "clone", "deploy", "migrate"),
+                     phases: Sequence[str] = ALL_PHASES) -> Dict[str, Any]:
+    """Which phases' action sections are known, per action."""
+    out: Dict[str, Any] = {}
+    for action in actions:
+        memory = EditSectionMemory(memory_dir) if action == "edit" else SectionMemory(memory_dir, action)
+        out[action] = memory.summaries(phases)
+    return out
 
 
 # ---------------------------------------------------------------- capture
@@ -804,15 +876,24 @@ class EditSectionLearner:
             await page.wait_for_timeout(400)
 
     async def learn(self, phase: str, *, target: str = "", input_data: Optional[Mapping[str, Any]] = None,
-                    options: Optional[Mapping[str, Any]] = None, out_dir: Optional[Path] = None) -> Dict[str, Any]:
+                    options: Optional[Mapping[str, Any]] = None, out_dir: Optional[Path] = None, action: str = "edit",
+                    gate: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+        """Learn one action's section of a phase object (read-only).
+
+        ``edit`` / ``clone``: the form, read completely, closed unsaved.
+        V243R31 ``migrate`` / ``deploy``: per environment tab, where the action goes
+        (its menu, its confirmation, or its dialog) -- never confirmed.
+        """
         from .portal_operations import OperationNeedsInput, _name_in
         from .portal_skills import PortalSkillStore
 
         started = time.monotonic()
-        out = Path(out_dir or self.run_dir / "edit_sections" / phase)
+        action = str(action or "edit")
+        out = Path(out_dir or self.run_dir / ("edit_sections" if action == "edit" else f"action_sections/{action}") / phase)
         start_net = len(getattr(self.browser, "network_tab_events", []) or [])
         listing = self.runner._listing_url(phase)
-        result: Dict[str, Any] = {"schema_version": CAPTURE_SCHEMA, "phase": phase, "listing_url": listing, "operation": "learn_edit"}
+        result: Dict[str, Any] = {"schema_version": CAPTURE_SCHEMA, "phase": phase, "listing_url": listing, "operation": f"learn_{action}",
+                                  "action": action}
         if not target:
             objects = (input_data or {}).get("objects") if isinstance((input_data or {}).get("objects"), Mapping) else {}
             target = _name_in(objects.get(phase) or {}) if isinstance(objects, Mapping) else ""
@@ -824,8 +905,11 @@ class EditSectionLearner:
             result.update({"pass": False, "status": "no_row_on_listing", "result": "NEEDS_INPUT",
                            "reason": "the listing shows no object to open; name one"})
             return self._finish(result, started, out)
+        if action not in {"edit", "clone"}:
+            return await self._learn_promotion(phase, target=target, action=action, gate=gate or {}, result=result,
+                                               started=started, out=out, start_net=start_net, listing=listing)
         try:
-            opened = await self.runner.open_surface(phase=phase, operation="edit", target=target, form_phase=phase, options=dict(options or {}))
+            opened = await self.runner.open_surface(phase=phase, operation=action, target=target, form_phase=phase, options=dict(options or {}))
         except OperationNeedsInput as exc:
             result.update({"pass": False, "status": "needs_input", "result": "NEEDS_INPUT", "needs_input": exc.detail, "reason": exc.detail.get("reason")})
             return self._finish(result, started, out)
@@ -859,16 +943,16 @@ class EditSectionLearner:
         safe_write_json(out / "edit_input.json", capture.get("input_json") or {}, mask=False)
         capture["capture_file"] = str(values_file)
         knowledge: Dict[str, Any] = {}
-        memory = EditSectionMemory.for_run(self.config, page)
+        memory = SectionMemory.for_run(self.config, page, action=action)
         if memory is not None and not writes:
-            knowledge = memory.record(phase, capture, opener=result["open"])
+            knowledge = memory.record(phase, capture, opener=result["open"], source=f"learn_{action}")
         store = PortalSkillStore.for_run(self.config, page)
         if store is not None and capture.get("record_verified") and result["close"].get("closed") and not writes:
-            # The opened Edit form was that object's: a verified outcome of the Edit path.
-            result["learned_mode"] = store.record_opener_outcome(phase, "edit", success=True, reason="edit_section_learned")
+            # The opened form was that object's: a verified outcome of the action's path.
+            result["learned_mode"] = store.record_opener_outcome(phase, action, success=True, reason=f"{action}_section_learned")
         passed = bool(result["close"].get("closed")) and not writes
         result.update({
-            "pass": passed, "status": "edit_section_learned" if passed else ("write_request_seen" if writes else "edit_form_not_closed"),
+            "pass": passed, "status": f"{action}_section_learned" if passed else ("write_request_seen" if writes else f"{action}_form_not_closed"),
             "result": "SUCCESS" if passed else "FAILED",
             "fields": capture.get("fields"), "input_json": capture.get("input_json"),
             "values_file": str(values_file), "edit_input_file": str(out / "edit_input.json"),
@@ -876,6 +960,151 @@ class EditSectionLearner:
             "knowledge_file": str(memory.file(phase)) if memory is not None else "",
         })
         return self._finish(result, started, out)
+
+    async def _open_details(self, phase: str, target: str) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
+        """Listing -> search -> the exact row -> its expanded details (read-only)."""
+        from .portal_operations import OperationNeedsInput
+
+        runner = self.runner
+        await runner._navigate(runner._listing_url(phase))
+        await runner._search(target)
+        page = await self._page()
+        token = uuid.uuid4().hex[:10]
+        hit = await runner._find_row(page, target, [], token)
+        if hit.get("found") == "ambiguous":
+            raise OperationNeedsInput("target", f"{len(hit.get('candidates') or [])} rows match {target!r}", offered=hit.get("candidates") or [])
+        if hit.get("found") != "expander":
+            return token, hit, {}
+        if not hit.get("expanded"):
+            await runner._click_token(token, "Expand the row")
+        return token, hit, await runner._panel(token, target)
+
+    async def _learn_promotion(self, phase: str, *, target: str, action: str, gate: Mapping[str, Any], result: Dict[str, Any],
+                               started: float, out: Path, start_net: int, listing: str) -> Dict[str, Any]:
+        """V243R31: Migrate / Deploy: where the action goes from every environment of the object.
+
+        A menu the page already holds is read without a click.  An action that is
+        not a guarded word (Migrate) is opened, read and closed.  A guarded one
+        (Deploy) may act at once, so it is opened only with the mutation gate open
+        -- and even then nothing is confirmed; otherwise it is learned by the first
+        authorized deploy, which records what it saw.
+        """
+        from .portal_operations import OPENER_LABELS, OperationNeedsInput, _GUARDED, _PANEL_PICK_JS
+
+        runner = self.runner
+        labels = list(OPENER_LABELS.get(action) or (action.title(),))
+        menus: Dict[str, List[str]] = {}
+        kinds: List[str] = []
+        confirm: Dict[str, Any] = {}
+        dialog: Dict[str, Any] = {}
+        blocked: List[str] = []
+        label_seen = ""
+        try:
+            token, hit, panel = await self._open_details(phase, target)
+        except OperationNeedsInput as exc:
+            result.update({"pass": False, "status": "needs_input", "result": "NEEDS_INPUT", "needs_input": exc.detail, "reason": exc.detail.get("reason")})
+            return self._finish(result, started, out)
+        if not panel.get("found"):
+            result.update({"pass": False, "status": "no_expanded_details", "result": "FAILED",
+                           "reason": f"{target!r} has no expander on this listing; its {action} is learned by the first {action}"})
+            return self._finish(result, started, out)
+        envs = [str(t.get("text")) for t in panel.get("tabs") or [] if not t.get("disabled")] or [""]
+        result["environments"] = envs
+        for env in envs:
+            page = await self._page()
+            if env:
+                panel = await runner._select_tab(token, target, env, panel)
+            pick = uuid.uuid4().hex[:10]
+            act = await page.evaluate(_PANEL_PICK_JS, {"token": token, "kind": "action", "value": labels, "pickToken": pick})
+            if not act.get("found"):
+                menus[env] = []
+                continue
+            label = str(act.get("label") or labels[0])
+            label_seen = label_seen or label
+            hidden = await page.evaluate(_HIDDEN_MENU_JS, {"controls": str(act.get("controls") or "")})
+            if hidden:
+                menus[env] = hidden
+                kinds.append("menu")
+                continue
+            guarded = bool(_GUARDED.search(label))
+            if guarded and not gate.get("pass"):
+                blocked.append(env)
+                continue
+            task_id = f"learn-{uuid.uuid4().hex[:8]}"
+            click_net = len(getattr(self.browser, "network_tab_events", []) or [])
+            if guarded:
+                # Gate open: the opener only; its menu choice / confirmation is never clicked.
+                self.browser.set_portal_mutation_authorization(enabled=True, allowed_labels=[label], task_id=task_id)
+            try:
+                await runner._click_token(pick, label.title(), mutation=guarded)
+                audit: Dict[str, Any] = {"path": [label]}
+                opened = await runner._note_what_opened(audit, controls=str(act.get("controls") or ""))
+                kind = str(opened.get("kind") or "none")
+                kinds.append(kind)
+                if kind == "menu":
+                    menus[env] = list(opened.get("items") or [])
+                    await self._close_menu(pick, label)
+                elif kind == "confirm":
+                    text = str(opened.get("text") or "").upper()
+                    to = re.search(r"\bTO\s+(DEV|TEST\d*|PROD|UAT|QA|SIT|STAGE)\b", text)
+                    menus[env] = [to.group(1)] if to else []
+                    confirm = {"title": opened.get("title") or "", "buttons": list(opened.get("buttons") or []),
+                               "text": runner._confirm_template(str(opened.get("text") or ""), target), "asks_before_acting": True}
+                    await runner._cancel_dialog()
+                elif kind == "form":
+                    cap = await self.capture(f"universal_{phase}_{action}", input_data={})
+                    env_field = next((f for f in cap.get("fields") or [] if f.get("options") and "environment" in _norm(f.get("label"))), None)
+                    menus[env] = list((env_field or {}).get("options") or [])
+                    dialog = cap
+                    await self.close(str(cap.get("surface_token") or ""), listing)
+                if guarded:
+                    await runner._reconcile_opener(click_net, form_visible=kind in {"menu", "confirm", "form"})
+            finally:
+                if guarded:
+                    self.browser.clear_portal_mutation_authorization()
+            # Start the next environment from a fresh listing: the dialog / confirmation is gone.
+            token, hit, panel = await self._open_details(phase, target)
+        writes = self._writes_since(start_net)
+        learned_envs = {env: items for env, items in menus.items() if env}
+        section_kind = next((k for k in ("dialog" if dialog else "", "confirm" if confirm else "", "menu" if "menu" in kinds else "") if k), "")
+        memory = SectionMemory.for_run(self.config, await self._page(), action=action)
+        knowledge: Dict[str, Any] = {}
+        if memory is not None and not writes and (learned_envs or confirm or dialog):
+            knowledge = memory.record(phase, {
+                **({k: dialog.get(k) for k in ("fields", "surface")} if dialog else {}),
+                "section_kind": section_kind or "menu", "menus": learned_envs, "confirm": confirm, "listing_url": listing,
+                "action_label": label_seen,
+            }, opener={"path": ["expand row", label_seen.lower()] if label_seen else ["expand row"]}, source=f"learn_{action}")
+        known_before = bool(memory is not None and memory.known(phase))
+        passed = not writes and bool(learned_envs or known_before)
+        result.update({
+            "pass": passed,
+            "status": ("write_request_seen" if writes else f"{action}_section_learned" if learned_envs and not blocked
+                       else f"{action}_section_learned_partly" if learned_envs else f"{action}_needs_authorized_run"),
+            "result": "SUCCESS" if passed else ("FAILED" if writes else "BLOCKED"),
+            "action_label": label_seen, "section_kind": section_kind or ("menu" if learned_envs else ""),
+            "menus": learned_envs, "confirm": confirm or None,
+            "dialog_fields": [{k: f.get(k) for k in ("label", "kind", "required", "options")} for f in dialog.get("fields") or []] if dialog else None,
+            "blocked_environments": blocked, "write_requests": writes, "no_write_requests": not writes,
+            "knowledge_file": str(memory.file(phase)) if memory is not None else "",
+            "knowledge": {"menus": (knowledge or {}).get("menus"), "section_kind": (knowledge or {}).get("section_kind")} if knowledge else {},
+        })
+        if blocked:
+            result["reason"] = (f"{label_seen or labels[0]!r} is a guarded action that may act at once, so it was not opened in "
+                                f"{', '.join(blocked)}: open the mutation gate to learn it (nothing is confirmed), or it is learned "
+                                f"by the first authorized {action}")
+        return self._finish(result, started, out)
+
+    async def _close_menu(self, pick: str, label: str) -> None:
+        page = await self._page()
+        try:
+            still = await page.evaluate("(t) => { const b = document.querySelector(`[data-hip-op=\"${t}\"]`); return !!b && b.getAttribute('aria-expanded') === 'true'; }", pick)
+            if still:
+                await self.runner._click_token(pick, label.title())
+            else:
+                await page.keyboard.press("Escape")
+        except Exception:
+            pass
 
     def _finish(self, result: Dict[str, Any], started: float, out: Path) -> Dict[str, Any]:
         result["seconds"] = round(time.monotonic() - started, 1)
@@ -914,30 +1143,38 @@ def resolve_phases(value: Any) -> List[str]:
 async def learn_edit_sections(
     config: Any, input_data: Optional[Mapping[str, Any]], *, run_dir: Path, phases: Sequence[str] = ALL_PHASES,
     browser: Any = None, listing_urls: Optional[Mapping[str, str]] = None, targets: Optional[Mapping[str, str]] = None,
+    actions: Sequence[str] = ("edit",), gate: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Learn the Edit section of every phase in one browser session."""
+    """Learn each phase's action sections (Edit; V243R31: Clone, Deploy, Migrate) in one browser session."""
     if browser is None:
         from .browser_session import BrowserSession
 
         async with BrowserSession(config, run_dir) as session:
             return await learn_edit_sections(config, input_data, run_dir=run_dir, phases=phases, browser=session,
-                                             listing_urls=listing_urls, targets=targets)
+                                             listing_urls=listing_urls, targets=targets, actions=actions, gate=gate)
     from .environment_faults import is_environment_fatal
 
     learner = EditSectionLearner(config, browser, run_dir, listing_urls=listing_urls)
     names = {**phase_targets(input_data, phases), **dict(targets or {})}
-    report: Dict[str, Any] = {"schema_version": "hip.edit-section-learning-report.v1", "phases": [], "started_at": _now()}
+    report: Dict[str, Any] = {"schema_version": "hip.edit-section-learning-report.v1", "phases": [], "started_at": _now(),
+                              "actions": list(actions)}
+    stop = False
     for phase in phases:
-        try:
-            row = await learner.learn(phase, target=str(names.get(phase) or ""), input_data=input_data)
-        except Exception as exc:
-            row = {"phase": phase, "pass": False, "status": "error", "result": "FAILED", "error": mask_sensitive_string(str(exc))[:600],
-                   "environment_fault": is_environment_fatal(exc)}
-        report["phases"].append(row)
-        if row.get("environment_fault"):
+        for action in actions:
+            try:
+                row = await learner.learn(phase, target=str(names.get(phase) or ""), input_data=input_data, action=action, gate=gate)
+            except Exception as exc:
+                row = {"phase": phase, "action": action, "pass": False, "status": "error", "result": "FAILED",
+                       "error": mask_sensitive_string(str(exc))[:600], "environment_fault": is_environment_fatal(exc)}
+            report["phases"].append(row)
+            if row.get("environment_fault"):
+                stop = True
+                break
+        if stop:
             break
     report["pass"] = bool(report["phases"]) and all(r.get("pass") for r in report["phases"])
-    report["summary"] = [{"phase": r.get("phase"), "target": r.get("target"), "result": r.get("result"), "status": r.get("status"),
+    report["summary"] = [{"phase": r.get("phase"), "action": r.get("action") or "edit", "target": r.get("target"), "result": r.get("result"),
+                          "status": r.get("status"), "menus": r.get("menus"), "reason": r.get("reason"),
                           "fields": (r.get("capture") or {}).get("field_count"), "tabs": [t.get("tab") for t in (r.get("capture") or {}).get("tabs_read") or [] if t.get("tab")],
                           "read_only": (r.get("knowledge") or {}).get("read_only_fields"), "values_file": r.get("values_file")} for r in report["phases"]]
     report["finished_at"] = _now()
@@ -946,6 +1183,6 @@ async def learn_edit_sections(
 
 
 __all__ = [
-    "ALL_PHASES", "CAPTURE_SCHEMA", "EditSectionLearner", "EditSectionMemory", "SCHEMA", "build_fields", "compare_requested",
+    "ALL_PHASES", "CAPTURE_SCHEMA", "EditSectionLearner", "EditSectionMemory", "SCHEMA", "SectionMemory", "action_summaries", "build_fields", "compare_requested",
     "input_json_from_fields", "learn_edit_sections", "map_fields_to_input", "phase_targets", "resolve_phases",
 ]

@@ -1,3 +1,20 @@
+## V243R31 — Clone, Deploy and Migrate on every phase: performed, learned, remembered (2026-09-29)
+
+- **Deploy, whatever shape it has.** Deploy can open a menu, a dialog with a Target Environment field, or a confirmation that names the target. The agent sees which one opened, checks the requested environment is offered, acts once and verifies the listing. Otherwise:
+  - a target that already has the version: EXISTING, nothing clicked;
+  - a target that is not offered: NEEDS_INPUT, with the offered ones and the route (DEV > TEST2 > PROD).
+- **Migrate and Clone on every phase.** A clone must have a new name. Afterwards the new object's Edit form is read back: the requested values, and every other value kept from the source.
+- **Learned read-only.** `learn-action-sections` (or "learn the deploy and migrate sections of …") reads:
+  - the Clone form;
+  - where Migrate and Deploy go from every environment.
+  It never confirms anything. A guarded Deploy button is opened only with the mutation gate. Operations remember what they saw too.
+- **Fixed:**
+  - a Deploy dialog was taken for an empty menu;
+  - a Deploy menu's choice was refused (`HIP_MUTATION_QUARANTINE_ACTIVE`);
+  - a text-shown Version made an already-deployed target look new.
+
+See `V243R31_CLONE_DEPLOY_MIGRATE_EVERY_PHASE_20260929.md`. Apply with `APPLY_V243R31_IN_PLACE.ps1`; it includes R13–R30.
+
 ## V243R30 — Every phase's Edit section learned, read and edited through (2026-09-29)
 
 - **Learn the Edit section.** For the Transport Profile, BizFlow, Data Map, Rule and Document Type, the agent:

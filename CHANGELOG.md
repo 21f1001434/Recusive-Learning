@@ -1,3 +1,29 @@
+# V243R31 — Clone, Deploy and Migrate on every phase: performed, learned, remembered (2026-09-29)
+
+- `portal_operations`:
+  - `_OPENED_JS` / `_note_what_opened`: after a row action, what opened — a menu (its choices), a dialog with fields, or a confirmation (its question). A popup attribute alone no longer makes a dialog a "menu";
+  - `_confirm_choice`: the portal's confirmation names the target; the wrong one is cancelled with NEEDS_INPUT, the right one confirmed once and verified in the listing;
+  - `_settle_guarded_opener`: a guarded Deploy that only opened a menu or confirmation (no write) is reconciled `opened_surface_no_write`, so its choice is not refused with `HIP_MUTATION_QUARANTINE_ACTIVE`;
+  - `_capture_action_dialog` + `_not_offered`: an action's dialog is read first; a value it does not offer is NEEDS_INPUT (no fill);
+  - `_PANEL_JS` reads a Version shown as text, so an already-deployed target is EXISTING;
+  - Deploy / Migrate through a dialog expect the environment on the listing row;
+  - Clone reads the Clone form first (remembered), stops a change to a field read-only in it, clicks its own Save, and reads the new object's Edit form back (`kept_from_source`, `differs_from_source`);
+  - `_learned_targets` / `_route_hint`: a guarded Deploy is not opened for a target it was learned not to offer; refusals name the learned route (DEV > TEST2 > PROD);
+  - menus, confirmations and dialogs seen by operations are remembered;
+  - `learn_clone` / `learn_deploy` / `learn_migrate` operations.
+- `edit_section_learning`:
+  - `SectionMemory(memory_dir, action)` (`action_sections/<action>/<phase>.json`; Edit keeps `edit_sections/`): menus per source environment, confirmation wording (`<object>`, `<version>`), dialog fields, `next_environments`, `route`; `action_summaries`;
+  - `EditSectionLearner.learn(action=…, gate=…)`: Clone forms like Edit;
+  - `_learn_promotion`: for every environment tab, a menu the page holds is read without a click, Migrate is opened and closed, and a guarded Deploy is opened only with the mutation gate (read, then cancelled, never confirmed);
+  - `learn_edit_sections(actions=…, gate=…)`.
+- `task_operations`: "clone X as|to|into|named Y" gives the clone's name (nested for the Business Flow); learn requests for edit / clone / deploy / migrate or "every action".
+- `portal_skills`: `learn_clone` / `learn_deploy` / `learn_migrate` operations.
+- CLI `learn-action-sections` (`--actions`, `--allow-portal-mutation` / `--confirmation` to open a guarded Deploy, `--show`); `learn-edit-sections --actions`.
+- Backend: `edit_sections.actions`, `action_knowledge`. Control Center tile adds clone / deploy / migrate.
+- Tests:
+  - `tests/test_v243r31_clone_deploy_migrate_every_phase.py` (9);
+  - `tests/phase_listing_support.py` gains Clone, Migrate (menu + confirmation), and Deploy as a dialog (Transport Profile), a menu (Business Flow) or a confirmation (Data Map); a Rule has none.
+
 # V243R30 — Every phase's Edit section learned, read and edited through (2026-09-29)
 
 - New `hip_id_agent/edit_section_learning.py`:

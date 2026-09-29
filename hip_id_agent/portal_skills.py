@@ -50,6 +50,10 @@ OPERATION_ALIASES: Dict[str, Sequence[str]] = {
     # V243R30: open the Edit form, read every value, close it unsaved, remember it.
     "learn_edit": ("learn edit", "learn edit section", "capture edit", "capture", "read edit", "view edit", "edit section",
                    "learn_edit", "capture edit values", "read edit values"),
+    # V243R31: the Clone form, and where Deploy / Migrate go from each environment.
+    "learn_clone": ("learn clone", "learn_clone", "capture clone", "clone section"),
+    "learn_deploy": ("learn deploy", "learn_deploy", "capture deploy", "deploy section"),
+    "learn_migrate": ("learn migrate", "learn_migrate", "capture migrate", "migrate section"),
     "create": ("create", "add", "new"),
     "edit": ("edit", "update", "modify", "change"),
     "clone": ("clone", "copy", "duplicate"),

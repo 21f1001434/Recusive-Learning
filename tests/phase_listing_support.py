@@ -16,6 +16,14 @@ read-only in Edit disabled:
 
 Save posts the form's values; the server keeps them, so a test can reopen the
 Edit form, or read the record, to see what was really saved.
+
+V243R31: Clone opens the same form titled "Clone ...", filled from the record,
+with the name editable (the server rejects a name that exists).  Migrate opens a
+menu of target environments (from DEV: TEST1, TEST2; from TEST1: TEST2; from
+TEST2: PROD) and a confirmation.  Deploy has the three shapes seen on portals:
+a dialog with a Target Environment field (Transport Profile), a menu of target
+environments plus a confirmation (Business Flow), and a plain button whose
+confirmation names the next environment (Data Map); a Rule has no Deploy.
 """
 from __future__ import annotations
 
@@ -60,6 +68,8 @@ FAMILIES: Dict[str, Dict[str, Any]] = {
         "phases": ("source_transport_profile", "target_transport_profile"),
         "path": "/hybrid-integrations/securelink/transport-profiles", "title": "Transport Profiles", "object": "Transport Profile",
         "fixture": "transport_profile_full_dds.html", "surface": "drawer", "commit_label": "Update",
+        # V243R31: Deploy opens a dialog with a Target Environment field.
+        "deploy": "dialog", "clone_label": "Create",
         "read_only": ["Profile Name *"], "columns": ["Profile Name", "Profile Usage", "Interface Type", "Available Environments"],
         "details": ["Profile Usage *", "Interface Type *"],
         # Shown in Edit only: the portal's audit fields and the account password.
@@ -68,18 +78,24 @@ FAMILIES: Dict[str, Dict[str, Any]] = {
     "bizflows": {
         "phases": ("biz_flow",), "path": "/hybrid-integrations/securelink/bizflows", "title": "Business Flows", "object": "Biz Flow",
         "fixture": "bizflow_wizard_dds.html", "surface": "page", "commit_label": "Save",
+        # Deploy opens a menu of target environments, then a confirmation.
+        "deploy": "menu", "clone_label": "Save",
         "read_only": ["Business Flow Name *"], "columns": ["Business Flow Name", "Source", "Target", "Available Environments"],
         "details": ["Source Type *", "Target Type *"],
     },
     "datamaps": {
         "phases": ("data_map",), "path": "/hybrid-integrations/securelink/datamaps", "title": "Data Maps", "object": "Map",
         "fixture": "data_map_full_dds.html", "surface": "drawer", "commit_label": "Submit",
+        # Deploy is a plain button: the confirmation names the next environment.
+        "deploy": "confirm", "clone_label": "Submit",
         "read_only": ["Map Identifier *"], "columns": ["Map Identifier", "Map Name", "Contivo version", "Available Environments"],
         "details": ["Map Name *", "Map Class *"],
     },
     "rules": {
         "phases": ("rule",), "path": "/hybrid-integrations/securelink/rules", "title": "Rules", "object": "Rule",
         "fixture": "rule_full_dds.html", "surface": "page", "commit_label": "Save",
+        # No Deploy: an environment is reached with Migrate (as Document Types).
+        "deploy": None, "clone_label": "Create",
         "read_only": ["Name *"], "columns": ["Name", "Rule Type", "Document Type", "Available Environments"],
         "details": ["Document Type Name (Version) *", "Description"],
     },
@@ -322,17 +338,29 @@ function render() {
     body.appendChild(host);
   });
 }
+const NEXT = { DEV: ['TEST1', 'TEST2'], TEST1: ['TEST2'], TEST2: ['PROD'], PROD: [] };
+let menuSeq = 0;
 function expanded(r, env) {
   const H = window.HIP;
+  const version = (r.envs[env] || ['1.0']).slice(-1)[0];
+  const targets = NEXT[env] || [];
+  const deployMenu = `deploy-menu-${++menuSeq}`;
+  const migrateMenu = `migrate-menu-${++menuSeq}`;
   const wrap = document.createElement('div');
   wrap.setAttribute('role', 'row');
   wrap.className = 'dds__tr dds__tr--expandable dds__tr--expanded';
   wrap.innerHTML = `<div class="dds__td dds__td--expandable"></div><div class="dds__td dds__td--expandable-content">
     <div role="tablist" aria-label="Environments">${ENVS.map(e => `<button type="button" role="tab" aria-selected="${e === env}"${r.envs[e] ? '' : ' disabled aria-disabled="true"'}>${e}</button>`).join('')}</div>
-    <div class="bar"><span>Version : ${esc((r.envs[env] || ['1.0']).slice(-1)[0])}</span>
+    <div class="bar"><span>Version : ${esc(version)}</span>
+      <app-tab-view-actionbar style="position:relative;display:inline-flex;gap:6px">
       <button type="button" class="dds__button dds__button--secondary dds__button--sm act-edit"><span class="dds__icon dds__icon--pencil" aria-hidden="true"></span>Edit</button>
       <button type="button" class="dds__button dds__button--secondary dds__button--sm act-clone">Clone</button>
-      <button type="button" class="dds__button dds__button--secondary dds__button--sm act-deploy">Deploy</button></div>
+      ${CFG.deploy === 'dialog' ? '<button type="button" class="dds__button dds__button--secondary dds__button--sm act-deploy" aria-haspopup="dialog">Deploy</button>' : ''}
+      ${CFG.deploy === 'menu' ? `<button type="button" class="dds__button dds__button--secondary dds__button--sm act-deploy" aria-expanded="false" aria-controls="${deployMenu}">Deploy</button><div class="dds__action-menu" id="${deployMenu}" role="menu" hidden>${targets.map(t => `<button type="button" role="menuitem" class="dds__action-menu__option">${t}</button>`).join('')}</div>` : ''}
+      ${CFG.deploy === 'confirm' ? '<button type="button" class="dds__button dds__button--secondary dds__button--sm act-deploy">Deploy</button>' : ''}
+      <button type="button" class="dds__button dds__button--secondary dds__button--sm act-migrate" aria-expanded="false" aria-controls="${migrateMenu}">Migrate</button>
+      <div class="dds__action-menu" id="${migrateMenu}" role="menu" hidden>${targets.map(t => `<button type="button" role="menuitem" class="dds__action-menu__option">${t}</button>`).join('')}</div>
+      </app-tab-view-actionbar></div>
     <fieldset><legend>${esc(CFG.object)} Details</legend><div class="row view-fields"></div></fieldset></div>`;
   const view = wrap.querySelector('.view-fields');
   view.appendChild(H.text({ label: 'Name', name: 'view_name', value: r.name, disabled: true }));
@@ -340,12 +368,69 @@ function expanded(r, env) {
   wrap.querySelectorAll('[role=tab]').forEach(tab => tab.addEventListener('click', () => { if (!tab.disabled) setTimeout(() => wrap.replaceWith(expanded(r, tab.textContent.trim())), 150); }));
   wrap.querySelector('.act-edit').onclick = () => {
     if (CFG.surface === 'page') { location.href = CFG.path + '/edit/' + encodeURIComponent(r.name); return; }
-    openDrawer(r);
+    openDrawer(r, 'edit');
   };
+  wrap.querySelector('.act-clone').onclick = () => {
+    if (CFG.surface === 'page') { location.href = CFG.path + '/clone/' + encodeURIComponent(r.name); return; }
+    openDrawer(r, 'clone');
+  };
+  const menuAction = (btn, action) => {
+    const menu = document.getElementById(btn.getAttribute('aria-controls')) || wrap.querySelector('#' + btn.getAttribute('aria-controls'));
+    btn.onclick = () => { menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
+    menu.querySelectorAll('[role=menuitem]').forEach(item => item.addEventListener('click', () => {
+      menu.hidden = true; btn.setAttribute('aria-expanded', 'false');
+      confirmAction(r, action, env, version, item.textContent.trim());
+    }));
+  };
+  menuAction(wrap.querySelector('.act-migrate'), 'migrate');
+  const deploy = wrap.querySelector('.act-deploy');
+  if (CFG.deploy === 'menu') menuAction(deploy, 'deploy');
+  if (CFG.deploy === 'confirm') deploy.onclick = () => confirmAction(r, 'deploy', env, version, targets[0]);
+  if (CFG.deploy === 'dialog') deploy.onclick = () => deployDialog(r, env, version, targets);
   return wrap;
 }
-async function openDrawer(r) {
-  const title = `Edit ${CFG.object}`;
+function modal(title) {
+  const m = document.createElement('div');
+  m.className = 'dds__modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', title);
+  m.style.cssText = 'position:fixed;top:25%;left:32%;width:420px;background:#fff;border:1px solid #555;padding:16px;z-index:2600';
+  document.body.appendChild(m);
+  return m;
+}
+async function act(action, body, m) {
+  const res = await fetch(CFG.api + '/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const out = await res.json();
+  if (m) m.remove();
+  toast(out.message, res.ok);
+  if (res.ok) load();
+}
+function confirmAction(r, action, from, version, to) {
+  const verb = action === 'deploy' ? 'Deploy' : 'Migrate';
+  if (!to) { toast(`${r.name} cannot be ${action}ed from ${from}`, false); return; }
+  const m = modal(`${verb} ${CFG.object}`);
+  m.innerHTML = `<h3>${verb} ${esc(CFG.object)}</h3><p>${verb} ${esc(r.name)} version ${esc(version)} from ${from} to ${to}?</p>
+    <button type="button" class="c-cancel">Cancel</button> <button type="button" class="c-ok">${verb}</button>`;
+  m.querySelector('.c-cancel').onclick = () => m.remove();
+  m.querySelector('.c-ok').onclick = () => act(action, { name: r.name, from, to, version }, m);
+}
+function deployDialog(r, from, version, targets) {
+  const H = window.HIP;
+  const m = modal(`Deploy ${CFG.object}`);
+  m.innerHTML = `<h3>Deploy ${esc(CFG.object)}</h3><p>${esc(r.name)} version ${esc(version)} from ${from}</p>`;
+  const form = document.createElement('form');
+  form.append(H.row(H.dropdown({ label: 'Target Environment *', name: 'targetEnvironment', options: targets })),
+              H.row(H.text({ label: 'Comments', name: 'comments', textarea: true })));
+  const bar = H.el('<div class="actions"><button type="button" class="c-cancel">Cancel</button> <button type="button" class="c-ok">Deploy</button></div>');
+  form.appendChild(bar);
+  m.appendChild(form);
+  bar.querySelector('.c-cancel').onclick = () => m.remove();
+  bar.querySelector('.c-ok').onclick = () => {
+    const to = form.querySelector('[formcontrolname=targetEnvironment] input').value;
+    if (!to) { toast('Target Environment is required', false); return; }
+    act('deploy', { name: r.name, from, to, version, comments: form.querySelector('[name=comments]').value }, m);
+  };
+}
+async function openDrawer(r, mode) {
+  const title = `${mode === 'clone' ? 'Clone' : 'Edit'} ${CFG.object}`;
   const backdrop = document.createElement('div'); backdrop.className = 'backdrop';
   const drawer = document.createElement('app-generic-drawer');
   drawer.innerHTML = `<div class="dds__drawer dds__drawer--open" role="dialog" aria-label="${title}"><a href="#" class="back">&#8249; Back</a>
@@ -361,14 +446,16 @@ async function openDrawer(r) {
   // filled: a detached radio / switch fires no change event.)
   form.style.display = 'none';
   panel.appendChild(form);
-  await window.hipPrefill(form, r.steps, CFG.readOnly);
-  form.querySelector('#submit').textContent = CFG.commitLabel;
+  // Clone: the name is the one thing to change, so it stays editable.
+  await window.hipPrefill(form, r.steps, mode === 'clone' ? CFG.readOnly.slice(1) : CFG.readOnly);
+  form.querySelector('#submit').textContent = mode === 'clone' ? CFG.cloneLabel : CFG.commitLabel;
   panel.querySelector('.loading').remove();
   form.style.display = '';
   form.querySelector('#cancel').onclick = close;
   form.querySelector('#submit').onclick = async () => {
     const values = await window.hipReadBack(form, r.steps);
-    const res = await fetch(CFG.api + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: r.name, values }) });
+    const res = await fetch(CFG.api + (mode === 'clone' ? '/clone' : '/save'), { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: r.name, values }) });
     const out = await res.json();
     const note = document.createElement('div');
     note.setAttribute('role', res.ok ? 'status' : 'alert'); note.className = res.ok ? 'toast' : 'toast--error';
@@ -392,16 +479,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   const E = window.__EDIT;
   const main = document.querySelector('main');
   const heading = main.querySelector('h2');
-  if (heading) heading.textContent = `Edit ${E.object}`;
+  const clone = E.mode === 'clone';
+  if (heading) heading.textContent = `${clone ? 'Clone' : 'Edit'} ${E.object}`;
   const form = main.querySelector('form');
-  await window.hipPrefill(form, E.record.steps, E.readOnly);
+  await window.hipPrefill(form, E.record.steps, clone ? E.readOnly.slice(1) : E.readOnly);
   let actions = form.querySelector(':scope > .actions');
   if (!actions) { actions = document.createElement('div'); actions.className = 'actions'; form.appendChild(actions); }
-  actions.innerHTML = `<button type="button" id="cancel">Cancel</button> <button type="button" id="submit">${E.commitLabel}</button>`;
+  actions.innerHTML = `<button type="button" id="cancel">Cancel</button> <button type="button" id="submit">${clone ? E.cloneLabel : E.commitLabel}</button>`;
   actions.querySelector('#cancel').onclick = () => { location.href = E.listing; };
   actions.querySelector('#submit').onclick = async () => {
     const values = await window.hipReadBack(form, E.record.steps);
-    const res = await fetch(E.api + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: E.record.name, values }) });
+    const res = await fetch(E.api + (clone ? '/clone' : '/save'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: E.record.name, values }) });
     const out = await res.json();
     const note = document.createElement('div');
     note.setAttribute('role', res.ok ? 'status' : 'alert'); note.className = res.ok ? 'toast' : 'toast--error';
@@ -452,12 +540,13 @@ class PhaseListingPortal:
                 path = unquote(urlparse(self.path).path)
                 if path == portal.spec["path"]:
                     self._send(200, portal.listing_html().encode("utf-8"), "text/html; charset=utf-8")
-                elif path.startswith(portal.spec["path"] + "/edit/"):
-                    record = portal.find(path.rsplit("/edit/", 1)[1])
+                elif path.startswith(portal.spec["path"] + "/edit/") or path.startswith(portal.spec["path"] + "/clone/"):
+                    mode = "clone" if path.startswith(portal.spec["path"] + "/clone/") else "edit"
+                    record = portal.find(path.rsplit(f"/{mode}/", 1)[1])
                     if not record:
                         self._send(404, b"not found", "text/plain")
                         return
-                    self._send(200, portal.edit_page_html(record).encode("utf-8"), "text/html; charset=utf-8")
+                    self._send(200, portal.edit_page_html(record, mode).encode("utf-8"), "text/html; charset=utf-8")
                 elif path == portal.api:
                     self._send(200, json.dumps(portal.records).encode("utf-8"), "application/json")
                 else:
@@ -466,7 +555,13 @@ class PhaseListingPortal:
             def do_POST(self) -> None:  # noqa: N802
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
                 portal.posts.append({"path": self.path, "body": body})
-                code, message = portal.save(body)
+                action = self.path.rsplit("/", 1)[-1]
+                if action in {"deploy", "migrate"}:
+                    code, message = portal.promote(body, action)
+                elif action == "clone":
+                    code, message = portal.clone(body)
+                else:
+                    code, message = portal.save(body)
                 self._send(code, json.dumps({"message": message}).encode("utf-8"), "application/json")
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -475,7 +570,8 @@ class PhaseListingPortal:
     def _cfg(self) -> Dict[str, Any]:
         return {"api": self.api, "path": self.spec["path"], "object": self.spec["object"], "surface": self.spec["surface"],
                 "commitLabel": self.spec["commit_label"], "readOnly": self.spec["read_only"], "details": self.spec["details"],
-                "editExtras": bool(self.spec.get("edit_extras"))}
+                "editExtras": bool(self.spec.get("edit_extras")), "deploy": self.spec.get("deploy"),
+                "cloneLabel": self.spec.get("clone_label") or "Save"}
 
     def listing_html(self) -> str:
         headers = "".join(f'<div role="columnheader" class="dds__th">{h}</div>' for h in self.spec["columns"])
@@ -484,8 +580,8 @@ class PhaseListingPortal:
                 .replace("__KIT__", self.kit).replace("__PREFILL__", _PREFILL_JS).replace("__EXTRAS__", _EXTRAS_JS)
                 .replace("__CFG__", json.dumps(self._cfg())).replace("__FIXTURE__", fixture))
 
-    def edit_page_html(self, record: Dict[str, Any]) -> str:
-        edit = {**self._cfg(), "record": record, "listing": self.spec["path"]}
+    def edit_page_html(self, record: Dict[str, Any], mode: str = "edit") -> str:
+        edit = {**self._cfg(), "record": record, "listing": self.spec["path"], "mode": mode}
         head = _EDIT_PAGE_HEAD.replace("__EDIT__", json.dumps(edit))
         html = replica_html(self.spec["fixture"])
         return html.replace("<head>", "<head>" + head + f"<script>{_PREFILL_JS}</script>", 1)
@@ -508,6 +604,39 @@ class PhaseListingPortal:
                 if step["label"] == posted.get("label") and int(step.get("index") or 0) == int(posted.get("index") or 0):
                     step["value"] = posted.get("value")
         return 200, f"{self.spec['object']} {record['name']} updated successfully"
+
+    def clone(self, body: Dict[str, Any]) -> tuple:
+        """A new object from the source's form; its name must not exist yet."""
+        source = self.find(str(body.get("name") or ""))
+        if not source:
+            return 404, f"{self.spec['object']} not found"
+        name_label = self.spec["read_only"][0]
+        posted = {(v.get("label"), int(v.get("index") or 0)): v.get("value") for v in body.get("values") or []}
+        name = str(posted.get((name_label, 0)) or "")
+        if not name or self.find(name):
+            return 409, f"{self.spec['object']} name already exists"
+        steps = copy.deepcopy(source["steps"])
+        for step in steps:
+            key = (step["label"], int(step.get("index") or 0))
+            if key in posted:
+                step["value"] = posted[key]
+        self.records.append({"name": name, "columns": [name, *source["columns"][1:]], "steps": steps, "envs": {"DEV": ["1.0"]},
+                             "cloned_from": source["name"]})
+        return 200, f"{self.spec['object']} {name} created successfully"
+
+    def promote(self, body: Dict[str, Any], action: str) -> tuple:
+        """Deploy / Migrate a version from one environment to another."""
+        record = self.find(str(body.get("name") or ""))
+        source, target, version = body.get("from"), body.get("to"), body.get("version")
+        if not record or version not in (record["envs"].get(source) or []):
+            return 400, "Source version not found"
+        if target not in {"DEV": ["TEST1", "TEST2"], "TEST1": ["TEST2"], "TEST2": ["PROD"]}.get(source, []):
+            return 400, f"{target} cannot be reached from {source}"
+        if version in (record["envs"].get(target) or []):
+            return 409, f"Version {version} already exists in {target}"
+        record["envs"].setdefault(target, []).append(version)
+        verb = "deployed" if action == "deploy" else "migrated"
+        return 200, f"{self.spec['object']} {record['name']} {verb} to {target} successfully"
 
     @property
     def url(self) -> str:

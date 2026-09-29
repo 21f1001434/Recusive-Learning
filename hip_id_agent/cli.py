@@ -1909,6 +1909,32 @@ def run_operations_cmd(
         raise typer.Exit(code=3)
 
 
+@app.command("learn-action-sections")
+def learn_action_sections_cmd(
+    input_json: str = typer.Argument("", help="input.json naming the objects to open (objects.<phase> names). Empty: the first row of each listing."),
+    phases: str = typer.Option("all", help="all, or a comma list: source_transport_profile,biz_flow,data_map,rule,source_document_type ..."),
+    actions: str = typer.Option("edit,clone,deploy,migrate", help="Sections to learn: edit, clone, deploy, migrate (comma list)."),
+    target: str = typer.Option("", help="Object to open (one phase only). Empty: input.json's name, else the listing's first row."),
+    config: str = typer.Option("config.yaml", help="Path to config YAML."),
+    runs_dir: Optional[str] = typer.Option(None, help="Override run directory."),
+    show: bool = typer.Option(False, "--show", help="Only print what is already known; open nothing."),
+    headless: Optional[bool] = typer.Option(None, "--headless/--headed", help="Override config.portal.headless."),
+    allow_portal_mutation: bool = typer.Option(False, help="Lets a guarded Deploy button be opened to read its menu / dialog / confirmation (never confirmed); with the environment gate and phrase."),
+    confirmation: str = typer.Option("", help=f"With --allow-portal-mutation: {MUTATION_CONFIRMATION}"),
+):
+    """V243R31: learn each phase's Edit, Clone, Deploy and Migrate sections (read-only).
+
+    Edit / Clone: the form, read completely and closed with Cancel.  Deploy /
+    Migrate: for every environment tab of the object, where the action goes --
+    its menu (read without a click), its confirmation or its dialog; nothing is
+    ever confirmed.  A guarded Deploy button may act at once, so it is opened only
+    with the three-part mutation gate; without it, the first authorized deploy
+    learns it.
+    """
+    learn_edit_sections_cmd(input_json=input_json, phases=phases, target=target, config=config, runs_dir=runs_dir, show=show,
+                            headless=headless, actions=actions, allow_portal_mutation=allow_portal_mutation, confirmation=confirmation)
+
+
 @app.command("learn-edit-sections")
 def learn_edit_sections_cmd(
     input_json: str = typer.Argument("", help="input.json naming the objects to open (objects.<phase> names). Empty: the first row of each listing."),
@@ -1918,6 +1944,9 @@ def learn_edit_sections_cmd(
     runs_dir: Optional[str] = typer.Option(None, help="Override run directory."),
     show: bool = typer.Option(False, "--show", help="Only print what is already known about each Edit section; open nothing."),
     headless: Optional[bool] = typer.Option(None, "--headless/--headed", help="Override config.portal.headless."),
+    actions: str = typer.Option("edit", help="V243R31: also clone, deploy, migrate (comma list); see learn-action-sections."),
+    allow_portal_mutation: bool = typer.Option(False, help="With --actions deploy: lets a guarded Deploy button be opened (never confirmed)."),
+    confirmation: str = typer.Option("", help=f"With --allow-portal-mutation: {MUTATION_CONFIRMATION}"),
 ):
     """V243R30: learn each phase's Edit section.
 
@@ -1927,8 +1956,9 @@ def learn_edit_sections_cmd(
     remember the Edit section.  The values are written to the run folder
     (edit_values.json, and edit_input.json shaped as input.json).
     """
-    from .edit_section_learning import EditSectionMemory, learn_edit_sections, resolve_phases
+    from .edit_section_learning import EditSectionMemory, SectionMemory, learn_edit_sections, resolve_phases
     from .dummy_fill_e2e import read_json_any
+    from .portal_operations import operation_gate
 
     load_dotenv()
     cfg = load_config(config)
@@ -1939,16 +1969,23 @@ def learn_edit_sections_cmd(
     wanted = resolve_phases(phases)
     if not wanted:
         raise typer.BadParameter(f"no known phase in {phases!r}")
+    wanted_actions = [a.strip().lower() for a in str(actions or "edit").split(",") if a.strip().lower() in {"edit", "clone", "deploy", "migrate"}]
+    if not wanted_actions:
+        raise typer.BadParameter(f"no known action in {actions!r} (edit, clone, deploy, migrate)")
     memory = EditSectionMemory(Path(cfg.reporting.memory_dir))
     if show:
-        table = Table(title="Learned Edit sections")
-        for column in ("Phase", "Known", "Form", "Tabs", "Fields", "Mapped keys", "Read-only in Edit", "Save label", "Path"):
-            table.add_column(column)
-        for row in memory.summaries(wanted)["phases"]:
-            table.add_row(row["phase"], "yes" if row.get("known") else "no", f"{row.get('title') or ''} ({row.get('kind') or ''})" if row.get("known") else "",
-                          ", ".join(row.get("tabs") or []), str(row.get("fields") or ""), str(row.get("mapped") or ""),
-                          ", ".join(row.get("read_only") or []), ", ".join(row.get("commit_labels") or []), " > ".join(row.get("path") or []))
-        console.print(table)
+        for action in wanted_actions:
+            known = memory if action == "edit" else SectionMemory(Path(cfg.reporting.memory_dir), action)
+            table = Table(title=f"Learned {action.title()} sections")
+            for column in ("Phase", "Known", "Form / kind", "Tabs", "Fields", "Read-only", "Goes to (per environment)", "Save label", "Path"):
+                table.add_column(column)
+            for row in known.summaries(wanted)["phases"]:
+                table.add_row(row["phase"], "yes" if row.get("known") else "no",
+                              f"{row.get('title') or ''} ({row.get('section_kind') or row.get('kind') or ''})" if row.get("known") else "",
+                              ", ".join(row.get("tabs") or []), str(row.get("fields") or ""), ", ".join(row.get("read_only") or []),
+                              "; ".join(f"{env} > {', '.join(items) or '-'}" for env, items in (row.get("menus") or {}).items()),
+                              ", ".join(row.get("commit_labels") or []), " > ".join(row.get("path") or []))
+            console.print(table)
         return
     payload = read_json_any(input_json) if input_json else {}
     if not isinstance(payload, dict):
@@ -1958,13 +1995,16 @@ def learn_edit_sections_cmd(
     run_dir = Path(cfg.reporting.runs_dir) / rid
     run_dir.mkdir(parents=True, exist_ok=True)
     targets = {wanted[0]: target} if target and len(wanted) == 1 else None
-    report = asyncio.run(learn_edit_sections(cfg, payload, run_dir=run_dir, phases=wanted, targets=targets))
-    table = Table(title="Edit sections learned (nothing saved on the portal)")
-    for column in ("Phase", "Object", "Result", "Fields", "Tabs", "Read-only in Edit", "Values"):
+    gate = operation_gate(allow_portal_mutation, confirmation)
+    report = asyncio.run(learn_edit_sections(cfg, payload, run_dir=run_dir, phases=wanted, targets=targets, actions=wanted_actions, gate=gate))
+    table = Table(title="Sections learned (nothing saved, deployed or migrated on the portal)")
+    for column in ("Phase", "Action", "Object", "Result", "Fields", "Tabs", "Read-only", "Goes to", "Values / note"):
         table.add_column(column)
     for row in report.get("summary") or []:
-        table.add_row(str(row.get("phase")), str(row.get("target") or ""), f"{row.get('result')} ({row.get('status')})", str(row.get("fields") or ""),
-                      ", ".join(row.get("tabs") or []), ", ".join(row.get("read_only") or []), str(row.get("values_file") or ""))
+        table.add_row(str(row.get("phase")), str(row.get("action")), str(row.get("target") or ""), f"{row.get('result')} ({row.get('status')})",
+                      str(row.get("fields") or ""), ", ".join(row.get("tabs") or []), ", ".join(row.get("read_only") or []),
+                      "; ".join(f"{env} > {', '.join(items) or '-'}" for env, items in (row.get("menus") or {}).items()),
+                      str(row.get("values_file") or row.get("reason") or ""))
     console.print(table)
     console.print(f"Report: {run_dir / 'edit_section_learning_report.json'}  Knowledge: {memory.root}")
     if not report.get("pass"):
