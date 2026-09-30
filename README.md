@@ -5,7 +5,7 @@
   - Refilling a field that is already filled is no longer "progress".
   - After a correct fill, the form is no longer changed to explore other dropdown branches and then filled again. That behaviour is opt-in: `exploration.explore_branches_after_fill`.
   - The watchdog probes a form that stopped gaining new fields and ends the attempt as complete. It stops a real refill loop.
-- **The completion proof reads every phase.** Transport Profile, BizFlow, Rule and Data Map fields sit in fieldsets, and "No" radios were dropped, so the R29 proof never passed on those phases. Now it does.
+- **The completion proof reads every phase.** Transport Profile, BizFlow, Rule and Data Map fields sit in fieldsets, and "No" radios were dropped, so the R29 proof never passed on those phases. Now it does. The Business Flow wizard is proved tab by tab: each tab while it is filled, and the whole flow by showing each tab in turn (navigation only).
 - **Whitelabel Error Page:**
   - seen mid-fill, on the phase link, or behind any error, it closes and reopens the browser, opens the same phase link and the form, and fills it from input.json;
   - up to 3 times per phase, then the phase is held for you;

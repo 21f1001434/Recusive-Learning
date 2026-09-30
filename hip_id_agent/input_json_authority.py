@@ -58,8 +58,13 @@ def is_authoritative(live: Mapping[str, Any]) -> bool:
 
 async def prove_input_json_completion(
     *, page: Any, phase: str, phase_input: Dict[str, Any], judge: Any = None, blur: bool = True,
+    section: Optional[str] = None, walk_tabs: bool = True,
 ) -> Dict[str, Any]:
-    """Fresh read-only proof of the current live form against input.json."""
+    """Fresh read-only proof of the current live form against input.json.
+
+    ``section``: one wizard tab.  ``walk_tabs``: a wizard's tabs may be shown in
+    turn (navigation only) -- never while the agent is still working.
+    """
     from .dds_control_driver import close_open_dropdown
     from .phase_live_reproof import live_read_only_phase_reproof
 
@@ -79,7 +84,8 @@ async def prove_input_json_completion(
             await page.wait_for_timeout(150)
         except Exception:
             pass
-    live = await live_read_only_phase_reproof(page=page, phase=phase, phase_input=phase_input, judge=judge)
+    live = await live_read_only_phase_reproof(
+        page=page, phase=phase, phase_input=phase_input, judge=judge, section=section, walk_tabs=walk_tabs)
     authoritative = is_authoritative(live)
     return {
         **live,
@@ -120,7 +126,7 @@ async def quiet_completion_probe(*, page: Any, phase: str, phase_input: Dict[str
         return {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
     if any(int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")):
         return {"pass": False, "status": "busy", **{k: int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")}}
-    proof = await prove_input_json_completion(page=page, phase=phase, phase_input=phase_input, blur=False)
+    proof = await prove_input_json_completion(page=page, phase=phase, phase_input=phase_input, blur=False, walk_tabs=False)
     return {"pass": bool(proof.get("pass")), "status": proof.get("status"),
             "matched_count": proof.get("matched_count"), "missing_count": len(proof.get("missing_fields") or [])}
 

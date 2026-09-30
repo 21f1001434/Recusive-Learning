@@ -40,8 +40,14 @@ A Whitelabel Error Page (Spring Boot's "This application has no explicit mapping
 **The proof reads every phase's form.**
 - Form-level facts are matched on the whole active form, still by label and by the exact committed value.
 - Row facts keep their strict section match.
-- A radio group answers with its checked option.
+- A radio group answers with its checked option; a chip multi-select answers with its chips.
 - On the replicas every field is now matched: Transport Profile 14/14, Rule 19/19, Data Map 6/6.
+
+**Business Flow is proved tab by tab.** A wizard shows one tab at a time, so a whole-phase proof could never pass on it.
+- Each tab's fill is stopped by that tab's own proof: the engine proves only the section it is filling.
+- The phase-level proof (after an error, at the pre-judge gate, at the watchdog's final check) shows each tab in turn, proves that tab's facts and shows the originally open tab again. It only switches tabs; no value is typed, selected or saved.
+- On the replica: Flow Details 2/2 and Configure Source 13/13. One changed value on another tab makes it "not complete".
+- The probe that runs while the agent is still working never switches tabs.
 
 **The mission's pre-judge gate proves the live form first.** It used to reopen and refill whenever the executor's own record was incomplete.
 
@@ -75,7 +81,7 @@ It is also checked when any other error ended the attempt, because a destroyed p
 
 ## Proof
 
-Tests in `tests/test_v243r32_stop_when_complete_and_whitelabel.py` (14). New support: `tests/whitelabel_portal_support.py`, a replica portal whose page turns into Spring's Whitelabel Error Page mid-fill, or whose phase link answers with it.
+Tests in `tests/test_v243r32_stop_when_complete_and_whitelabel.py` (15). New support: `tests/whitelabel_portal_support.py`, a replica portal whose page turns into Spring's Whitelabel Error Page mid-fill, or whose phase link answers with it.
 
 - **Complete form, engine checks unmet** (Transport Profile replica, with one required field that input.json does not name):
   - before R32: 4 of 4 cycles, "needs_input";
@@ -86,6 +92,7 @@ Tests in `tests/test_v243r32_stop_when_complete_and_whitelabel.py` (14). New sup
   2. The same link answers with the error page. The form check sees it and the browser is restarted again (session 3).
   3. The stage is opened from its link, the form filled, and the phase passes. The ladder learns that the restart resolved it.
 - **Persistent Whitelabel:** 3 restarts, each to the same stage link, then held for a human.
+- **Business Flow wizard:** each tab proved on its own; the phase proof visits every tab, returns to the open one, and catches a changed value on another tab.
 - **Operations:** restarted and repeated before a Save; never repeated after one.
 - **Watchdog:**
   - a complete form stops within two probes;

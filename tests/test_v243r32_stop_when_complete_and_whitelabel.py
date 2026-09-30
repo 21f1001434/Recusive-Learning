@@ -169,6 +169,62 @@ def test_a_whitelabel_error_page_closes_the_browser_and_restarts_the_stage(tmp_p
     assert rows["restart_browser_session"]["resolved"] == 1
 
 
+def test_a_business_flow_wizard_is_proved_tab_by_tab(tmp_path: Path):
+    """Each tab stops on its own proof; the phase proof shows every tab in turn and returns to the open one."""
+    _need_browser()
+    from playwright.async_api import async_playwright
+
+    from hip_id_agent.autonomous_form_runtime import execute_autonomous_phase_goal
+    from hip_id_agent.input_json_authority import prove_input_json_completion, quiet_completion_probe
+    from hip_id_agent.stateful_form_runtime import compile_phase_state_graph
+    from phase_replica_support import chromium_path, replica_html, uhaul_input
+
+    obj = uhaul_input("biz_flow", tmp_path)["objects"]["biz_flow"]
+    data = {"objects": {"biz_flow": {k: obj[k] for k in ("flow_details", "configure_source", "flow_identifiers")}}}
+    html = replica_html("bizflow_wizard_dds.html").replace("duplicateMessage:", "_noDuplicate:")
+    selected = "() => document.querySelector('[role=tab][aria-selected=true]').innerText"
+
+    async def run():
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True, executable_path=chromium_path())
+            page = await browser.new_page(viewport={"width": 1280, "height": 720})
+            try:
+                await page.set_content(html)
+                await page.wait_for_timeout(300)
+                tabs = {}
+                for index, section in enumerate(("Flow Details", "Configure Source")):
+                    await page.evaluate(f"document.getElementById('tab-{index}').click()")
+                    await page.wait_for_timeout(400)
+                    await execute_autonomous_phase_goal(
+                        page=page, graph=compile_phase_state_graph(data, "biz_flow"), phase="biz_flow", input_data=data,
+                        config=None, output_dir=tmp_path / section, max_cycles=2, section=section)
+                    tabs[section] = await prove_input_json_completion(page=page, phase="biz_flow", phase_input=data, section=section)
+                quiet = await quiet_completion_probe(page=page, phase="biz_flow", phase_input=data)
+                open_before = await page.evaluate(selected)
+                whole = await prove_input_json_completion(page=page, phase="biz_flow", phase_input=data)
+                open_after = await page.evaluate(selected)
+                await page.evaluate("document.getElementById('tab-0').click()")
+                await page.fill("input[name=businessFlowName]", "SOMETHING_ELSE")
+                await page.evaluate("document.getElementById('tab-1').click()")
+                broken = await prove_input_json_completion(page=page, phase="biz_flow", phase_input=data)
+                return tabs, quiet, open_before, whole, open_after, broken
+            finally:
+                await browser.close()
+
+    tabs, quiet, open_before, whole, open_after, broken = asyncio.run(run())
+    # Each tab proves its own facts (the chip multi-select reads as its chips).
+    assert tabs["Flow Details"]["pass"] is True and tabs["Configure Source"]["pass"] is True
+    assert tabs["Configure Source"]["matched_count"] == 13
+    # The probe used while the agent works never switches tabs: it cannot see Flow Details.
+    assert quiet["pass"] is False
+    # The phase proof shows each tab in turn and leaves the open tab open.
+    assert whole["pass"] is True and whole["tab_navigation_only"] is True and whole["form_mutated"] is False
+    assert [(t["section"], t["pass"]) for t in whole["wizard_tabs_proved"]] == [("Flow Details", True), ("Configure Source", True)]
+    assert open_before == open_after == "Configure Source"
+    # One changed value on another tab: not complete.
+    assert broken["pass"] is False and broken["missing_fields"] == ["business_flow_name"]
+
+
 def test_whitelabel_detection_reads_springs_own_page():
     _need_browser()
     from playwright.async_api import async_playwright

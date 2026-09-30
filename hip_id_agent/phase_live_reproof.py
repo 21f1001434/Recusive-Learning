@@ -67,6 +67,7 @@ def _upload_nodes(phase_input: Dict[str, Any], phase: str) -> List[Dict[str, Any
             "field": str(node.get("field_key") or node.get("node_id") or "upload_file"),
             "input_path": str(node.get("input_path") or ""),
             "expected_basename": _basename_any(expected),
+            "section": str(node.get("section") or ""),
         })
     return rows
 
@@ -140,6 +141,19 @@ async def _live_file_proof(page: Any, uploads: List[Dict[str, Any]]) -> Dict[str
     }
 
 
+def _chip_values(controls: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """V243R32: a chip multi-select with an empty text value reads as its chosen chips."""
+    out: List[Dict[str, Any]] = []
+    for c in controls:
+        if (isinstance(c, dict) and str(c.get("value") or "").strip() == ""
+                and [str(v).strip() for v in (c.get("selected_values") or []) if str(v).strip()]):
+            chips = [str(v).strip() for v in c.get("selected_values") if str(v).strip()]
+            out.append(dict(c, value=", ".join(chips), value_source="selected_chips"))
+        else:
+            out.append(c)
+    return out
+
+
 def _radio_group_answers(controls: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """One control per radio group: its label and the checked option's label (V243R32)."""
     groups: Dict[tuple, Dict[str, Any]] = {}
@@ -161,6 +175,11 @@ def _radio_group_answers(controls: Sequence[Dict[str, Any]]) -> List[Dict[str, A
             row["value"] = str(c.get("label") or "").strip()
             row["selected_values"] = [row["value"]]
     return [g for g in groups.values() if g["value"]]
+
+
+def _section_matches(expected: Optional[str], actual: Any) -> bool:
+    e, a = _norm_section(expected), _norm_section(actual)
+    return bool(e and a and (e == a or e in a or a in e))
 
 
 def _norm_section(value: Any) -> str:
@@ -198,14 +217,19 @@ def _form_level_facts_relaxed(
     return dict(expected, facts=relaxed) if changed else None
 
 
-async def live_read_only_phase_reproof(
+async def _prove_surface(
     *,
     page: Any,
     phase: str,
     phase_input: Dict[str, Any],
     judge: Optional[DualModelSectionJudge] = None,
+    section: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Prove the *current* live form without taking any physical action.
+
+    V243R32: ``section`` proves one section of a wizard (a Business Flow tab):
+    only that section's input.json facts and uploads are compared, because a
+    wizard shows one tab at a time.
 
     This is a terminal/checkpoint probe only. It never authorizes a mutation and
     never persists customer values, selectors, or coordinates.  Exact values are
@@ -230,11 +254,27 @@ async def live_read_only_phase_reproof(
 
     expected = build_phase_expectation(phase_input if isinstance(phase_input, dict) else {}, phase)
     uploads = _upload_nodes(phase_input if isinstance(phase_input, dict) else {}, phase)
+    if section:
+        uploads = [u for u in uploads if _section_matches(section, u.get("section"))]
     expected_for_fields = _without_upload_facts(expected, uploads)
+    if section:
+        scoped = [f for f in (expected_for_fields.get("facts") or []) if isinstance(f, dict)
+                  and _section_matches(section, f.get("section"))]
+        if not scoped:
+            return {
+                "schema_version": "hip.live-read-only-phase-reproof.v1", "phase": phase, "section": section,
+                "pass": False, "status": "no_input_json_facts_for_section", "read_only": True,
+                "source": "current_live_browser", "values_stored": False, "selectors_stored": False,
+                "coordinates_stored": False,
+            }
+        expected_for_fields = dict(expected_for_fields, facts=scoped, row_counts={
+            k: v for k, v in (expected_for_fields.get("row_counts") or {}).items()
+            if any(str(f.get("row_kind") or "") and str(k).startswith(str(f.get("row_kind"))) for f in scoped)})
     actual_state = {
         # V243R32: a radio group answers with its checked option ("Existing
         # Account" -> "Yes"); a checked "No" radio was dropped as a false value.
-        "controls": [*controls, *_radio_group_answers(controls)],
+        # A chip multi-select holds its choice in selected_values, not in value.
+        "controls": [*_chip_values(controls), *_radio_group_answers(controls)],
         "row_counts": _row_counts(controls),
         "visible_text": "",
         "source": "current_live_browser_stateful_controls",
@@ -269,6 +309,7 @@ async def live_read_only_phase_reproof(
     return {
         "schema_version": "hip.live-read-only-phase-reproof.v1",
         "phase": phase,
+        "section": section or "",
         "pass": passed,
         "status": "exact_live_state_reproved" if passed else "live_state_not_exact",
         "read_only": True,
@@ -288,3 +329,118 @@ async def live_read_only_phase_reproof(
         "selectors_stored": False,
         "coordinates_stored": False,
     }
+_TABS_JS = r"""() => {
+  const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  return Array.from(document.querySelectorAll('[role=tab]')).map((t, index) => ({
+    index, shown: shown(t), text: String(t.innerText || t.textContent || t.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim(),
+    selected: t.getAttribute('aria-selected') === 'true' || /\b(active|dds__tabs__tab--active)\b/.test(String(t.className || '')),
+  })).filter((t) => t.shown && t.text);
+}"""
+
+# The live portal names some wizard tabs differently from the canonical sections.
+_TAB_SECTION_ALIASES = {
+    "flow details": ("basic details", "general details", "flow information", "create biz flow"),
+    "configure source": ("source details", "source configuration", "source information"),
+    "configure target(s)": ("configure target", "target details", "target configuration", "target(s)"),
+    "configure routing": ("routing", "routing configuration"),
+}
+
+
+def _tab_for_section(section: str, tabs: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    names = [_norm_section(section), *[_norm_section(a) for a in _TAB_SECTION_ALIASES.get(_norm_section(section), ())]]
+    for tab in tabs:
+        text = _norm_section(tab.get("text"))
+        if any(n and (n == text or n in text or text in n) for n in names):
+            return tab
+    return None
+
+
+async def _click_tab(page: Any, index: int) -> None:
+    await page.locator("[role=tab]").nth(int(index)).click(timeout=3000)
+    await page.wait_for_timeout(450)
+
+
+async def live_read_only_phase_reproof(
+    *,
+    page: Any,
+    phase: str,
+    phase_input: Dict[str, Any],
+    judge: Optional[DualModelSectionJudge] = None,
+    section: Optional[str] = None,
+    walk_tabs: bool = True,
+) -> Dict[str, Any]:
+    """Prove the live form (see ``_prove_surface``); a tabbed wizard tab by tab (V243R32).
+
+    A wizard (Business Flow) shows one tab at a time, so a whole-phase proof
+    could never pass.  When input.json's facts span several sections and each
+    has a tab on the page, every tab is shown in turn (tab navigation only: no
+    value is typed, selected or saved), that tab's facts are proved, and the tab
+    that was open is shown again.  ``walk_tabs=False`` (a probe while the agent
+    is still working) never switches tabs.
+    """
+    if section or not walk_tabs:
+        return await _prove_surface(page=page, phase=phase, phase_input=phase_input, judge=judge, section=section)
+    expected = build_phase_expectation(phase_input if isinstance(phase_input, dict) else {}, phase)
+    sections = list(dict.fromkeys(
+        str(f.get("section") or "") for f in (expected.get("facts") or []) if isinstance(f, dict) and f.get("section")))
+    tabs: List[Dict[str, Any]] = []
+    if len(sections) > 1:
+        try:
+            tabs = list(await page.evaluate(_TABS_JS) or [])
+        except Exception:
+            tabs = []
+    plan = [(sec, _tab_for_section(sec, tabs)) for sec in sections] if len(tabs) > 1 else []
+    if not plan or any(tab is None for _, tab in plan) or len({tab["index"] for _, tab in plan}) < 2:
+        return await _prove_surface(page=page, phase=phase, phase_input=phase_input, judge=judge)
+    original = next((t for t in tabs if t.get("selected")), None)
+    parts: List[Dict[str, Any]] = []
+    try:
+        for sec, tab in plan:
+            try:
+                await _click_tab(page, tab["index"])
+            except Exception as exc:
+                parts.append({"section": sec, "pass": False, "status": "tab_not_shown",
+                              "error": mask_sensitive_string(str(exc))[:200], "missing_fields": [sec]})
+                continue
+            parts.append(await _prove_surface(page=page, phase=phase, phase_input=phase_input, judge=judge, section=sec))
+    finally:
+        if original is not None:
+            try:
+                await _click_tab(page, original["index"])
+            except Exception:
+                pass
+    def joined(key: str) -> List[str]:
+        return [str(x) for part in parts for x in (part.get(key) or [])]
+    uploads = [part.get("required_upload_proof") or {} for part in parts]
+    passed = bool(parts) and all(part.get("pass") is True for part in parts)
+    return {
+        "schema_version": "hip.live-read-only-phase-reproof.v1",
+        "phase": phase,
+        "section": "",
+        "pass": passed,
+        "status": "exact_live_state_reproved" if passed else "live_state_not_exact",
+        "read_only": True,
+        "source": "current_live_browser",
+        "deterministic_pass": bool(parts) and all(part.get("deterministic_pass") is True for part in parts),
+        "matched_fields": joined("matched_fields"),
+        "missing_fields": joined("missing_fields"),
+        "row_issue_fields": joined("row_issue_fields"),
+        "invalid_fields": joined("invalid_fields"),
+        "form_level_section_matched_fields": joined("form_level_section_matched_fields"),
+        "actual_control_count": sum(int(part.get("actual_control_count") or 0) for part in parts),
+        "row_counts": {k: v for part in parts for k, v in (part.get("row_counts") or {}).items()},
+        "required_upload_proof": {"required": any(u.get("required") for u in uploads),
+                                  "pass": all(bool(u.get("pass", True)) for u in uploads), "values_stored": False},
+        "wizard_tabs_proved": [{"section": part.get("section"), "pass": bool(part.get("pass")),
+                                "matched": len(part.get("matched_fields") or []),
+                                "missing": list(part.get("missing_fields") or [])[:10]} for part in parts],
+        "tab_navigation_only": True,
+        "browser_replay_performed": False,
+        "form_mutated": False,
+        "values_stored": False,
+        "selectors_stored": False,
+        "coordinates_stored": False,
+    }
+
+

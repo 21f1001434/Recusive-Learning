@@ -8,7 +8,9 @@
   - progress is a newly proven field or a never-seen form shape; refills are not progress.
 - `phase_live_reproof`:
   - `_form_level_facts_relaxed`: facts whose section is the form title are matched on the whole active form (exact value still required; row facts strict);
-  - `_radio_group_answers`: a radio group's checked option.
+  - `_radio_group_answers`: a radio group's checked option; `_chip_values`: a chip multi-select's chips;
+  - `section=`: one wizard tab's facts (the engine proves the section it fills);
+  - a tabbed wizard (Business Flow) is proved tab by tab (`wizard_tabs_proved`, `tab_navigation_only`) and the open tab is shown again; `walk_tabs=False` for the in-flight probe.
   - The proof now reads Transport Profile, BizFlow, Rule and Data Map forms (TP 14/14 on the replica; it was 1/14).
 - `phase_progress.run_with_progress_watchdog`:
   - `completion_probe` + `refill_probe_seconds` (two exact read-only probes stop the attempt as complete);
@@ -27,7 +29,7 @@
   - `runtime_self_heal`: class `whitelabel_error_page`, ladder family `whitelabel` = `restart_browser_session` × `whitelabel_browser_restarts` (3), each to the same phase link; the class is also taken from the live page whatever error surfaced.
   - `portal_operations`: a Whitelabel page (named by the error, or seen on the live page after a failed operation) restarts the browser and repeats the operation from its listing, only before any Save / Deploy / confirm click (`whitelabel_after_commit` otherwise).
 - Tests:
-  - `tests/test_v243r32_stop_when_complete_and_whitelabel.py` (14);
+  - `tests/test_v243r32_stop_when_complete_and_whitelabel.py` (15);
   - `tests/whitelabel_portal_support.py`;
   - `tests/test_single_sso_browser_session_reuse.py` reads the routing body.
 

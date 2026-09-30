@@ -1608,7 +1608,7 @@ async def execute_autonomous_phase_goal(
             # V243R32: the checks above were not all met, but the live form may
             # already hold every input.json value.  Prove it read-only before
             # anything is filled again.
-            completion_proof = await _input_json_exact_now(page, phase=phase, input_data=input_data)
+            completion_proof = await _input_json_exact_now(page, phase=phase, input_data=input_data, section=section)
             cycle_audit["input_json_completion_proof"] = _proof_summary(completion_proof)
             if completion_proof.get("pass"):
                 cycle_audit["status"] = "goal_achieved_input_json_exact"
@@ -1893,15 +1893,17 @@ async def _complete_learning(
     return restored
 
 
-async def _input_json_exact_now(page: Any, *, phase: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
-    """V243R32: read-only proof that the live form holds exactly what input.json asks for."""
+async def _input_json_exact_now(
+    page: Any, *, phase: str, input_data: Dict[str, Any], section: Optional[str] = None,
+) -> Dict[str, Any]:
+    """V243R32: read-only proof that the live form (or this wizard tab) holds exactly what input.json asks for."""
     try:
         from .environment_faults import raise_if_whitelabel
         from .input_json_authority import prove_input_json_completion
 
         await raise_if_whitelabel(page, f"{phase} form")
         return await prove_input_json_completion(
-            page=page, phase=phase, phase_input=input_data if isinstance(input_data, dict) else {})
+            page=page, phase=phase, phase_input=input_data if isinstance(input_data, dict) else {}, section=section)
     except Exception as exc:
         raise_if_environment_fatal(exc)
         return {"pass": False, "status": "proof_error", "error": mask_sensitive_string(str(exc))[:300]}
