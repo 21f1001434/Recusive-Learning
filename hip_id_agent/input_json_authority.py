@@ -35,6 +35,8 @@ SCHEMA = "hip.input-json-completion-authority.v1"
 NOT_ELIGIBLE_CLASSES = frozenset({
     "authentication_expired", "unsafe_or_mutating", "dependency_contract_invalid", "browser_disconnected",
     "dropdown_options_empty", "route_not_committed", "mcp_surface_drift",
+    # V243R32: the page is a Whitelabel Error Page -- the form is gone.
+    "whitelabel_error_page",
 })
 
 
@@ -89,6 +91,38 @@ async def prove_input_json_completion(
         "proved_at": utc_now(),
         "rule": "every input.json value, row and required upload is exact and committed on the live form",
     }
+
+
+_BUSY_JS = r"""() => {
+  const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const open = document.querySelectorAll('[role=combobox][aria-expanded=true]').length;
+  const lists = Array.from(document.querySelectorAll('[role=listbox],[role=menu]')).filter(shown).length;
+  const busy = Array.from(document.querySelectorAll('[aria-busy=true],.dds__loading-indicator,.dds__progress-indicator,.spinner,.loading'))
+    .filter(shown).length;
+  return {open, lists, busy};
+}"""
+
+
+async def quiet_completion_probe(*, page: Any, phase: str, phase_input: Dict[str, Any]) -> Dict[str, Any]:
+    """V243R32: is the live form complete right now?  Read-only and non-intrusive.
+
+    Used while the agent is still working, so it never blurs, opens or closes
+    anything: when a dropdown or list is open, or the portal is loading, the
+    answer is "busy" (not complete) -- a value only typed into a search box is
+    not committed.
+    """
+    if page is None:
+        return {"pass": False, "status": "no_page"}
+    try:
+        state = await page.evaluate(_BUSY_JS)
+    except Exception as exc:
+        return {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
+    if any(int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")):
+        return {"pass": False, "status": "busy", **{k: int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")}}
+    proof = await prove_input_json_completion(page=page, phase=phase, phase_input=phase_input, blur=False)
+    return {"pass": bool(proof.get("pass")), "status": proof.get("status"),
+            "matched_count": proof.get("matched_count"), "missing_count": len(proof.get("missing_fields") or [])}
 
 
 def model_judge_verdicts(judge_result: Mapping[str, Any]) -> List[Dict[str, Any]]:
@@ -163,6 +197,6 @@ def learning_review_needed(*, learning_phase: bool, authority: Mapping[str, Any]
 
 
 __all__ = [
-    "accept_exact_phase", "learning_review_needed",
+    "accept_exact_phase", "learning_review_needed", "quiet_completion_probe",
     "NOT_ELIGIBLE_CLASSES", "SCHEMA", "is_authoritative", "model_judge_verdicts", "prove_input_json_completion", "write_authority",
 ]

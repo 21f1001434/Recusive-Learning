@@ -21,7 +21,10 @@ from .safe_io import safe_write_json, safe_write_csv
 from .llm_form_planner import LLMFormPlanner, apply_llm_control_hints
 from .section_judge import DualModelSectionJudge, SectionJudgePolicy, build_bizflow_section_expectation
 from .repeatable_rows import apply_repeatable_row_adds, build_repeatable_section_plan
-from .portal_form_exploration import run_portal_form_exploration, merge_section_knowledge
+from .portal_form_exploration import (
+    explore_after_fill, form_changed_by_exploration, merge_section_knowledge, recorded_dropdowns,
+    run_portal_form_exploration,
+)
 from .deterministic_plan_runtime import sort_controls as deterministic_sort_controls, annotate_attempt as annotate_plan_attempt, plan_summary as deterministic_plan_summary
 from .dds_control_driver import active_form_root_info, assert_active_surface, close_open_dropdown, get_active_form_root, restore_filled_values, set_text_control as dds_set_text_control, select_dds_combobox, click_visible_tab, semantic_runtime_enabled, open_control_for_discovery
 from .phase_form_entry import ensure_phase_form_entry, find_same_page_top_right_add, same_page_add_candidate
@@ -3336,26 +3339,36 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
                 required = _required_fields(controls)
             else:
                 try:
+                    # V243R32: the tab is complete -- by default nothing on it is opened or changed any more.
+                    change_form = explore_after_fill(config)
+                    tab_controls = _filter_bizflow_controls(await _evaluate_controls(page))
                     learned = await run_portal_form_exploration(
                         page=page, phase="biz_flow", section=tab, input_data=input_data or {},
-                        controls=_filter_bizflow_controls(await _evaluate_controls(page)),
-                        dropdowns=await _collect_bizflow_dropdowns_with_options(page, _filter_bizflow_controls(await _evaluate_controls(page)), tab_label=tab),
+                        controls=tab_controls,
+                        dropdowns=(await _collect_bizflow_dropdowns_with_options(page, tab_controls, tab_label=tab)
+                                   if change_form else recorded_dropdowns(tab_controls)),
                         buttons=_filter_bizflow_buttons(await _evaluate_buttons(page)),
                         repeatable_plan=build_repeatable_section_plan(input_data or {}, "biz_flow"),
                         repeatable_audit=repeatable_row_audits, output_dir=exploration_root,
-                        config=config, allow_live_branching=True,
+                        config=config, allow_live_branching=change_form,
                     )
                     if learned.get("restore_errors") or str(learned.get("status") or "").startswith("failed"):
                         raise RuntimeError(f"{tab} exploration did not restore the target values")
-                    learned["learning_order"] = "target branch first; alternative branches second; section rejudged"
-                    exploration_graphs.append(learned)
-                    await restore_filled_values(page, "biz_flow", reason=f"after target-first exploration {tab}", attempts=attempts)
-                    restored_graph_gate = await _execute_state_graph_section(tab, attempts, "post_exploration_restore")
-                    if not restored_graph_gate.get("pass"):
-                        raise RuntimeError(f"{tab} deterministic target path failed after exploration")
-                    post_explore_gate = await judge_with_repairs(tab, attempts, _repair_current_tab)
-                    if not post_explore_gate.get("pass"):
-                        raise RuntimeError(f"{tab} failed after restoring the explored parent branches")
+                    if not form_changed_by_exploration(learned):
+                        # V243R32: exploration only read the tab; it still holds every
+                        # input.json value, so it is not filled or judged a second time.
+                        learned["learning_order"] = "target branch filled once; other branches recorded read-only; tab not refilled"
+                        exploration_graphs.append(learned)
+                    else:
+                        learned["learning_order"] = "target branch first; alternative branches second; section rejudged"
+                        exploration_graphs.append(learned)
+                        await restore_filled_values(page, "biz_flow", reason=f"after target-first exploration {tab}", attempts=attempts)
+                        restored_graph_gate = await _execute_state_graph_section(tab, attempts, "post_exploration_restore")
+                        if not restored_graph_gate.get("pass"):
+                            raise RuntimeError(f"{tab} deterministic target path failed after exploration")
+                        post_explore_gate = await judge_with_repairs(tab, attempts, _repair_current_tab)
+                        if not post_explore_gate.get("pass"):
+                            raise RuntimeError(f"{tab} failed after restoring the explored parent branches")
                 except Exception as exc:
                     raise RuntimeError("BizFlow target-first learning failed closed: " + mask_sensitive_string(str(exc)))
 
@@ -3418,26 +3431,33 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
             if routing_gate.get("pass"):
                 try:
                     live_nested = _filter_bizflow_controls(await _evaluate_controls(page))
+                    change_form = explore_after_fill(config)
                     learned = await run_portal_form_exploration(
                         page=page, phase="biz_flow", section="Configure Routing + Add",
                         input_data=input_data or {}, controls=live_nested,
-                        dropdowns=await _collect_bizflow_dropdowns_with_options(page, live_nested, tab_label="Configure Routing + Add"),
+                        dropdowns=(await _collect_bizflow_dropdowns_with_options(page, live_nested, tab_label="Configure Routing + Add")
+                                   if change_form else recorded_dropdowns(live_nested)),
                         buttons=_filter_bizflow_buttons(await _evaluate_buttons(page)),
                         repeatable_plan=build_repeatable_section_plan(input_data or {}, "biz_flow"),
                         repeatable_audit=repeatable_row_audits, output_dir=exploration_root,
-                        config=config, allow_live_branching=True,
+                        config=config, allow_live_branching=change_form,
                     )
                     if learned.get("restore_errors") or str(learned.get("status") or "").startswith("failed"):
                         raise RuntimeError("Configure Routing exploration did not restore target values")
-                    learned["learning_order"] = "target routing first; alternative branches second; routing rejudged"
-                    exploration_graphs.append(learned)
-                    await restore_filled_values(page, "biz_flow", reason="after target-first routing exploration", attempts=nested_attempts)
-                    restored_routing_graph = await _execute_state_graph_section("Configure Routing", nested_attempts, "post_exploration_restore")
-                    if not restored_routing_graph.get("pass"):
-                        raise RuntimeError("Configure Routing deterministic target path failed after exploration")
-                    routing_gate = await judge_with_repairs("Configure Routing", nested_attempts, _repair_routing)
-                    if not routing_gate.get("pass"):
-                        raise RuntimeError("Configure Routing failed after branch restoration")
+                    if not form_changed_by_exploration(learned):
+                        # V243R32: routing is complete and was only read -- not refilled.
+                        learned["learning_order"] = "target routing filled once; other branches recorded read-only; routing not refilled"
+                        exploration_graphs.append(learned)
+                    else:
+                        learned["learning_order"] = "target routing first; alternative branches second; routing rejudged"
+                        exploration_graphs.append(learned)
+                        await restore_filled_values(page, "biz_flow", reason="after target-first routing exploration", attempts=nested_attempts)
+                        restored_routing_graph = await _execute_state_graph_section("Configure Routing", nested_attempts, "post_exploration_restore")
+                        if not restored_routing_graph.get("pass"):
+                            raise RuntimeError("Configure Routing deterministic target path failed after exploration")
+                        routing_gate = await judge_with_repairs("Configure Routing", nested_attempts, _repair_routing)
+                        if not routing_gate.get("pass"):
+                            raise RuntimeError("Configure Routing failed after branch restoration")
                 except Exception as exc:
                     raise RuntimeError("BizFlow routing learning failed closed: " + mask_sensitive_string(str(exc)))
             controls = [*controls, *nested_controls]

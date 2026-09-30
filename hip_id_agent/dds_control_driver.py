@@ -169,6 +169,11 @@ async def close_open_dropdown(page: Page, phase: str = "") -> None:
         pass
 
 async def assert_active_surface(page: Page, phase: str) -> Dict[str, Any]:
+    # V243R32: a Whitelabel Error Page instead of the form is not a form problem --
+    # the stage is restarted in a fresh browser (HIP_WHITELABEL_ERROR_PAGE).
+    from .environment_faults import raise_if_whitelabel
+
+    await raise_if_whitelabel(page, f"{phase} form")
     text = (await active_form_text(page, phase)).lower()
     fatal: List[str] = []
     if phase == "data_map":

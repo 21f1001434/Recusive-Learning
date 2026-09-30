@@ -22,7 +22,10 @@ from .models import RunContext, utc_now
 from .security import mask_sensitive_data, mask_sensitive_string
 from .safe_io import safe_write_json, safe_write_csv
 from .repeatable_rows import apply_repeatable_row_adds, build_repeatable_section_plan
-from .portal_form_exploration import run_portal_form_exploration, merge_section_knowledge
+from .portal_form_exploration import (
+    explore_after_fill, form_changed_by_exploration, merge_section_knowledge, recorded_dropdowns,
+    run_portal_form_exploration,
+)
 from .deterministic_plan_runtime import sort_controls as deterministic_sort_controls, annotate_attempt as annotate_plan_attempt, plan_summary as deterministic_plan_summary
 from .stateful_form_runtime import compile_phase_state_graph, execute_phase_state_graph, build_target_branch_knowledge, capture_stateful_controls
 from .autonomous_form_runtime import execute_autonomous_phase_goal, autonomous_phase_enabled, autonomous_target_execution
@@ -5519,40 +5522,47 @@ class RuleKBFlow:
                 try:
                     live_controls = await _evaluate_controls(page)
                     live_buttons = await _evaluate_buttons(page)
-                    live_dropdowns = await _collect_dropdown_options(page, live_controls)
+                    # V243R32: the form is complete -- by default no dropdown is opened any more.
+                    live_dropdowns = (await _collect_dropdown_options(page, live_controls) if explore_after_fill(self.config)
+                                      else recorded_dropdowns(live_controls))
                     exploration_knowledge = await run_portal_form_exploration(
                         page=page, phase="rule", section="Create Rule", input_data=input_data,
                         controls=live_controls, dropdowns=live_dropdowns, buttons=live_buttons,
                         repeatable_plan=build_repeatable_section_plan(input_data, "rule"),
                         repeatable_audit=repeatable_row_audit, output_dir=portal_form_dir,
-                        config=self.config, allow_live_branching=True,
+                        config=self.config, allow_live_branching=explore_after_fill(self.config),
                     )
                     if exploration_knowledge.get("restore_errors") or str(exploration_knowledge.get("status") or "").startswith("failed"):
                         raise RuntimeError("Rule exploration could not restore the target parent values")
-                    if autonomous_phase_enabled(self.config, "rule"):
-                        autonomous_cfg = getattr(self.config, "autonomous_form", None)
-                        restored_autonomous = await execute_autonomous_phase_goal(
-                            page=page, graph=state_graph, phase="rule", input_data=input_data,
-                            config=self.config, output_dir=kb_dir / "autonomous_form_runtime_restore",
-                            prior_attempts=fill_attempts,
-                            max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
-                            repair=True, strict_live_execution=True,
-                        )
-                        restored_execution = autonomous_target_execution(restored_autonomous)
-                        _write_json(kb_dir / "rule_autonomous_restore_execution.json", restored_autonomous)
+                    if not form_changed_by_exploration(exploration_knowledge):
+                        # V243R32: exploration only read the form; it still holds every
+                        # input.json value, so it is not filled a second time.
+                        exploration_knowledge["learning_order"] = "target branch filled once; other branches recorded read-only; form not refilled"
                     else:
-                        restored_execution = await execute_phase_state_graph(
-                            page, state_graph, phase="rule", max_retries=2, repair=True, prior_attempts=fill_attempts, strict_live_execution=True
-                        )
-                    _write_json(kb_dir / "rule_post_exploration_restore_execution.json", restored_execution)
-                    if not restored_execution.get("pass"):
-                        raise RuntimeError("Rule target path failed after exploratory branches")
-                    fill_attempts.extend(dict(a, execution_stage="post_exploration_restore") for a in restored_execution.get("attempts", []) if isinstance(a, dict))
-                    target_branch_execution = restored_execution
-                    target_branch_knowledge = build_target_branch_knowledge(state_graph, restored_execution)
-                    target_branch_knowledge["knowledge_file"] = str(target_knowledge_file)
-                    safe_write_json(target_knowledge_file, target_branch_knowledge)
-                    exploration_knowledge["learning_order"] = "target branch first; alternatives second; deterministic target restore last"
+                        if autonomous_phase_enabled(self.config, "rule"):
+                            autonomous_cfg = getattr(self.config, "autonomous_form", None)
+                            restored_autonomous = await execute_autonomous_phase_goal(
+                                page=page, graph=state_graph, phase="rule", input_data=input_data,
+                                config=self.config, output_dir=kb_dir / "autonomous_form_runtime_restore",
+                                prior_attempts=fill_attempts,
+                                max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
+                                repair=True, strict_live_execution=True,
+                            )
+                            restored_execution = autonomous_target_execution(restored_autonomous)
+                            _write_json(kb_dir / "rule_autonomous_restore_execution.json", restored_autonomous)
+                        else:
+                            restored_execution = await execute_phase_state_graph(
+                                page, state_graph, phase="rule", max_retries=2, repair=True, prior_attempts=fill_attempts, strict_live_execution=True
+                            )
+                        _write_json(kb_dir / "rule_post_exploration_restore_execution.json", restored_execution)
+                        if not restored_execution.get("pass"):
+                            raise RuntimeError("Rule target path failed after exploratory branches")
+                        fill_attempts.extend(dict(a, execution_stage="post_exploration_restore") for a in restored_execution.get("attempts", []) if isinstance(a, dict))
+                        target_branch_execution = restored_execution
+                        target_branch_knowledge = build_target_branch_knowledge(state_graph, restored_execution)
+                        target_branch_knowledge["knowledge_file"] = str(target_knowledge_file)
+                        safe_write_json(target_knowledge_file, target_branch_knowledge)
+                        exploration_knowledge["learning_order"] = "target branch first; alternatives second; deterministic target restore last"
                 except Exception as exc:
                     raise RuntimeError("Rule state learning failed closed after target fill: " + mask_sensitive_string(str(exc)))
 

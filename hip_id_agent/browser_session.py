@@ -3227,6 +3227,9 @@ class BrowserSession:
         verified_node_count = len([n for n in verified_nodes if str(n).startswith(prefix)]) if isinstance(verified_nodes, set) else 0
         distinct_click_targets = len({str(getattr(ev, "target", "")) for ev in attempt_events
                                       if getattr(ev, "type", "") == "click" and bool(getattr(ev, "success", False))})
+        # V243R32: refilling a field that is already filled is not progress.
+        distinct_fill_targets = len({str(getattr(ev, "target", "")) for ev in attempt_events
+                                     if getattr(ev, "type", "") == "fill" and bool(getattr(ev, "success", False))})
         fill_complete = bool((getattr(page, "_hip_fill_complete", None) or {}).get(str(phase or self._active_phase_name or "")))
         route = ""
         try:
@@ -3243,7 +3246,8 @@ class BrowserSession:
             "successful_click_count": successful_clicks,
             "verified_node_count": verified_node_count,
             "distinct_click_target_count": distinct_click_targets,
-            "progress_units": verified_node_count + successful_fills + distinct_click_targets,
+            "distinct_fill_target_count": distinct_fill_targets,
+            "progress_units": verified_node_count + distinct_fill_targets + distinct_click_targets,
             # Every field of the phase is filled and verified: the attempt is finishing.
             "fill_complete": fill_complete,
             "dom_transition_count": len(self.dom_transition_records),
@@ -3253,8 +3257,18 @@ class BrowserSession:
             # the no-progress watchdog waits for the loading budget before it
             # hands over to the refresh / browser-restart ladder.
             **(await self._progress_marker_loader_state()),
+            # V243R32: a Whitelabel Error Page replaced the portal page.
+            "whitelabel_error": await self._whitelabel_state(page),
             "values_stored": False,
         }
+
+    async def _whitelabel_state(self, page: Any) -> Optional[Dict[str, Any]]:
+        try:
+            from .environment_faults import whitelabel_error_on
+
+            return await whitelabel_error_on(page)
+        except Exception:
+            return None
 
     async def _progress_marker_loader_state(self) -> Dict[str, Any]:
         try:
@@ -3489,6 +3503,27 @@ class BrowserSession:
             raise
 
     async def goto_base_and_complete_sso(self, target_url: Optional[str] = None) -> None:
+        """Reach the requested HIP module (see ``_goto_base_and_complete_sso_route``).
+
+        V243R32: when the portal answers with a Whitelabel Error Page instead of
+        the module, ``HIP_WHITELABEL_ERROR_PAGE`` is raised (also when routing
+        failed because of it), so recovery closes and reopens the browser and
+        opens the same phase link again.
+        """
+        from .environment_faults import whitelabel_error_on, whitelabel_message
+
+        try:
+            await self._goto_base_and_complete_sso_route(target_url)
+        except Exception as exc:
+            found = await whitelabel_error_on(getattr(self, "page", None))
+            if found and "HIP_WHITELABEL_ERROR_PAGE" not in str(exc):
+                raise RuntimeError(whitelabel_message(found, self._evidence_url(str(target_url or "")))) from exc
+            raise
+        found = await whitelabel_error_on(getattr(self, "page", None))
+        if found:
+            raise RuntimeError(whitelabel_message(found, self._evidence_url(str(target_url or ""))))
+
+    async def _goto_base_and_complete_sso_route(self, target_url: Optional[str] = None) -> None:
         """Reuse one authenticated session and reach the requested HIP module.
 
         Navigation is controlled by a bounded ReAct loop: plan from the validated

@@ -70,6 +70,6 @@ def test_registering_new_phase_reenables_log_flush(tmp_path: Path):
 
 
 def test_sso_prompt_counter_is_session_scoped():
-    source = inspect.getsource(BrowserSession.goto_base_and_complete_sso)
+    source = inspect.getsource(BrowserSession._goto_base_and_complete_sso_route)  # V243R32: routing body
     assert "self._sso_prompt_count += 1" in source
     assert "self._authenticated_once = True" in source

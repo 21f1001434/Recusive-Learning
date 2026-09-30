@@ -1,3 +1,18 @@
+## V243R32 — Stop filling once the form is complete; a Whitelabel Error restarts the stage (2026-09-30)
+
+- **It stops when everything is filled.**
+  - The live form is proved read-only against input.json. When every value is filled and committed, the agent stops, even if one of its own checks was not met.
+  - Refilling a field that is already filled is no longer "progress".
+  - After a correct fill, the form is no longer changed to explore other dropdown branches and then filled again. That behaviour is opt-in: `exploration.explore_branches_after_fill`.
+  - The watchdog probes a form that stopped gaining new fields and ends the attempt as complete. It stops a real refill loop.
+- **The completion proof reads every phase.** Transport Profile, BizFlow, Rule and Data Map fields sit in fieldsets, and "No" radios were dropped, so the R29 proof never passed on those phases. Now it does.
+- **Whitelabel Error Page:**
+  - seen mid-fill, on the phase link, or behind any error, it closes and reopens the browser, opens the same phase link and the form, and fills it from input.json;
+  - up to 3 times per phase, then the phase is held for you;
+  - operations are repeated only if nothing was saved yet.
+
+See `V243R32_STOP_WHEN_COMPLETE_AND_WHITELABEL_RESTART_20260930.md`. Apply with `APPLY_V243R32_IN_PLACE.ps1`; it includes R13–R31.
+
 ## V243R31 — Clone, Deploy and Migrate on every phase: performed, learned, remembered (2026-09-29)
 
 - **Deploy, whatever shape it has.** Deploy can open a menu, a dialog with a Target Environment field, or a confirmation that names the target. The agent sees which one opened, checks the requested environment is offered, acts once and verifies the listing. Otherwise:

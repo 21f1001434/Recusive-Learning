@@ -515,6 +515,11 @@ class PortalOperationRunner:
         self.edit_capture = bool(getattr(edit_cfg, "enabled", True)) and bool(getattr(edit_cfg, "capture_on_edit", True))
         self.block_read_only = bool(getattr(edit_cfg, "block_read_only_changes", True))
         self.verify_by_edit = bool(getattr(edit_cfg, "verify_by_reopening_edit", True))
+        # V243R32: a Whitelabel Error Page -> close/reopen the browser and perform the
+        # operation again from its listing (only when nothing was saved yet).
+        heal_cfg = getattr(config, "runtime_self_heal", None)
+        self.whitelabel_restarts = max(0, int(getattr(heal_cfg, "whitelabel_browser_restarts", 3) or 0))
+        self._commit_clicked = False
 
     # ------------------------------------------------------------------ helpers
     def _listing_url(self, phase: str) -> str:
@@ -535,6 +540,9 @@ class PortalOperationRunner:
         except Exception:
             pass
         await self.browser.wait_ready()
+        from .environment_faults import raise_if_whitelabel
+
+        await raise_if_whitelabel(page, url)
 
     async def _click_token(self, token: str, label: str, *, mutation: bool = False) -> None:
         page = await self._page()
@@ -1045,6 +1053,7 @@ class PortalOperationRunner:
         page = await self._page()
         before_url = page.url
         start_net = len(getattr(self.browser, "network_tab_events", []) or [])
+        self._commit_clicked = True  # V243R32: from here on the operation is never repeated
         self.browser.set_portal_mutation_authorization(enabled=True, allowed_labels=[*allowed, *confirm_labels], task_id=task_id)
         click_error = ""
         confirm: Dict[str, Any] = {}
@@ -1207,15 +1216,37 @@ class PortalOperationRunner:
         gate = operation_gate(allow_portal_mutation, confirmation)
         started = time.monotonic()
         report: Dict[str, Any] = {"schema_version": SCHEMA, "operations": [], "mutation_gate": gate}
+        restarts_left = self.whitelabel_restarts
         for index, spec in enumerate(specs, start=1):
-            try:
-                row = await self.run_one(spec, input_data, gate, index=index)
-            except Exception as exc:
-                from .environment_faults import is_environment_fatal
+            recoveries: List[Dict[str, Any]] = []
+            while True:
+                self._commit_clicked = False
+                error: Optional[BaseException] = None
+                try:
+                    row = await self.run_one(spec, input_data, gate, index=index)
+                except Exception as exc:
+                    from .environment_faults import is_environment_fatal
 
-                row = {"phase": spec.get("phase"), "operation": spec.get("operation"), "pass": False,
-                       "status": "error", "result": "FAILED", "error": mask_sensitive_string(str(exc))[:800],
-                       "environment_fault": is_environment_fatal(exc)}
+                    error = exc
+                    row = {"phase": spec.get("phase"), "operation": spec.get("operation"), "pass": False,
+                           "status": "error", "result": "FAILED", "error": mask_sensitive_string(str(exc))[:800],
+                           "environment_fault": is_environment_fatal(exc)}
+                if not row.get("pass") and await self._whitelabel_behind(error):
+                    # The portal answered with a Whitelabel Error Page (the error itself
+                    # may only say a field vanished or the page context was destroyed).
+                    row.update(status="whitelabel_error_page", environment_fault=True)
+                    if self._commit_clicked:
+                        # Save / Submit / Deploy was already clicked: its outcome is
+                        # unknown, so the operation is not repeated (check the listing).
+                        row["whitelabel_after_commit"] = True
+                    elif restarts_left > 0:
+                        restarts_left -= 1
+                        recoveries.append(await self._restart_after_whitelabel(spec, error or RuntimeError(row.get("error") or "")))
+                        if recoveries[-1].get("restarted"):
+                            continue
+                if recoveries:
+                    row["whitelabel_recoveries"] = recoveries
+                break
             report["operations"].append(row)
             if row.get("environment_fault"):
                 break
@@ -1225,6 +1256,31 @@ class PortalOperationRunner:
         report["seconds"] = round(time.monotonic() - started, 1)
         safe_write_json(self.run_dir / "portal_operations.json", mask_sensitive_data(report))
         return mask_sensitive_data(report)
+
+    async def _whitelabel_behind(self, error: Optional[BaseException]) -> bool:
+        from .environment_faults import WHITELABEL_CODE, whitelabel_error_on
+
+        if error is not None and WHITELABEL_CODE in str(error):
+            return True
+        try:
+            return bool(await whitelabel_error_on(getattr(self.browser, "page", None)))
+        except Exception:
+            return False
+
+    async def _restart_after_whitelabel(self, spec: Mapping[str, Any], exc: BaseException) -> Dict[str, Any]:
+        """V243R32: close and reopen the browser; the operation then starts again from its listing."""
+        record: Dict[str, Any] = {"phase": spec.get("phase"), "operation": spec.get("operation"),
+                                  "error": mask_sensitive_string(str(exc))[:300], "restarted": False}
+        restart = getattr(self.browser, "restart", None)
+        if not callable(restart):
+            record["reason"] = "browser session cannot restart"
+            return record
+        try:
+            info = await restart(reason=f"Whitelabel Error Page during {spec.get('operation')} {spec.get('phase')}: close and reopen the browser")
+            record.update(restarted=True, browser_restart=mask_sensitive_data(info if isinstance(info, dict) else {}))
+        except Exception as restart_exc:
+            record["reason"] = mask_sensitive_string(str(restart_exc))[:300]
+        return record
 
     async def run_one(self, spec: Mapping[str, Any], input_data: Mapping[str, Any], gate: Mapping[str, Any], *, index: int = 1) -> Dict[str, Any]:
         started = time.monotonic()

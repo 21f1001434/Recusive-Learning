@@ -999,6 +999,12 @@ async def execute_autonomous_phase_goal(
     cycles: List[Dict[str, Any]] = []
     last_shape = ""
     no_progress = 0
+    # V243R32: progress is a field proven for the first time or a form shape never
+    # seen before.  Refilling fields that were already proven is not progress --
+    # it had let a completely filled form be filled again for every cycle.
+    proven_ever: set = set()
+    shapes_seen: set = set()
+    stop_when_exact = bool(getattr(autonomous_cfg, "stop_when_input_json_exact", True))
     goal_values = _graph_goal_values(working_graph, section)
     goal_summary = ", ".join(f"{k}={v}" for k, v in goal_values.items() if "file" not in k)[:1600]
     understanding_engine = WebsiteUnderstandingEngine(config=config)
@@ -1597,6 +1603,15 @@ async def execute_autonomous_phase_goal(
                 cycle_audit["replay_novelty_error"] = mask_sensitive_string(str(exc))[:300]
             replay_outcome = {"replayed_skill_id": replay_skill.get("skill_id"), "novelty": novelty,
                               "replay_seconds": round(asyncio.get_running_loop().time() - run_started, 2)}
+        completion_proof: Dict[str, Any] = {}
+        if not success and stop_when_exact and not skills.replay_only:
+            # V243R32: the checks above were not all met, but the live form may
+            # already hold every input.json value.  Prove it read-only before
+            # anything is filled again.
+            completion_proof = await _input_json_exact_now(page, phase=phase, input_data=input_data)
+            cycle_audit["input_json_completion_proof"] = _proof_summary(completion_proof)
+            if completion_proof.get("pass"):
+                cycle_audit["status"] = "goal_achieved_input_json_exact"
         cycles.append(mask_sensitive_data(cycle_audit))
 
         if output_dir is not None:
@@ -1657,13 +1672,29 @@ async def execute_autonomous_phase_goal(
                 safe_write_json(output_dir / "autonomous_form_runtime.json", result)
             return mask_sensitive_data(result)
 
-        # Bounded anti-stagnation. A newly mounted/replaced control shape or a new
-        # successful transaction is progress; an identical shape with no success is not.
-        successful_now = sum(
-            1 for a in (full_result.get("attempts") or [])
+        if completion_proof.get("pass"):
+            result = _input_json_exact_result(
+                phase=phase, section=section, cycles=cycles, full_result=full_result, proof=completion_proof,
+                prior=all_prior, memory_audit=memory_audit, fast=fast,
+                seconds=round(asyncio.get_running_loop().time() - run_started, 2),
+            )
+            if output_dir is not None:
+                safe_write_json(output_dir / "autonomous_form_runtime.json", result)
+            return mask_sensitive_data(result)
+
+        # Bounded anti-stagnation (V243R32): a field proven for the first time or a
+        # control shape never seen before is progress; refilling proven fields and
+        # toggling between known shapes is not.
+        proven_now = {
+            str(a.get("node_id")) for a in (full_result.get("attempts") or [])
             if isinstance(a, dict) and a.get("success") is True
-        )
-        progressed = bool(shape_after != shape_before or shape_after != last_shape or successful_now)
+        }
+        newly_proven = proven_now - proven_ever
+        proven_ever |= proven_now
+        new_shape = shape_after not in (shapes_seen | {shape_before})
+        shapes_seen.update({shape_before, shape_after})
+        progressed = bool(newly_proven or new_shape)
+        cycles[-1]["progress"] = {"newly_proven_fields": len(newly_proven), "new_form_shape": new_shape}
         if fast:
             # The replay did not hold; the next cycles learn the form adaptively.
             fast = False
@@ -1860,6 +1891,80 @@ async def _complete_learning(
     restored_skill["learning_run"] = report
     restored["skill"] = restored_skill
     return restored
+
+
+async def _input_json_exact_now(page: Any, *, phase: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """V243R32: read-only proof that the live form holds exactly what input.json asks for."""
+    try:
+        from .environment_faults import raise_if_whitelabel
+        from .input_json_authority import prove_input_json_completion
+
+        await raise_if_whitelabel(page, f"{phase} form")
+        return await prove_input_json_completion(
+            page=page, phase=phase, phase_input=input_data if isinstance(input_data, dict) else {})
+    except Exception as exc:
+        raise_if_environment_fatal(exc)
+        return {"pass": False, "status": "proof_error", "error": mask_sensitive_string(str(exc))[:300]}
+
+
+def _proof_summary(proof: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "pass": bool(proof.get("pass")), "status": proof.get("status"),
+        "matched_count": proof.get("matched_count") or len(proof.get("matched_fields") or []),
+        "missing_fields": list(proof.get("missing_fields") or [])[:20],
+        "invalid_fields": list(proof.get("invalid_fields") or [])[:20],
+        "read_only": True,
+    }
+
+
+def _input_json_exact_result(
+    *, phase: str, section: Optional[str], cycles: List[Dict[str, Any]], full_result: Dict[str, Any],
+    proof: Dict[str, Any], prior: List[Dict[str, Any]], memory_audit: Dict[str, Any], fast: bool, seconds: float,
+) -> Dict[str, Any]:
+    """The goal is met: every input.json value is filled and committed on the live form (V243R32).
+
+    Some of the engine's own checks were not met (a late field error, a required
+    portal field input.json does not name, an unproven transaction), but the
+    live form already holds exactly what input.json asks for.  Filling it again
+    changes nothing, so the run stops here.  The executor's own flags are kept;
+    the proof that replaces them is named in ``verified_by``.
+    """
+    summary = _proof_summary(proof)
+    final = dict(full_result or {})
+    stage = dict(final.get("execution_stage_audit") or {}) if isinstance(final.get("execution_stage_audit"), dict) else {}
+    stage.update({
+        "executor_exact_execution_verified": stage.get("exact_execution_verified"),
+        "executor_authoritative_execution_verified": stage.get("authoritative_execution_verified"),
+        "exact_execution_verified": True,
+        "authoritative_execution_verified": True,
+        "verified_by": "input_json_live_read_only_proof",
+    })
+    final.update({
+        "pass": True, "status": "pass_input_json_exact", "execution_stage_audit": stage,
+        "executor_pass": bool((full_result or {}).get("pass")),
+        "input_json_completion_proof": summary,
+    })
+    return {
+        "schema_version": "hip.autonomous-form-runtime.v1",
+        "phase": phase,
+        "section": section or "",
+        "status": "pass",
+        "pass": True,
+        "goal_driven": True,
+        "adaptive": True,
+        "completed_by": "input_json_exact_on_live_form",
+        "stopped_filling": True,
+        "fixed_selectors_required": False,
+        "fixed_coordinates_required": False,
+        "cycles": cycles,
+        "final_execution": final,
+        "prior_attempts": prior,
+        "form_structure_memory": memory_audit,
+        "input_json_completion_proof": summary,
+        "execution_mode": "deterministic_replay" if fast else "adaptive_learning",
+        # A skill is saved only from a run whose own checks all held.
+        "skill": {"outcome": {"status": "not_saved", "reason": "completed by the live input.json proof"}, "seconds": seconds},
+    }
 
 
 def _unmet_success_checks(

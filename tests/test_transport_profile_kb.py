@@ -264,5 +264,8 @@ def test_transport_profile_invasive_dropdown_scan_runs_after_no_save_snapshot():
     from pathlib import Path
     source = Path("hip_id_agent/transport_profile_kb.py").read_text(encoding="utf-8")
     assert "after-fill no-save snapshot has already" in source
-    assert "post_fill_dropdowns = await _collect_dropdown_options(page, post_fill_controls)" in source
-    assert source.index("transport_profile_add_form_after_dummy_fill_no_save") < source.index("post_fill_dropdowns = await _collect_dropdown_options")
+    # V243R32: the invasive scan runs only when post-fill exploration is switched on;
+    # by default a filled form is not opened again (non-invasive capture instead).
+    assert "await _collect_dropdown_options(page, post_fill_controls) if explore_after_fill(self.config)" in source
+    assert "else _collect_dropdown_options_noninvasive(post_fill_controls)" in source
+    assert source.index("transport_profile_add_form_after_dummy_fill_no_save") < source.index("await _collect_dropdown_options(page, post_fill_controls)")

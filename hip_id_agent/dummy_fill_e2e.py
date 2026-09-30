@@ -63,8 +63,10 @@ from .mlflow_async import AsyncMLflowTracker
 from .replay_policy import replay_policy_engine_from_config
 from .run_history_learning import apply_lessons, lesson_value, run_history_learner_from_config
 from .input_json_authority import (
-    NOT_ELIGIBLE_CLASSES, accept_exact_phase, learning_review_needed, prove_input_json_completion, write_authority,
+    NOT_ELIGIBLE_CLASSES, accept_exact_phase, learning_review_needed, prove_input_json_completion, quiet_completion_probe,
+    write_authority,
 )
+from .environment_faults import whitelabel_error_on
 from .model_qualification import record_live_judge_truth
 from .mission_learning import close_mission_learning_loop
 from .judge_consensus import MultiModelJudgeConsensus
@@ -3135,6 +3137,15 @@ class FullDummyFillE2EFlow:
                 })
             return phase_exact_completion_checkpoint(phase_name, phase_dir)
 
+        async def _quiet_completion_probe(phase_name: str, phase_input_path: Path) -> Dict[str, Any]:
+            """V243R32: read-only, non-intrusive "is the form complete?" while the attempt runs."""
+            try:
+                payload = read_json_any(phase_input_path)
+                return await quiet_completion_probe(
+                    page=shared_browser.page, phase=phase_name, phase_input=payload if isinstance(payload, dict) else {})
+            except Exception as exc:
+                return {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
+
         async def _input_json_authority(
             phase_name: str,
             phase_dir: Path,
@@ -3410,6 +3421,10 @@ class FullDummyFillE2EFlow:
                                 # A blocking portal loader gets the loading budget, then
                                 # HIP_PORTAL_LOADING_STUCK -> refresh -> browser restart.
                                 blocking_wait_seconds=runtime_self_healer.watchdog_blocking_wait_seconds(),
+                                # V243R32: once every input.json value is filled, stop filling.
+                                completion_probe=lambda: _quiet_completion_probe(phase, input_path),
+                                refill_probe_seconds=float(getattr(self.config.runtime_self_heal, "refill_probe_seconds", 120.0) or 0.0),
+                                refill_loop_seconds=float(getattr(self.config.runtime_self_heal, "refill_loop_seconds", 600.0) or 0.0),
                             ),
                             phase=phase,
                             budget_seconds=remaining_phase_seconds,
@@ -3451,6 +3466,14 @@ class FullDummyFillE2EFlow:
                             message,
                             failure_kind="execution_exception",
                         )
+                        if classification not in {"unsafe_or_mutating", "dependency_contract_invalid"}:
+                            # V243R32: a Whitelabel Error Page replaced the form (the error
+                            # itself may only say the page context was destroyed).
+                            try:
+                                if await whitelabel_error_on(shared_browser.page):
+                                    classification = "whitelabel_error_page"
+                            except Exception:
+                                pass
                         checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
                         no_progress_after_exact = "HIP_PHASE_EXACT_STATE_POST_COMPLETION_STALL" in message
                         if (checkpoint.get("pass") is not True and classification not in NOT_ELIGIBLE_CLASSES
@@ -3466,6 +3489,8 @@ class FullDummyFillE2EFlow:
                         recovered_reporting_only = bool(
                             (classification == "reporting_only_failure" or no_progress_after_exact)
                             and checkpoint.get("pass") is True
+                            # V243R32: a Whitelabel Error Page replaced the form -- the stage restarts.
+                            and classification != "whitelabel_error_page"
                         )
 
                         if recovered_reporting_only:
@@ -3617,7 +3642,7 @@ class FullDummyFillE2EFlow:
                                             pass
                                     continue
                                 hold_reason = message
-                                if str(decision.reason or "").startswith(("HIP_PORTAL_LOADING_STUCK_AFTER_RECOVERY", "HIP_PHASE_STALL_AFTER_RECOVERY", "HIP_DROPDOWN_OPTIONS_EMPTY_AFTER_RECOVERY")):
+                                if str(decision.reason or "").startswith(("HIP_PORTAL_LOADING_STUCK_AFTER_RECOVERY", "HIP_PHASE_STALL_AFTER_RECOVERY", "HIP_DROPDOWN_OPTIONS_EMPTY_AFTER_RECOVERY", "HIP_WHITELABEL_ERROR_AFTER_RECOVERY")):
                                     hold_reason = f"{decision.reason}\n\nLast error: {message}"
                                 if self.options.hold_browser_on_incomplete_phase:
                                     hold = await _hold_incomplete_phase_for_human(
@@ -3647,6 +3672,14 @@ class FullDummyFillE2EFlow:
                     # misleading "section judge blocked" errors.  Recover from the
                     # earliest failed state instead: form/control/execution.
                     pre_judge_checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
+                    if pre_judge_checkpoint.get("pass") is not True:
+                        # V243R32: the executor's own record is incomplete, but the form
+                        # may already hold every input.json value.  Prove the live form
+                        # read-only before the phase is reopened and filled again.
+                        gate_authority = await _input_json_authority(
+                            phase, phase_dir, input_path, reason=f"attempt_{attempt_no}_pre_judge_gate")
+                        if gate_authority.get("pass"):
+                            pre_judge_checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
                     safe_write_json(phase_dir / f"pre_judge_exact_execution_gate_attempt_{attempt_no:02d}.json", pre_judge_checkpoint)
                     safe_write_json(phase_dir / "pre_judge_exact_execution_gate.json", pre_judge_checkpoint)
                     if pre_judge_checkpoint.get("pass") is not True:

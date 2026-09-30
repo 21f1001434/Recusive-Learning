@@ -1,3 +1,36 @@
+# V243R32 — Stop filling once the form is complete; a Whitelabel Error restarts the stage (2026-09-30)
+
+- A complete form is left alone:
+  - `portal_form_exploration.explore_after_fill` (`exploration.explore_branches_after_fill`, default false; `HIP_EXPLORE_BRANCHES_AFTER_FILL`): Transport Profile, BizFlow (tabs and routing), Rule and Data Map explore other branches read-only after the fill (`recorded_dropdowns`, no dropdown opened);
+  - `form_changed_by_exploration`: no restore refill or re-judge when nothing on the form changed.
+- `autonomous_form_runtime`:
+  - after a cycle whose checks were not all met, `_input_json_exact_now` proves the live form read-only; when exact, `_input_json_exact_result` returns `completed_by: input_json_exact_on_live_form` (`verified_by: input_json_live_read_only_proof`, executor flags kept, no skill saved) (`autonomous_form.stop_when_input_json_exact`);
+  - progress is a newly proven field or a never-seen form shape; refills are not progress.
+- `phase_live_reproof`:
+  - `_form_level_facts_relaxed`: facts whose section is the form title are matched on the whole active form (exact value still required; row facts strict);
+  - `_radio_group_answers`: a radio group's checked option.
+  - The proof now reads Transport Profile, BizFlow, Rule and Data Map forms (TP 14/14 on the replica; it was 1/14).
+- `phase_progress.run_with_progress_watchdog`:
+  - `completion_probe` + `refill_probe_seconds` (two exact read-only probes stop the attempt as complete);
+  - `refill_loop_seconds` (a refill loop goes to recovery);
+  - a Whitelabel marker ends the attempt at once.
+  - `input_json_authority.quiet_completion_probe` never opens, closes or blurs anything.
+- `browser_session`: progress units count distinct fill targets (refills add nothing); the marker reports `whitelabel_error`.
+- `dummy_fill_e2e`:
+  - the pre-judge gate proves the live form before reopening;
+  - the attempt watchdog gets the completion probe and refill limits;
+  - a Whitelabel page is recognised from the page and never taken for a finished form;
+  - `HIP_WHITELABEL_ERROR_AFTER_RECOVERY` holds the phase for a human.
+- Whitelabel Error Page:
+  - `environment_faults`: `WHITELABEL_CODE` (environment-fatal), `whitelabel_error_on`, `raise_if_whitelabel`;
+  - checked by `assert_active_surface`, `goto_base_and_complete_sso` (the routing body is now `_goto_base_and_complete_sso_route`) and the engine's proof.
+  - `runtime_self_heal`: class `whitelabel_error_page`, ladder family `whitelabel` = `restart_browser_session` × `whitelabel_browser_restarts` (3), each to the same phase link; the class is also taken from the live page whatever error surfaced.
+  - `portal_operations`: a Whitelabel page (named by the error, or seen on the live page after a failed operation) restarts the browser and repeats the operation from its listing, only before any Save / Deploy / confirm click (`whitelabel_after_commit` otherwise).
+- Tests:
+  - `tests/test_v243r32_stop_when_complete_and_whitelabel.py` (14);
+  - `tests/whitelabel_portal_support.py`;
+  - `tests/test_single_sso_browser_session_reuse.py` reads the routing body.
+
 # V243R31 — Clone, Deploy and Migrate on every phase: performed, learned, remembered (2026-09-29)
 
 - `portal_operations`:

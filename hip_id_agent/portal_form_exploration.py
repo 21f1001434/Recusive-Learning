@@ -305,6 +305,46 @@ class FormExplorationPolicy:
         )
 
 
+def explore_after_fill(config: Optional[AppConfig] = None) -> bool:
+    """V243R32: may the agent change a form that already holds every input.json value?
+
+    Branch exploration after the fill switched each parent dropdown to its other
+    values and then refilled the whole form -- on a completely filled form the
+    agent "kept on filling".  It is opt-in now
+    (``exploration.explore_branches_after_fill``); by default the other branches
+    are recorded read-only (catalog) and the filled form is not touched again.
+    """
+    exploration = getattr(config, "exploration", None)
+    env = os.getenv("HIP_EXPLORE_BRANCHES_AFTER_FILL")
+    if env not in {None, ""}:
+        return _truthy(env)
+    return bool(getattr(exploration, "explore_branches_after_fill", False))
+
+
+def recorded_dropdowns(controls: Sequence[Dict[str, Any]], max_dropdowns: int = 60) -> List[Dict[str, Any]]:
+    """Dropdown options the control capture already read -- no dropdown is opened (V243R32)."""
+    out: List[Dict[str, Any]] = []
+    for c in list(controls or [])[:max_dropdowns]:
+        if not isinstance(c, dict):
+            continue
+        options = [str(o.get("text") if isinstance(o, dict) else o) for o in (c.get("options") or [])]
+        options = [o for o in options if o.strip()]
+        if not options:
+            continue
+        out.append({"label": str(c.get("label") or c.get("name") or c.get("id") or ""), "selector": c.get("selector"),
+                    "kind": str(c.get("tag") or c.get("role") or "select"), "options": mask_sensitive_data(options),
+                    "source": "captured_without_opening"})
+    return out
+
+
+def form_changed_by_exploration(knowledge: Optional[Dict[str, Any]]) -> bool:
+    """True when exploration changed a value on the form (it then needs the target restored)."""
+    if not isinstance(knowledge, dict):
+        return False
+    completeness = knowledge.get("completeness") if isinstance(knowledge.get("completeness"), dict) else {}
+    return bool(int(completeness.get("parent_values_live_explored") or 0) or knowledge.get("restore_errors"))
+
+
 async def _live_snapshot(page: Page, *, phase: str, section: str, label: str) -> Dict[str, Any]:
     script = r"""
 ({phase, section, label}) => {

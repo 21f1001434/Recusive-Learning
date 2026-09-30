@@ -81,6 +81,10 @@ class RuntimeSelfHealController:
         # theirs -- only closing and reopening the browser helps; then the same
         # phase link is opened, the form opened and filled again.
         "dropdown_options_empty": ("restart_browser_session",),
+        # V243R32: a Spring "Whitelabel Error Page" instead of the portal page --
+        # close and reopen the browser, open the same phase link, reopen the form
+        # and fill it again from input.json.
+        "whitelabel_error_page": ("restart_browser_session",),
         "vision_loading_refresh_replay": ("reopen_phase_from_input", "recover_page_and_route"),
         "active_surface_lost": ("reopen_phase_from_input", "recover_page_and_route"),
         "control_not_found": ("refresh_evidence_and_reopen", "reopen_phase_from_input"),
@@ -154,6 +158,8 @@ class RuntimeSelfHealController:
         self.max_browser_restarts_per_phase = max(0, int(getattr(policy, "max_browser_restarts_per_phase", 1)))
         # V243R28: browser restarts a phase may use when its dropdowns list no values.
         self.empty_options_browser_restarts = max(1, int(getattr(policy, "empty_options_browser_restarts", 2) or 2))
+        # V243R32: browser restarts a phase may use when the portal shows a Whitelabel Error Page.
+        self.whitelabel_browser_restarts = max(1, int(getattr(policy, "whitelabel_browser_restarts", 3) or 3))
         self.learn_recovery_ladder = bool(getattr(policy, "learn_recovery_ladder", True))
         self._ladder_steps: Dict[str, List[str]] = {}
         self._ladder_pending: Dict[str, Dict[str, str]] = {}
@@ -224,6 +230,8 @@ class RuntimeSelfHealController:
             return "unsafe_or_mutating"
         if "hip_dropdown_options_empty" in joined:
             return "dropdown_options_empty"
+        if "hip_whitelabel_error_page" in joined or "whitelabel error page" in joined:
+            return "whitelabel_error_page"
         if "hip_auth_session_expired" in joined or (
             any(x in joined for x in ("login", "signin", "sso", "saml", "oauth"))
             and any(x in joined for x in ("expired", "redirected", "unauthenticated", "session"))
@@ -717,6 +725,7 @@ class RuntimeSelfHealController:
         "vision_loading_refresh_replay": "loader",
         "phase_no_progress": "stall",
         "dropdown_options_empty": "lists",
+        "whitelabel_error_page": "whitelabel",
     }
     STALL_LADDER: Sequence[str] = ("reopen_phase_from_input", "refresh_page_and_reopen", "restart_browser_session")
 
@@ -820,8 +829,9 @@ class RuntimeSelfHealController:
         """Next unused step of the phase's ladder (learned order, never fewer steps)."""
         family = self.LADDER_FAMILIES[classification]
         steps = list(self._ladder_steps.setdefault(f"{phase}|{family}", []))
-        if family == "lists":
-            ladder = ["restart_browser_session"] * self.empty_options_browser_restarts
+        if family in {"lists", "whitelabel"}:
+            restarts = self.empty_options_browser_restarts if family == "lists" else self.whitelabel_browser_restarts
+            ladder = ["restart_browser_session"] * restarts
             remaining = list(ladder)
             for used in steps:
                 if used in remaining:
@@ -881,6 +891,15 @@ class RuntimeSelfHealController:
             if key.startswith(f"{phase}|"):
                 done.extend(names.get(step, step) for step in steps)
         return ", ".join(done) if done else "no recovery step"
+
+    async def _whitelabel_on_page(self) -> Optional[Dict[str, Any]]:
+        """V243R32: the page the phase runs in shows a Whitelabel Error Page."""
+        try:
+            from .environment_faults import whitelabel_error_on
+
+            return await asyncio.wait_for(whitelabel_error_on(getattr(self.browser, "page", None)), timeout=5.0)
+        except Exception:
+            return None
 
     async def _blocking_loader_persists(self, samples: int = 3, interval_seconds: float = 0.75) -> Dict[str, Any]:
         """True only when a blocking portal loader is seen on every sample."""
@@ -1232,6 +1251,16 @@ class RuntimeSelfHealController:
             failure_kind=failure_kind,
             diagnosis=diagnosis,
         )
+        # V243R32: whatever error surfaced (a destroyed page context, a field that
+        # vanished ...), a Whitelabel Error Page in place of the form is the cause:
+        # close and reopen the browser and start the stage again.
+        if classification not in {"unsafe_or_mutating", "dependency_contract_invalid", "whitelabel_error_page"}:
+            whitelabel = await self._whitelabel_on_page()
+            if whitelabel:
+                from .environment_faults import whitelabel_message
+
+                classification = "whitelabel_error_page"
+                message = f"{whitelabel_message(whitelabel, phase)} (surfaced as: {message})"
         # Whatever error surfaced, a portal loading indicator that still blocks
         # the page when the attempt failed is the real cause: use the loader
         # ladder (refresh, then browser restart) instead of replaying the form
@@ -1240,6 +1269,7 @@ class RuntimeSelfHealController:
         if loader_probe.get("persistent") and classification not in {
             "authentication_expired", "unsafe_or_mutating", "dependency_contract_invalid",
             "portal_loading_stuck", "blocking_overlay", "vision_loading_refresh_replay", "reporting_only_failure",
+            "whitelabel_error_page",
         }:
             classification = "portal_loading_stuck"
             message = f"HIP_PORTAL_LOADING_STUCK (loader still blocking when the attempt failed): {message}"
@@ -1371,6 +1401,12 @@ class RuntimeSelfHealController:
                 "HIP_DROPDOWN_OPTIONS_EMPTY_AFTER_RECOVERY: the portal's dropdowns kept listing no values; "
                 f"automatic recovery already {self.ladder_summary(phase)} and reopened the form each time. "
                 "Check the portal (its lists / lookups), then press Resume."
+            )
+        elif family == "whitelabel":
+            reason = (
+                "HIP_WHITELABEL_ERROR_AFTER_RECOVERY: the portal kept answering with a Whitelabel Error Page; "
+                f"automatic recovery already {self.ladder_summary(phase)}, opened the same phase link and the form each time. "
+                "Check the portal (its server returned an error page), then press Resume."
             )
         elif family == "stall":
             reason = (

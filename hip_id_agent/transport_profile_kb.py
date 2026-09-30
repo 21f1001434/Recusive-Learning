@@ -24,7 +24,9 @@ from .security import mask_sensitive_data, mask_sensitive_string
 from .deployment_group_policy import resolve_transport_deployment_group
 from .safe_io import safe_write_json, safe_write_csv
 from .repeatable_rows import apply_repeatable_row_adds, build_repeatable_section_plan
-from .portal_form_exploration import run_portal_form_exploration, merge_section_knowledge
+from .portal_form_exploration import (
+    explore_after_fill, form_changed_by_exploration, merge_section_knowledge, run_portal_form_exploration,
+)
 from .upload_assets import attempt_upload_for_control
 from .dds_control_driver import active_form_root_info, assert_active_surface, close_open_dropdown, get_active_form_root, restore_filled_values, set_text_control as dds_set_text_control, select_dds_combobox, select_radio_value, set_checkbox_value, semantic_runtime_enabled, open_control_for_discovery
 from .phase_form_entry import ensure_phase_form_entry, find_same_page_top_right_add, same_page_add_candidate
@@ -4766,7 +4768,11 @@ class TransportProfileKBFlow:
                                     c2["recommended_value"] = dummy_values.get(key2, "")
                                 if c2.get("required"):
                                     required_fields.append(c2)
-                        post_fill_dropdowns = await _collect_dropdown_options(page, post_fill_controls)
+                        # V243R32: the form is complete -- by default no dropdown is opened any more.
+                        post_fill_dropdowns = (
+                            await _collect_dropdown_options(page, post_fill_controls) if explore_after_fill(self.config)
+                            else _collect_dropdown_options_noninvasive(post_fill_controls)
+                        )
                         dropdowns = _merge_dropdown_kb(dropdowns, post_fill_dropdowns)
                 except Exception as exc:
                     warnings.append(f"Post-fill dropdown capture skipped: {mask_sensitive_string(str(exc))}")
@@ -4783,34 +4789,39 @@ class TransportProfileKBFlow:
                         buttons=live_buttons, repeatable_plan=build_repeatable_section_plan(input_data, phase_name),
                         repeatable_audit=repeatable_row_audit,
                         output_dir=kb_dir.parent.parent / "portal_form_knowledge",
-                        config=self.config, allow_live_branching=True,
+                        config=self.config, allow_live_branching=explore_after_fill(self.config),
                     )
                     if exploration_knowledge.get("restore_errors") or str(exploration_knowledge.get("status") or "").startswith("failed"):
                         raise RuntimeError("Transport Profile exploration could not restore the target branch")
-                    if autonomous_phase_enabled(self.config, phase_name):
-                        autonomous_cfg = getattr(self.config, "autonomous_form", None)
-                        restored_autonomous = await execute_autonomous_phase_goal(
-                            page=page, graph=state_graph, phase=phase_name, input_data=input_data,
-                            config=self.config, output_dir=kb_dir / "autonomous_form_runtime_restore",
-                            prior_attempts=fill_attempts,
-                            max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
-                            repair=True, strict_live_execution=True,
-                        )
-                        restored_execution = autonomous_target_execution(restored_autonomous)
-                        _write_json(kb_dir / "transport_profile_autonomous_restore_execution.json", restored_autonomous)
+                    if not form_changed_by_exploration(exploration_knowledge):
+                        # V243R32: exploration only read the form; it still holds every
+                        # input.json value, so it is not filled a second time.
+                        exploration_knowledge["learning_order"] = "target branch filled once; other branches recorded read-only; form not refilled"
                     else:
-                        restored_execution = await execute_phase_state_graph(
-                            page, state_graph, phase=phase_name, max_retries=2, repair=True, prior_attempts=fill_attempts, strict_live_execution=True
-                        )
-                    _write_json(kb_dir / "transport_profile_post_exploration_restore_execution.json", restored_execution)
-                    if not restored_execution.get("pass"):
-                        raise RuntimeError("Transport Profile target path failed after exploratory branches")
-                    fill_attempts.extend(dict(a, execution_stage="post_exploration_restore") for a in restored_execution.get("attempts", []) if isinstance(a, dict))
-                    target_branch_execution = restored_execution
-                    target_branch_knowledge = build_target_branch_knowledge(state_graph, restored_execution)
-                    target_branch_knowledge["knowledge_file"] = str(target_knowledge_file)
-                    safe_write_json(target_knowledge_file, target_branch_knowledge)
-                    exploration_knowledge["learning_order"] = "target branch first; alternatives second; deterministic target restore last"
+                        if autonomous_phase_enabled(self.config, phase_name):
+                            autonomous_cfg = getattr(self.config, "autonomous_form", None)
+                            restored_autonomous = await execute_autonomous_phase_goal(
+                                page=page, graph=state_graph, phase=phase_name, input_data=input_data,
+                                config=self.config, output_dir=kb_dir / "autonomous_form_runtime_restore",
+                                prior_attempts=fill_attempts,
+                                max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
+                                repair=True, strict_live_execution=True,
+                            )
+                            restored_execution = autonomous_target_execution(restored_autonomous)
+                            _write_json(kb_dir / "transport_profile_autonomous_restore_execution.json", restored_autonomous)
+                        else:
+                            restored_execution = await execute_phase_state_graph(
+                                page, state_graph, phase=phase_name, max_retries=2, repair=True, prior_attempts=fill_attempts, strict_live_execution=True
+                            )
+                        _write_json(kb_dir / "transport_profile_post_exploration_restore_execution.json", restored_execution)
+                        if not restored_execution.get("pass"):
+                            raise RuntimeError("Transport Profile target path failed after exploratory branches")
+                        fill_attempts.extend(dict(a, execution_stage="post_exploration_restore") for a in restored_execution.get("attempts", []) if isinstance(a, dict))
+                        target_branch_execution = restored_execution
+                        target_branch_knowledge = build_target_branch_knowledge(state_graph, restored_execution)
+                        target_branch_knowledge["knowledge_file"] = str(target_knowledge_file)
+                        safe_write_json(target_knowledge_file, target_branch_knowledge)
+                        exploration_knowledge["learning_order"] = "target branch first; alternatives second; deterministic target restore last"
                     # Overwrite final evidence only after the graph has restored all
                     # requested parent/child values.
                     if await _looks_like_transport_profile_add_form(page) or _controls_look_like_transport_profile_add_form_controls(await _evaluate_controls(page)):

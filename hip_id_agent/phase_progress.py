@@ -39,6 +39,9 @@ async def run_with_progress_watchdog(
     poll_seconds: float = 5.0,
     recent_signature_limit: int = 12,
     blocking_wait_seconds: Optional[float] = None,
+    completion_probe: Optional[Callable[[], Any]] = None,
+    refill_probe_seconds: float = 120.0,
+    refill_loop_seconds: float = 600.0,
 ) -> Any:
     """Run ``operation`` while requiring new structural state within a time bound.
 
@@ -51,6 +54,15 @@ async def run_with_progress_watchdog(
     loading budget) before it stops the attempt, and reports
     ``HIP_PORTAL_LOADING_STUCK`` so recovery refreshes the page and, if that is
     not enough, restarts the browser instead of treating it as an agent stall.
+
+    V243R32 refill guard: filling fields that are already filled produces new
+    screens and executor heartbeats, so it looked like progress for ever.  The
+    loop-proof ``progress_units`` (distinct fields verified / filled / clicked)
+    decide instead: once they stop growing for ``refill_probe_seconds`` the
+    live form is probed read-only (``completion_probe``, never while a dropdown
+    is open); two exact probes in a row stop the attempt as complete.  When they
+    stop growing for ``refill_loop_seconds`` the attempt is a refill loop and is
+    stopped (exact -> complete, otherwise the stall recovery ladder).
     """
     task = asyncio.ensure_future(operation)
     started = time.monotonic()
@@ -74,6 +86,9 @@ async def run_with_progress_watchdog(
                 "dom_transition_count": int(row.get("dom_transition_count") or 0),
                 "executor_progress": str(row.get("executor_progress") or ""),
                 "blocking_loader": bool(row.get("blocking_loader")),
+                "progress_units": (int(row.get("progress_units") or 0) if "progress_units" in row else None),
+                "fill_complete": bool(row.get("fill_complete")),
+                "whitelabel_error": dict(row.get("whitelabel_error") or {}) if row.get("whitelabel_error") else None,
             }
             samples.append(clean)
             if len(samples) > 20:
@@ -106,11 +121,29 @@ async def run_with_progress_watchdog(
 
     loader_wait = max(threshold, float(blocking_wait_seconds or 0.0))
     loader_since: Optional[float] = None
+    # V243R32 refill guard state.
+    probe_after = max(poll, float(refill_probe_seconds or 0.0)) if refill_probe_seconds else None
+    refill_limit = max(threshold, float(refill_loop_seconds or 0.0)) if refill_loop_seconds else None
+    best_units = -1
+    units_since = started
+    exact_probes = 0
+    probes: list[Dict[str, Any]] = []
+
+    def units_progressed(row: Dict[str, Any], now: float) -> None:
+        nonlocal best_units, units_since, exact_probes
+        units = row.get("progress_units")
+        if units is None:
+            return
+        if int(units) > best_units:
+            best_units = int(units)
+            units_since = now
+            exact_probes = 0
 
     first = await sample()
     if first.get("signature"):
         recent.append(first["signature"])
     executor_progressed(first)
+    units_progressed(first, started)
     if first.get("blocking_loader"):
         loader_since = started
 
@@ -123,6 +156,24 @@ async def run_with_progress_watchdog(
             row = await sample()
             sig = str(row.get("signature") or "")
             now = time.monotonic()
+            if row.get("whitelabel_error"):
+                # V243R32: the portal replaced the page with a Whitelabel Error Page --
+                # nothing on it can be filled; the stage restarts in a fresh browser.
+                from .environment_faults import WHITELABEL_CODE, whitelabel_message
+
+                payload = {
+                    "schema_version": "hip.phase-no-progress-watchdog.v1", "phase": str(phase),
+                    "code": WHITELABEL_CODE, "stop_reason": "whitelabel_error_page",
+                    "whitelabel_error": row.get("whitelabel_error"),
+                    "elapsed_seconds": round(now - started, 3), "operation_cancelled": True,
+                    "message": whitelabel_message(row.get("whitelabel_error") or {}, f"{phase} (watchdog)").split(": ", 1)[1],
+                }
+                if evidence_path:
+                    safe_write_json(Path(evidence_path), payload)
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+                raise PhaseNoProgressError(WHITELABEL_CODE, payload)
             loader_blocking = bool(row.get("blocking_loader"))
             fills_before = max_fills
             heartbeat = executor_progressed(row)
@@ -149,8 +200,30 @@ async def run_with_progress_watchdog(
             else:
                 loader_since = None
 
+            units_progressed(row, now)
+            stop_reason = ""
+            refill_idle = now - units_since
+            if not loader_blocking and best_units >= 0:
+                if refill_limit is not None and refill_idle >= refill_limit:
+                    stop_reason = "refill_loop"
+                elif completion_probe is not None and probe_after is not None and refill_idle >= probe_after:
+                    try:
+                        probe = completion_probe()
+                        if inspect.isawaitable(probe):
+                            probe = await probe
+                        probe = dict(probe or {})
+                    except Exception as exc:
+                        probe = {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
+                    exact_probes = exact_probes + 1 if probe.get("pass") is True else 0
+                    probes.append({"at_seconds": round(now - started, 3), "pass": probe.get("pass") is True,
+                                   "status": str(probe.get("status") or "")[:80]})
+                    if len(probes) > 10:
+                        del probes[:-10]
+                    if exact_probes >= 2:
+                        stop_reason = "input_json_complete"
+
             no_progress_for = now - last_novel
-            if no_progress_for < (loader_wait if loader_blocking else threshold):
+            if not stop_reason and no_progress_for < (loader_wait if loader_blocking else threshold):
                 continue
 
             checkpoint: Dict[str, Any]
@@ -172,6 +245,10 @@ async def run_with_progress_watchdog(
                 "schema_version": "hip.phase-no-progress-watchdog.v1",
                 "phase": str(phase),
                 "code": code,
+                "stop_reason": stop_reason or ("loader" if loader_stuck else "no_new_state"),
+                "seconds_without_new_field": round(refill_idle, 3),
+                "progress_units": best_units,
+                "completion_probes": probes[-5:],
                 "exact_completion_checkpoint_pass": bool(exact),
                 "elapsed_seconds": round(now - started, 3),
                 "no_progress_seconds": round(no_progress_for, 3),
@@ -187,9 +264,15 @@ async def run_with_progress_watchdog(
                 "marker_errors": marker_errors[-5:],
                 "operation_cancelled": True,
                 "message": (
+                    "Every input.json value is filled and committed on the live form; the agent was still filling "
+                    "fields that were already filled -- stopped filling and continuing to read-only verification."
+                    if exact and stop_reason else
                     "Exact phase state was already proven, but post-completion work stopped making progress; "
                     "cancel reporting/exploration and continue to read-only verification."
                     if exact else
+                    f"Fields were filled again for {round(refill_idle)}s without a new field being verified "
+                    "(a refill loop); stop this attempt and enter deterministic recovery."
+                    if stop_reason == "refill_loop" else
                     f"The Dell portal's loading indicator stayed blocking for {round(now - (loader_since or now))}s; "
                     "refresh the page, and restart the browser if it is still loading, then resume the phase from input.json."
                     if loader_stuck else

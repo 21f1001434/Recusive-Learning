@@ -155,6 +155,11 @@ class ExplorationConfig(BaseModel):
     settle_ms: int = 700
     use_llm_dependency_analyst: bool = True
     fail_closed_on_restore_error: bool = False
+    # V243R32: once the form holds every input.json value the agent stops.  Live
+    # branch exploration after the fill (switching parent dropdowns to other
+    # values, then refilling the whole form) is opt-in; by default the other
+    # branches are recorded read-only and the filled form is left untouched.
+    explore_branches_after_fill: bool = False
     safe_action_keywords: List[str] = Field(default_factory=lambda: ["view", "show", "details", "detail", "open", "edit", "partners", "domains", "systems", "users", "biz flows", "deployment groups"])
     unsafe_action_keywords: List[str] = Field(default_factory=lambda: ["delete", "remove", "update", "save", "submit", "create", "add", "reset", "disable", "enable", "archive"])
 
@@ -295,6 +300,10 @@ class AutonomousFormConfig(BaseModel):
     apply_to_all_form_phases: bool = True
     max_adaptive_cycles: int = 5
     no_progress_cycle_limit: int = 2
+    # V243R32: after a cycle that did not meet every check, the live form is proved
+    # read-only against input.json; when every value is filled and committed the
+    # goal is achieved and nothing is filled again.
+    stop_when_input_json_exact: bool = True
     use_autowebglm_live_observation: bool = True
     use_dell_aia_binding_advisor_on_ambiguity: bool = True
     rediscover_controls_before_every_action: bool = True
@@ -351,6 +360,15 @@ class RuntimeSelfHealConfig(BaseModel):
     no_progress_watchdog_seconds: float = 90.0
     no_progress_poll_seconds: float = 5.0
     no_progress_recent_signature_limit: int = 12
+    # V243R32: stop filling once the form is complete.  With no newly verified
+    # field for refill_probe_seconds the live form is probed read-only; two exact
+    # probes stop the attempt as complete.  refill_loop_seconds without a new
+    # field while still filling is a refill loop (stopped, then recovered).
+    refill_probe_seconds: float = 120.0
+    refill_loop_seconds: float = 600.0
+    # V243R32: a Spring "Whitelabel Error Page" -> close and reopen the browser,
+    # open the same phase link and the form again, fill from input.json.
+    whitelabel_browser_restarts: int = 3
     # V243R18: when the portal itself keeps a blocking loader up, first refresh
     # the page, then close and reopen the browser (same profile, SSO kept), and
     # resume the phase from input.json.  Human review only after these steps.

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path, PureWindowsPath
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 from .section_judge import build_phase_expectation, DualModelSectionJudge
 from .stateful_form_runtime import capture_stateful_controls, compile_phase_state_graph
@@ -140,6 +140,64 @@ async def _live_file_proof(page: Any, uploads: List[Dict[str, Any]]) -> Dict[str
     }
 
 
+def _radio_group_answers(controls: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """One control per radio group: its label and the checked option's label (V243R32)."""
+    groups: Dict[tuple, Dict[str, Any]] = {}
+    for c in controls:
+        if not isinstance(c, dict) or str(c.get("type") or "").lower() != "radio" or not isinstance(c.get("checked"), bool):
+            continue
+        label = str(c.get("group_label") or "").strip()
+        if not label:
+            continue
+        key = (label, str(c.get("group_name") or c.get("name") or ""), str(c.get("section") or ""),
+               str(c.get("row_kind") or ""), c.get("row_index"))
+        row = groups.setdefault(key, {
+            "label": label, "type": "radio_group", "role": "radiogroup", "value": "", "selected_values": [],
+            "section": c.get("section"), "row_kind": c.get("row_kind"), "row_index": c.get("row_index"),
+            "framework_key": c.get("framework_key"), "group_name": c.get("group_name"), "disabled": False,
+            "source": "radio_group_checked_option",
+        })
+        if c.get("checked"):
+            row["value"] = str(c.get("label") or "").strip()
+            row["selected_values"] = [row["value"]]
+    return [g for g in groups.values() if g["value"]]
+
+
+def _norm_section(value: Any) -> str:
+    return " ".join(str(value or "").replace(":", " ").split()).strip().lower()
+
+
+def _form_level_facts_relaxed(
+    expected: Dict[str, Any], controls: Sequence[Dict[str, Any]], deterministic: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Missing scalar facts whose section is the form's own title, matched on the whole form (V243R32).
+
+    The form title is the section most scalar facts share; controls directly
+    under it carry it, controls in its fieldsets carry the fieldset's name --
+    both are on that form.  Only facts the strict match missed are relaxed, the
+    committed value must still be exactly equal, and row facts (row kind / row
+    index) always keep their strict section match.
+    """
+    facts = [f for f in (expected.get("facts") or []) if isinstance(f, dict)]
+    scalar = [f for f in facts if not f.get("row_kind") and f.get("row_index") is None and _norm_section(f.get("section"))]
+    if not scalar:
+        return None
+    counts: Dict[str, int] = {}
+    for f in scalar:
+        counts[_norm_section(f.get("section"))] = counts.get(_norm_section(f.get("section")), 0) + 1
+    title = max(counts, key=lambda k: counts[k])
+    missing = {str(x.get("field")) for x in deterministic.get("missing_values") or [] if isinstance(x, dict)}
+    changed = False
+    relaxed: List[Dict[str, Any]] = []
+    for f in facts:
+        if (f in scalar and _norm_section(f.get("section")) == title and str(f.get("field")) in missing):
+            relaxed.append(dict(f, section="", section_aliases=[], form_level_section=f.get("section")))
+            changed = True
+        else:
+            relaxed.append(f)
+    return dict(expected, facts=relaxed) if changed else None
+
+
 async def live_read_only_phase_reproof(
     *,
     page: Any,
@@ -174,7 +232,9 @@ async def live_read_only_phase_reproof(
     uploads = _upload_nodes(phase_input if isinstance(phase_input, dict) else {}, phase)
     expected_for_fields = _without_upload_facts(expected, uploads)
     actual_state = {
-        "controls": controls,
+        # V243R32: a radio group answers with its checked option ("Existing
+        # Account" -> "Yes"); a checked "No" radio was dropped as a false value.
+        "controls": [*controls, *_radio_group_answers(controls)],
         "row_counts": _row_counts(controls),
         "visible_text": "",
         "source": "current_live_browser_stateful_controls",
@@ -184,6 +244,20 @@ async def live_read_only_phase_reproof(
         actual_state=actual_state,
         attempts=[],
     )
+    relaxed_fields: List[str] = []
+    if deterministic.get("missing_values"):
+        # V243R32: form-level facts carry the form title as their section
+        # ("Create Transport Profile") while the live controls carry their
+        # fieldset ("Basic Details :"), so every field looked missing on Transport
+        # Profile, BizFlow, Rule and Data Map.  Such facts are matched on the
+        # whole active form -- still by label and exact committed value.
+        relaxed_expected = _form_level_facts_relaxed(expected_for_fields, controls, deterministic)
+        if relaxed_expected is not None:
+            again = deterministic_judge.deterministic_judge(expected=relaxed_expected, actual_state=actual_state, attempts=[])
+            before = {str(x.get("field")) for x in deterministic.get("missing_values") or [] if isinstance(x, dict)}
+            after = {str(x.get("field")) for x in again.get("missing_values") or [] if isinstance(x, dict)}
+            relaxed_fields = sorted(before - after)
+            deterministic = again
     upload_proof = await _live_file_proof(page, uploads)
     invalid_fields = sorted({
         str(c.get("label") or c.get("framework_key") or c.get("semantic_key") or "control")
@@ -204,6 +278,7 @@ async def live_read_only_phase_reproof(
         "missing_fields": [str(x.get("field") or "") for x in (deterministic.get("missing_values") or []) if isinstance(x, dict)],
         "row_issue_fields": [str(x.get("field") or "") for x in (deterministic.get("row_issues") or []) if isinstance(x, dict)],
         "invalid_fields": invalid_fields,
+        "form_level_section_matched_fields": relaxed_fields,
         "actual_control_count": int(deterministic.get("actual_control_count") or len(controls)),
         "row_counts": actual_state["row_counts"],
         "required_upload_proof": upload_proof,
