@@ -69,11 +69,12 @@ The page's tool list is also given to the model's live observation, and recorded
   - `--phases`: which phase links to open;
   - `--url`: open a given URL instead;
   - `--call <tool> --args '{…}'`: call one tool; a mutating tool also needs the gate.
+  - `--browser-executable <chromium>`: a local check with a plain browser session and no MCP servers; leave it empty on the Dell machine.
 - **Control Center:** a *WebMCP tools* tile and `GET /api/webmcp` show the policy and the page tools the latest run found (or which page tool filled the form).
 
 ## Proof
 
-Tests in `tests/test_v243r33_webmcp.py` (9). New replicas are in `tests/webmcp_portal_support.py`: a Transport Profile page with its own tools, a declarative form page, and a stand-in for Chrome's native API.
+Tests in `tests/test_v243r33_webmcp.py` (10). New replicas are in `tests/webmcp_portal_support.py`: a Transport Profile page with its own tools, a declarative form page, and a stand-in for Chrome's native API.
 
 - **The page's `fill_transport_profile_form`:**
   - one call filled the form, and the proof matched 14 of 14 values;
@@ -90,6 +91,7 @@ Tests in `tests/test_v243r33_webmcp.py` (9). New replicas are in `tests/webmcp_p
 - **Native WebMCP:** the stand-in `navigator.modelContextTesting` is used (no polyfill), and page tools come from it.
 - **In-page tools:** page state (tabs; the Whitelabel page), read form, fill text, form matches (matched / missing) and open tab all work.
 - **Every page:** the layer is on every page of a real browser session, also after a restart.
+- **CLI:** `webmcp-tools` on the replica lists the page's three tools and the agent's five (polyfill), calls the read-only tool, and refuses `save_transport_profile` without the gate.
 
 ## Settings (all have defaults)
 

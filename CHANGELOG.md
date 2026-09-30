@@ -16,11 +16,11 @@
   - WebMCP pre-pass before the first cycle, followed by the live input.json proof; exact gives `completed_by: webmcp_page_tool_then_input_json_proof`;
   - otherwise the cycles complete the form;
   - the page tool list goes to the AutoWebGLM observation and the cycle audit.
-- CLI `webmcp-tools` (`--phases`, `--url`, `--call`, `--args`, `--allow-portal-mutation` / `--confirmation`).
+- CLI `webmcp-tools` (`--phases`, `--url`, `--call`, `--args`, `--allow-portal-mutation` / `--confirmation`, and `--browser-executable` for a local check).
 - Backend `GET /api/webmcp`; runtime status `webmcp`; Control Center tile *WebMCP tools*.
 - Config `webmcp` section (`HIP_WEBMCP=off` switches it off).
 - Tests:
-  - `tests/test_v243r33_webmcp.py` (9);
+  - `tests/test_v243r33_webmcp.py` (10);
   - `tests/webmcp_portal_support.py`: a Transport Profile page with its own tools, a declarative form page, and a native `modelContextTesting` stand-in.
 
 # V243R32 — Stop filling once the form is complete; a Whitelabel Error restarts the stage (2026-09-30)

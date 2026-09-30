@@ -1920,6 +1920,7 @@ def webmcp_tools_cmd(
     headless: Optional[bool] = typer.Option(None, "--headless/--headed", help="Override config.portal.headless."),
     allow_portal_mutation: bool = typer.Option(False, help="A mutating tool (save / submit / deploy ...) also needs the environment gate and phrase."),
     confirmation: str = typer.Option("", help=f"With --allow-portal-mutation: {MUTATION_CONFIRMATION}"),
+    browser_executable: str = typer.Option("", "--browser-executable", help="Local check only: this Chromium, a plain Playwright session without MCP servers. Leave empty on the Dell machine."),
 ):
     """V243R33: list the WebMCP tools each HIP page offers (navigator.modelContext) and optionally call one.
 
@@ -1939,6 +1940,15 @@ def webmcp_tools_cmd(
         cfg.reporting.runs_dir = runs_dir
     if headless is not None:
         cfg.portal.headless = headless
+    if browser_executable:
+        cfg.portal.chromium_channel = None
+        cfg.portal.chrome_executable_path = browser_executable
+        cfg.mcp.browser_backend = "playwright"
+        for name in ("use_playwright_mcp", "use_chrome_devtools_mcp", "use_pyautogui_mcp", "require_playwright_mcp", "require_chrome_devtools_mcp"):
+            if hasattr(cfg.mcp, name):
+                setattr(cfg.mcp, name, False)
+        if getattr(cfg, "browser_use", None) is not None:
+            cfg.browser_use.enabled = False
     if url:
         urls = {"page": url}
     else:

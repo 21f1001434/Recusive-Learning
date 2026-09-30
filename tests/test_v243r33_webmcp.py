@@ -291,6 +291,34 @@ def test_every_browser_page_gets_webmcp_also_after_a_restart(tmp_path: Path):
     assert before == after == ["fill_transport_profile_form", "get_deployment_groups", "save_transport_profile"]
 
 
+def test_the_webmcp_tools_command_lists_calls_and_refuses_a_save_without_the_gate(tmp_path: Path, monkeypatch):
+    _need_browser()
+    from typer.testing import CliRunner
+
+    from hip_id_agent.cli import app
+    from phase_replica_support import ROOT, chromium_path
+    from webmcp_portal_support import tp_page
+
+    url = tp_page(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config.yaml").write_text((ROOT / "config.yaml").read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setenv("COLUMNS", "220")
+    runner = CliRunner()
+    base = ["webmcp-tools", "--url", url, "--headless", "--browser-executable", chromium_path(), "--runs-dir", str(tmp_path / "runs")]
+    listed = runner.invoke(app, [*base, "--call", "get_deployment_groups", "--args", '{"profileUsage": "Sender"}'])
+    assert listed.exit_code == 0, listed.output
+    saved = runner.invoke(app, [*base, "--call", "save_transport_profile"])
+    assert saved.exit_code == 0, saved.output
+    reports = sorted((tmp_path / "runs").glob("HIP-WEBMCP-*/webmcp_tools.json"))
+    first, second = [json.loads(r.read_text(encoding="utf-8")) for r in reports]
+    page = first["pages"][0]
+    assert page["layer"]["polyfilled"] is True and page["page_tool_count"] == 3
+    assert {t["name"]: t["classification"] for t in page["tools"]}["save_transport_profile"] == "mutating"
+    assert page["call"]["text"] == '["da-sender-sftphaft-dce-shared"]'
+    assert second["pages"][0]["call"]["refused"].startswith("HIP_WEBMCP_MUTATING_TOOL_BLOCKED")
+    assert "fill_transport_profile_form" in listed.output and "mutating" in listed.output
+
+
 # ------------------------------------------------------------- units
 def test_tool_classification_fails_closed():
     cases = {
