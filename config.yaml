@@ -861,6 +861,21 @@ production_e2e:
   write_final_summary: true
   final_summary_filename: "production_final_summary.json"
 
+webmcp:
+  # V243R33: WebMCP (navigator.modelContext) -- tools a page offers an agent.
+  # Native when the browser has it, otherwise a polyfill on every page; plus the
+  # agent's own in-page tools. A page's form-edit tool that covers input.json
+  # fills the form in one call; the live input.json proof decides. Mutating page
+  # tools (save/submit/deploy ...) need the mutation gate and are never used to fill.
+  enabled: true
+  inject_polyfill: true
+  agent_tools: true
+  use_page_tools_for_fill: true
+  min_input_coverage: 0.6
+  tool_timeout_seconds: 20
+  max_calls_per_phase: 20
+  settle_ms: 400
+
 edit_sections:
   # V243R30: every phase's Edit section (listing -> search -> expand -> Edit) is
   # read completely (every tab, collapsed section and row), closed unsaved and

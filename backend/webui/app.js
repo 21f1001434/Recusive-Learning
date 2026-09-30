@@ -686,6 +686,15 @@ async function refreshStatus() {
         ? known.slice(0,2).map(p=>`${p.title||p.phase}: ${p.fields||0} fields${(p.tabs||[]).length?`, ${p.tabs.length} tabs`:""}`).join(" • ") + (actLine?` • ${actLine}`:"")
         : (actLine || "learn-action-sections, or ask: capture the edit values of <object>");
     }
+    if ($("webmcpMetric")) {
+      // V243R33: tools the portal pages offer through WebMCP (navigator.modelContext).
+      const wm=runtime.webmcp||{};
+      const last=wm.last;
+      $("webmcpMetric").textContent = wm.enabled===false ? "Off" : (last ? `${last.page_tools||0} page tools` : "On");
+      $("webmcpDetail").textContent = wm.enabled===false ? "WebMCP disabled" : (last
+        ? (last.filled_by_page_tool ? `filled by ${last.tool_used}` : ((last.tools||[]).slice(0,3).map(t=>`${t.name} (${t.kind})`).join(" • ") || `none on ${last.phase||"the page"}`))
+        : "native or polyfill; + agent in-page tools");
+    }
     if ($("recursiveMetric")) {
       $("recursiveMetric").textContent = !ri.enabled ? "Off" : `Cycle ${ri.cycle||0}`;
       $("recursiveDetail").textContent = ri.enabled ? `best ${Number(ri.best_reward||0).toFixed(3)} • plateau ${ri.plateau_count||0}` : "recursive improvement disabled";

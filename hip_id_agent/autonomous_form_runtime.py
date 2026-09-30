@@ -1124,6 +1124,38 @@ async def execute_autonomous_phase_goal(
 
     total_cycles = 1 if skills.replay_only else max_cycles + (1 if fast else 0)
     replay_outcome: Dict[str, Any] = {}
+    # V243R33: WebMCP -- when the page offers a form-edit tool that takes this
+    # phase's input.json values, one call fills the form; the live input.json
+    # proof decides whether the goal is met (otherwise the cycles fill the rest).
+    webmcp_audit: Dict[str, Any] = {}
+    if not skills.replay_only:
+        try:
+            from .webmcp import fill_with_page_tools
+
+            webmcp_audit = await fill_with_page_tools(
+                page, phase=phase, leaves=scoped_input_leaves, config=config, output_dir=output_dir)
+        except Exception as exc:
+            raise_if_environment_fatal(exc)
+            webmcp_audit = {"filled": False, "error": mask_sensitive_string(str(exc))[:300]}
+        if webmcp_audit.get("filled"):
+            webmcp_proof = await _input_json_exact_now(page, phase=phase, input_data=input_data, section=section)
+            webmcp_audit["input_json_completion_proof"] = _proof_summary(webmcp_proof)
+            if webmcp_proof.get("pass"):
+                cycle_zero = {"cycle": 0, "mode": "webmcp_page_tool", "section": section or "", "status": "goal_achieved_input_json_exact",
+                              "webmcp": mask_sensitive_data(webmcp_audit)}
+                result = _input_json_exact_result(
+                    phase=phase, section=section, cycles=[cycle_zero], prior=all_prior, memory_audit=memory_audit, fast=False,
+                    full_result={"pass": True, "attempts": [], "execution_stage_audit": {"executed_by": "webmcp_page_tool"}},
+                    proof=webmcp_proof, seconds=round(asyncio.get_running_loop().time() - run_started, 2),
+                )
+                result.update({"completed_by": "webmcp_page_tool_then_input_json_proof", "execution_mode": "webmcp_page_tool",
+                               "webmcp": mask_sensitive_data(webmcp_audit)})
+                if output_dir is not None:
+                    safe_write_json(output_dir / "autonomous_form_runtime.json", result)
+                return mask_sensitive_data(result)
+    page_tools = [t for t in (webmcp_audit.get("tools") or []) if t.get("source") != "hip-agent"]
+    webmcp_hint = ("; page WebMCP tools: " + ", ".join(f"{t.get('name')} ({t.get('classification')})" for t in page_tools[:12])
+                   if page_tools else "")
     for cycle in range(1, total_cycles + 1):
         cycle_started = asyncio.get_running_loop().time()
         stage_seconds: Dict[str, float] = {}
@@ -1205,7 +1237,7 @@ async def execute_autonomous_phase_goal(
             "shape_before": shape_before,
             "bindings_before": _binding_summary(controls_before, working_graph, section),
             "autowebglm_observation": (
-                await _observe_autowebglm(page, phase=phase, cycle=cycle, goal=goal_summary)
+                await _observe_autowebglm(page, phase=phase, cycle=cycle, goal=goal_summary + webmcp_hint)
                 if use_autowebglm_observation and not fast else
                 {"available": False, "reason": "deterministic replay of a certified skill" if fast
                  else "disabled by autonomous_form.use_autowebglm_live_observation"}
@@ -1213,6 +1245,9 @@ async def execute_autonomous_phase_goal(
             "adaptive_hints": [],
             "file_attempts": [],
         }
+        if cycle == 1 and webmcp_audit:
+            # V243R33: what the page offers through WebMCP, and whether a page tool filled first.
+            cycle_audit["webmcp"] = mask_sensitive_data({k: v for k, v in webmcp_audit.items() if k != "candidates"})
         if gate.get("fatal"):
             cycle_audit["status"] = "surface_lost"
             cycles.append(cycle_audit)

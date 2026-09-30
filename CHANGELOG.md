@@ -1,3 +1,28 @@
+# V243R33 — WebMCP: the tools a page offers the agent help complete the task (2026-09-30)
+
+- New `hip_id_agent/webmcp.py`:
+  - `WEBMCP_INIT_JS`, added to every page before its own scripts:
+    - native `navigator.modelContext` / `modelContextTesting` when the browser has them (tools mirrored), otherwise a standards-shaped polyfill (`provideContext`, `registerTool`, `unregisterTool`, `clearContext`);
+    - declarative `<form toolname>` read as tools (parameters, titles, descriptions, enums, required; a placeholder option is left out);
+    - declarative calls fill the fields and never submit unless the tool is called as mutating with the gate.
+  - `HIP_AGENT_TOOLS_JS`: the agent's private in-page tools `hip_page_state`, `hip_read_form`, `hip_form_matches`, `hip_open_tab`, `hip_fill_text`.
+  - `classify_tool`: read_only / navigation / form_edit / mutating (fail closed).
+  - `call_tool` refuses mutating tools without the three-part mutation gate (`HIP_WEBMCP_MUTATING_TOOL_BLOCKED`).
+  - `map_input_to_tool`: by name or title, rows onto array parameters, the page's own enum spelling, booleans and numbers.
+  - `fill_with_page_tools`: one call of the best form-edit tool (required parameters given, coverage ≥ `min_input_coverage`); `webmcp_page_tools.json` is value-free.
+  - `probe_pages`.
+- `browser_session.start` installs the layer on the context (so after `restart` too).
+- `autonomous_form_runtime`:
+  - WebMCP pre-pass before the first cycle, followed by the live input.json proof; exact gives `completed_by: webmcp_page_tool_then_input_json_proof`;
+  - otherwise the cycles complete the form;
+  - the page tool list goes to the AutoWebGLM observation and the cycle audit.
+- CLI `webmcp-tools` (`--phases`, `--url`, `--call`, `--args`, `--allow-portal-mutation` / `--confirmation`).
+- Backend `GET /api/webmcp`; runtime status `webmcp`; Control Center tile *WebMCP tools*.
+- Config `webmcp` section (`HIP_WEBMCP=off` switches it off).
+- Tests:
+  - `tests/test_v243r33_webmcp.py` (9);
+  - `tests/webmcp_portal_support.py`: a Transport Profile page with its own tools, a declarative form page, and a native `modelContextTesting` stand-in.
+
 # V243R32 — Stop filling once the form is complete; a Whitelabel Error restarts the stage (2026-09-30)
 
 - A complete form is left alone:

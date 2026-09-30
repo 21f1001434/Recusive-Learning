@@ -1,3 +1,12 @@
+## V243R33 — WebMCP: the tools a page offers the agent help complete the task (2026-09-30)
+
+- **WebMCP on every page.** Pages can offer tools to agents through `navigator.modelContext`: registered tools, or forms marked `toolname`. The agent uses Chrome's native WebMCP when it is there, and otherwise a polyfill. It also has its own in-page tools: page state (including the Whitelabel page), read form, form matches, open tab, fill text.
+- **Page tools complete the task.** When a page offers a fill tool that takes the phase's input.json values, one call fills the form, mapped onto the page's own option spellings. The live input.json proof then decides: exact means done (about 4 s instead of about 30 s on the replica); otherwise the normal fill finishes and corrects it.
+- **Safe.** Save / submit / deploy tools, auto-submitting forms and unknown tools are mutating: they need the three-part mutation gate and are never used to fill.
+- **See what a page offers:** `python -m hip_id_agent.cli webmcp-tools`, the Control Center *WebMCP tools* tile, and `GET /api/webmcp`.
+
+See `V243R33_WEBMCP_TOOLS_HELP_COMPLETE_THE_TASK_20260930.md`. Apply with `APPLY_V243R33_IN_PLACE.ps1`; it includes R13–R32.
+
 ## V243R32 — Stop filling once the form is complete; a Whitelabel Error restarts the stage (2026-09-30)
 
 - **It stops when everything is filled.**

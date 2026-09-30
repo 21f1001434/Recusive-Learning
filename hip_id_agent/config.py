@@ -864,6 +864,28 @@ class EditSectionsConfig(BaseModel):
     verify_by_reopening_edit: bool = True
 
 
+class WebMCPConfig(BaseModel):
+    """V243R33: WebMCP -- tools a web page offers an agent (``navigator.modelContext``).
+
+    The native API is used when the browser has it; otherwise a standards-shaped
+    polyfill is added to every page so a page that registers tools can be used.
+    The agent adds its own in-page tools (page state, read form, form matches,
+    open tab, fill text).  A page's form-edit tool that covers input.json fills
+    the form in one call; the live input.json proof decides whether it is done.
+    Mutating page tools (save / submit / deploy ...) need the mutation gate and
+    are never called by a fill.
+    """
+    enabled: bool = True
+    inject_polyfill: bool = True
+    agent_tools: bool = True
+    use_page_tools_for_fill: bool = True
+    # Share of the phase's input.json values a page tool must take to be used.
+    min_input_coverage: float = 0.6
+    tool_timeout_seconds: float = 20.0
+    max_calls_per_phase: int = 20
+    settle_ms: int = 400
+
+
 class RunHistoryLearningConfig(BaseModel):
     """V243R27: learn from past runs (run folders and MLflow) at mission start.
 
@@ -1278,6 +1300,7 @@ class AppConfig(BaseModel):
     mlflow: MLflowConfig = Field(default_factory=MLflowConfig)
     run_history_learning: RunHistoryLearningConfig = Field(default_factory=RunHistoryLearningConfig)
     edit_sections: EditSectionsConfig = Field(default_factory=EditSectionsConfig)
+    webmcp: WebMCPConfig = Field(default_factory=WebMCPConfig)
     universal_operator: UniversalOperatorConfig = Field(default_factory=UniversalOperatorConfig)
     skill_induction: SkillInductionConfig = Field(default_factory=SkillInductionConfig)
     replay_policy: ReplayPolicyConfig = Field(default_factory=ReplayPolicyConfig)

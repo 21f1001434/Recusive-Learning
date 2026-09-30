@@ -1027,6 +1027,7 @@ def _runtime_status_payload(config: str = "config.yaml") -> Dict[str, Any]:
         "model_portfolio": portfolio.manifest(),
         "run_history_learning": _run_history_summary(cfg),
         "edit_sections": _edit_sections_summary(cfg),
+        "webmcp": _webmcp_summary(cfg),
         "portal_skills": _portal_skills_totals(cfg),
         "recursive_self_improvement": recursive_improvement_from_config(
             cfg, replay_policy=replay, model_portfolio=portfolio, skill_library=skills
@@ -1670,6 +1671,44 @@ def _edit_sections_summary(cfg: Any) -> Dict[str, Any]:
                              "phases": [{k: row.get(k) for k in ("phase", "known", "title", "section_kind", "menus", "fields")} for row in data["phases"]]}
                     for action, data in per_action.items()},
     }
+
+
+def _webmcp_summary(cfg: Any) -> Dict[str, Any]:
+    """V243R33: WebMCP policy and what the latest runs found (tool names and kinds only)."""
+    from hip_id_agent.webmcp import webmcp_policy
+
+    policy = webmcp_policy(cfg)
+    out: Dict[str, Any] = {"enabled": policy.enabled, "policy": policy.to_dict(), "last": None}
+    try:
+        runs = sorted((d for d in Path(cfg.reporting.runs_dir).iterdir() if d.is_dir()),
+                      key=lambda d: d.stat().st_mtime, reverse=True)[:30]
+    except Exception:
+        return out
+    for run in runs:
+        found = sorted(list(run.rglob("webmcp_page_tools.json")) + list(run.rglob("webmcp_tools.json")),
+                       key=lambda f: f.stat().st_mtime, reverse=True)
+        for f in found:
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            pages = data.get("pages") if isinstance(data.get("pages"), list) else [data]
+            tools = [t for page in pages for t in (page.get("tools") or []) if isinstance(t, dict)]
+            page_tools = [t for t in tools if t.get("source") != "hip-agent"]
+            out["last"] = {
+                "run": run.name, "file": f.name, "phase": data.get("phase") or ", ".join(str(p.get("phase")) for p in pages),
+                "page_tools": len(page_tools), "agent_tools": len(tools) - len(page_tools),
+                "tools": [{"name": t.get("name"), "kind": t.get("classification"), "source": t.get("source")} for t in page_tools][:20],
+                "filled_by_page_tool": bool(data.get("filled")), "tool_used": data.get("tool"),
+            }
+            return out
+    return out
+
+
+@app.get("/api/webmcp")
+def webmcp_status(config: str = "config.yaml") -> Dict[str, Any]:
+    """V243R33: the WebMCP layer and the page tools the latest run found."""
+    return _webmcp_summary(_cfg(config))
 
 
 @app.get("/api/learning/edit-sections")
