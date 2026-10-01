@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
 from .safe_io import safe_write_json
+from .agent_chat import AgentChatFeed, humanize
 from .security import is_secret_target, mask_sensitive_data, mask_sensitive_string
 
 TRACE_FILENAME = "mission_trace.json"
@@ -32,6 +33,10 @@ STEP_DEFINITIONS: Dict[str, tuple[str, str]] = {
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def phase_display(phase: str) -> str:
+    return (STEP_DEFINITIONS.get(str(phase)) or ("", humanize(phase)))[1]
 
 
 def _read_json(path: Path, default: Any = None) -> Any:
@@ -87,6 +92,8 @@ class MissionTraceLedger:
         self.run_id = str(run_id)
         self.phases = [str(p) for p in phases]
         self.active_phase = ""
+        # V243R35: the live agent chat of this run (agent_chat.jsonl).
+        self.chat = AgentChatFeed(self.root_dir, run_id=self.run_id)
         existing = _read_json(self.path, {})
         if isinstance(existing, dict) and existing.get("schema_version") == self.SCHEMA:
             self.state = existing
@@ -170,6 +177,23 @@ class MissionTraceLedger:
             step["current_activity"] = mask_sensitive_string(str(activity))[:500]
         step["updated_at"] = _utc_now()
         self._persist()
+        self._chat_phase(phase, status, attempt=attempt, activity=activity, blocker=blocker)
+
+    def _chat_phase(self, phase: str, status: str, *, attempt: int = 0, activity: str = "", blocker: str = "") -> None:
+        name = phase_display(phase)
+        st = str(status)
+        tries = f" (attempt {int(attempt)})" if int(attempt or 0) > 1 else ""
+        if st in {"running", "in_progress"}:
+            text, kind = f"▶ Working on {name}{tries}" + (f": {activity}" if activity else ""), "phase"
+        elif st == "completed":
+            text, kind = f"✅ {name} is complete", "complete"
+        elif st == "resumed":
+            text, kind = f"✅ {name} was already done — resuming after it", "complete"
+        elif st == "blocked":
+            text, kind = f"⛔ {name} is blocked" + (f": {blocker}" if blocker else ""), "blocked"
+        else:
+            text, kind = f"{name}: {humanize(st).lower()}" + (f" — {activity}" if activity else ""), "phase"
+        self.chat.post(text, kind=kind, phase=phase)
 
     def record_action(self, event: Any, *, phase: str = "") -> None:
         phase_name = str(phase or self.active_phase or "")
@@ -239,6 +263,7 @@ class MissionTraceLedger:
         step["current_activity"] = row["summary"][:500]
         step["updated_at"] = _utc_now()
         self._persist()
+        self.chat.post(row["summary"], kind="progress" if source == "input_json_live_map" else "observe", phase=phase)
 
     def record_transition(self, from_phase: str, to_phase: str, *, status: str, details: Optional[Mapping[str, Any]] = None) -> None:
         """Record an explicit phase-to-phase handoff without planner reasoning."""
@@ -279,6 +304,11 @@ class MissionTraceLedger:
         from_step["updated_at"] = _utc_now()
         to_step["updated_at"] = _utc_now()
         self._persist()
+        if status in {"starting", "complete", "blocked", "continued_from_blocked"}:
+            verb = {"starting": "Moving on", "complete": "Moved on", "blocked": "Could not move on",
+                    "continued_from_blocked": "Moving on (the previous phase is still blocked)"}[status]
+            self.chat.post(f"{verb}: {phase_display(from_phase)} → {phase_display(to_phase)}",
+                           kind="warn" if status == "blocked" else "phase", phase=to_phase)
 
     def record_warning(self, phase: str, message: str) -> None:
         step = self._step(phase)
@@ -288,6 +318,8 @@ class MissionTraceLedger:
             step["warnings"] = step["warnings"][-40:]
         step["updated_at"] = _utc_now()
         self._persist()
+        if clean:
+            self.chat.post(f"⚠ {clean[:400]}", kind="warn", phase=phase)
 
     def set_runtime_contract(self, *, autowebglm_primary: bool, playwright_mcp_required: bool, playwright_mcp_available: bool = False, live_witness_mode: bool = False, semantic_understanding_enabled: bool = True, autonomous_all_form_phases: bool = True) -> None:
         self.state["runtime_contract"] = {
@@ -511,6 +543,11 @@ class MissionTraceLedger:
         if complete:
             self.state["current_step_id"] = ""
         self._persist()
+        done = len(self.state.get("completed_step_ids") or [])
+        self.chat.post(
+            f"🏁 Mission complete — {done}/{len(self.phases)} phases done" if complete
+            else f"Mission ended — {done}/{len(self.phases)} phases done; see the blocked phase above",
+            kind="complete" if complete else "blocked")
 
 
 def read_mission_trace(run_dir: str | Path) -> Dict[str, Any]:

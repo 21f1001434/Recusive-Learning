@@ -1,3 +1,22 @@
+## V243R35 — The live agent chat (2026-10-01)
+
+- **A Live agent chat on the right of the Control Center** narrates every action as it happens:
+  - which page it opens and which buttons it clicks;
+  - for each field (by the form's own label): which dropdown it opens, which option it selects, what it types, and that the value is verified;
+  - retries, self-heal steps, the live input.json count, phase and mission completion.
+
+  Secrets are masked; selectors and reasoning are never shown.
+- **The agent's browser, live:** a read-only frame every 3 s, with the phase progress bar.
+- **Talk to it:**
+  - *status*, *what's left?*;
+  - *pause* / *resume* (it finishes the field in hand; paused time does not count against the watchdog or the phase budget);
+  - *stop*;
+  - *accept* / *reject* a phase review;
+  - any other message is a hint: the agent acknowledges it and gives it to the planner (advisory: input.json stays the source of every value; nothing is saved without your Save confirmation).
+- No slower: the Transport Profile replica still fills in about 28 s.
+
+See `V243R35_LIVE_AGENT_CHAT_20261001.md`. Apply with `APPLY_V243R35_IN_PLACE.ps1`; it includes R13–R34.
+
 ## V243R34 — Live input.json map, real learning status, faster fill; WebMCP removed (2026-10-01)
 
 - **Learning was on; the status was failing.** One status part that raised an error used to blank the whole Control Center status, so every learning tile showed "Off" and AutoGen "blocked". Each part is now computed on its own:

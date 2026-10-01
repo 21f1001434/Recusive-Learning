@@ -523,6 +523,15 @@ portal_operations:
   # V243R24: Edit / Clone snapshot the form first, change only the requested
   # fields, and do not save when any other field changed.
   block_unrelated_changes: true
+# V243R35: the live agent chat on the right of the Control Center -- every
+# action the agent takes, as it takes it, and the operator's pause / resume /
+# hints.  Paused time does not count against the watchdog or the phase budget.
+agent_chat:
+  enabled: true
+  live_frame_seconds: 3.0
+  live_frame_quality: 55
+  pause_poll_seconds: 0.5
+
 runtime_self_heal:
   enabled: true
   max_phase_attempts: 5

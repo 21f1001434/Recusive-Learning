@@ -29,6 +29,7 @@ from .website_understanding import WebsiteUnderstandingEngine
 from .llm_form_planner import LLMFormPlanner
 from .safe_io import safe_write_json
 from .security import mask_sensitive_data, mask_sensitive_string
+from . import operator_control
 from .stateful_form_runtime import (
     capture_stateful_controls,
     execute_phase_state_graph,
@@ -1264,6 +1265,8 @@ async def execute_autonomous_phase_goal(
                             "runtime_input_leaf_ledger": runtime_input_ledger,
                             "golden_visual_feedback": last_golden_visual_feedback,
                             "golden_reference_count": len(golden_refs),
+                            # V243R35: the operator's hints from the live chat (advisory only).
+                            "operator_notes": operator_control.notes(),
                         },
                         failures=unresolved_required + list(runtime_input_ledger.get("unresolved_input_leaves") or []),
                     )

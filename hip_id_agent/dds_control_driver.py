@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from playwright.async_api import Locator, Page
 
 from .security import mask_sensitive_string
+from . import agent_chat
 from .environment_faults import raise_if_environment_fatal
 from .semantic_affordance import selector_looks_generation_volatile
 from .autonomous_transition_runtime import choose_dynamic_portal_option
@@ -256,7 +257,7 @@ def _last_session_executor(session: Any) -> str:
         return ""
 
 
-def _remember_broker_execution(page: Page, *, action: str, selector: str, label: str, success: bool, executor: str = "", value_present: bool = False, error: Any = None) -> Dict[str, Any]:
+def _remember_broker_execution(page: Page, *, action: str, selector: str, label: str, success: bool, executor: str = "", value_present: bool = False, error: Any = None, value: Any = None) -> Dict[str, Any]:
     row = {
         "action": str(action or ""),
         "selector": str(selector or ""),
@@ -287,6 +288,11 @@ def _remember_broker_execution(page: Page, *, action: str, selector: str, label:
             del hist[:-500]
     except Exception:
         pass
+    # V243R35: every physical click / type / key press, said in the live agent
+    # chat ("Selected “SFTP HAFT” in Interface Type").  The value is shown only
+    # there (masked when sensitive); the execution history never stores it.
+    agent_chat.broker_action(page, action=row["action"], label=row["label"], success=row["success"],
+                             value=value, error=error)
     return row
 
 
@@ -297,6 +303,11 @@ def read_last_control_execution(page: Page) -> Dict[str, Any]:
 
 async def _with_phase(page: Page, phase: str):
     """Small async helper used only internally to annotate BrowserSession actions."""
+    try:
+        # V243R35: the broker narrates this action itself (it knows the field).
+        setattr(page, "_hip_in_broker", True)
+    except Exception:
+        pass
     session = getattr(page, "_hip_browser_session", None)
     previous = str(getattr(session, "_active_phase_name", "") or "") if session is not None else ""
     if session is not None and phase:
@@ -307,7 +318,12 @@ async def _with_phase(page: Page, phase: str):
     return session, previous
 
 
-async def _restore_phase(session: Any, previous: str) -> None:
+async def _restore_phase(session: Any, previous: str, page: Any = None) -> None:
+    if page is not None:
+        try:
+            setattr(page, "_hip_in_broker", False)
+        except Exception:
+            pass
     if session is not None:
         try:
             session._active_phase_name = previous
@@ -371,7 +387,7 @@ async def _broker_click(page: Page, selector: str, *, label: str, phase: str = "
         except Exception:
             return False
     finally:
-        await _restore_phase(session, previous)
+        await _restore_phase(session, previous, page)
 
 
 async def _broker_fill(page: Page, selector: str, value: str, *, label: str, phase: str = "", action_type: str = "fill") -> bool:
@@ -386,13 +402,13 @@ async def _broker_fill(page: Page, selector: str, value: str, *, label: str, pha
                 await session.fill_and_log(locator=loc, value=str(value), selector=selector, action_type=action_type)
                 _remember_broker_execution(
                     page, action=action_type, selector=selector, label=label, success=True,
-                    executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)),
+                    executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)), value=value,
                 )
                 return True
             except Exception as exc:
                 _remember_broker_execution(
                     page, action=action_type, selector=selector, label=label, success=False,
-                    executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)), error=exc,
+                    executor=_last_session_executor(session) or "browser-session", value_present=bool(str(value)), error=exc, value=value,
                 )
                 raise_if_environment_fatal(exc)
                 return False
@@ -400,20 +416,20 @@ async def _broker_fill(page: Page, selector: str, value: str, *, label: str, pha
         if backend is not None and hasattr(backend, "fill"):
             try:
                 await backend.fill(selector, str(value), element=label or "HIP Portal field", slowly=False)
-                _remember_broker_execution(page, action=action_type, selector=selector, label=label, success=True, executor="playwright-mcp-offline", value_present=bool(str(value)))
+                _remember_broker_execution(page, action=action_type, selector=selector, label=label, success=True, executor="playwright-mcp-offline", value_present=bool(str(value)), value=value)
                 return True
             except Exception:
                 if semantic_runtime_enabled(page):
-                    _remember_broker_execution(page, action=action_type, selector=selector, label=label, success=False, executor="playwright-mcp-offline", value_present=bool(str(value)))
+                    _remember_broker_execution(page, action=action_type, selector=selector, label=label, success=False, executor="playwright-mcp-offline", value_present=bool(str(value)), value=value)
                     return False
         try:
             await loc.fill(str(value), timeout=2500)
-            _remember_broker_execution(page, action=action_type, selector=selector, label=label, success=True, executor="python-playwright-offline", value_present=bool(str(value)))
+            _remember_broker_execution(page, action=action_type, selector=selector, label=label, success=True, executor="python-playwright-offline", value_present=bool(str(value)), value=value)
             return True
         except Exception:
             return False
     finally:
-        await _restore_phase(session, previous)
+        await _restore_phase(session, previous, page)
 
 
 async def _broker_press(page: Page, selector: str, key: str, *, label: str, phase: str = "") -> bool:
@@ -447,7 +463,7 @@ async def _broker_press(page: Page, selector: str, key: str, *, label: str, phas
         except Exception:
             return False
     finally:
-        await _restore_phase(session, previous)
+        await _restore_phase(session, previous, page)
 
 
 async def open_control_for_discovery(page: Page, selector: str, *, label: str = "HIP Portal dropdown", phase: str = "") -> bool:

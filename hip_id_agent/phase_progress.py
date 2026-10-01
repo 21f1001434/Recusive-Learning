@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import time
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional
 
+from . import agent_chat, operator_control
 from .safe_io import safe_write_json
 from .security import mask_sensitive_string
 
@@ -73,7 +73,7 @@ async def run_with_progress_watchdog(
     that is only finishing its checks (no more fills) is left to finish.
     """
     task = asyncio.ensure_future(operation)
-    started = time.monotonic()
+    started = operator_control.work_clock()
     last_novel = started
     recent: list[str] = []
     samples: list[Dict[str, Any]] = []
@@ -167,7 +167,7 @@ async def run_with_progress_watchdog(
 
             row = await sample()
             sig = str(row.get("signature") or "")
-            now = time.monotonic()
+            now = operator_control.work_clock()
             if row.get("whitelabel_error"):
                 # V243R32: the portal replaced the page with a Whitelabel Error Page --
                 # nothing on it can be filled; the stage restarts in a fresh browser.
@@ -182,6 +182,8 @@ async def run_with_progress_watchdog(
                 }
                 if evidence_path:
                     safe_write_json(Path(evidence_path), payload)
+                agent_chat.say("⚠ The portal replaced the page with a Whitelabel Error Page — stopping this attempt",
+                               kind="warn", phase=str(phase))
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
@@ -306,6 +308,10 @@ async def run_with_progress_watchdog(
             }
             if evidence_path:
                 safe_write_json(Path(evidence_path), payload)
+            agent_chat.say(
+                ("🛑 Every input.json value is on the form — I stop filling and go on to verification"
+                 if exact else "⚠ " + str(payload["message"])[:300]),
+                kind="complete" if exact else "stop", phase=str(phase))
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
@@ -368,14 +374,17 @@ async def run_with_progress_budget(
 
     finalize_used: list[Dict[str, Any]] = []
 
-    deadline = time.monotonic() + max(1.0, float(budget_seconds or 0.0))
+    deadline = operator_control.work_clock() + max(1.0, float(budget_seconds or 0.0))
     last_units = await units()
     extensions: list[Dict[str, Any]] = []
     try:
         while True:
-            done, _ = await asyncio.wait({task}, timeout=max(0.01, deadline - time.monotonic()))
+            done, _ = await asyncio.wait({task}, timeout=max(0.01, deadline - operator_control.work_clock()))
             if task in done:
                 return await task
+            if operator_control.work_clock() < deadline:
+                # V243R35: the operator paused the agent; paused time does not count.
+                continue
             now_units = await units()
             granted: Dict[str, Any] = {}
             if now_units > last_units >= 0:
@@ -391,8 +400,9 @@ async def run_with_progress_budget(
             if granted.get("granted"):
                 extensions.append(granted)
                 last_units = now_units
-                deadline = time.monotonic() + float(granted.get("seconds") or 0.0)
+                deadline = operator_control.work_clock() + float(granted.get("seconds") or 0.0)
                 record["decision"] = "extended_for_verified_progress"
+                agent_chat.say("⏱ Still verifying new fields — this attempt gets more time", kind="info", phase=str(phase))
                 if evidence_path:
                     safe_write_json(Path(evidence_path), record)
                 continue
@@ -402,7 +412,7 @@ async def run_with_progress_budget(
                 grant = {"granted": True, "seconds": float(finalize_seconds), "reason": "form complete; finishing verification"}
                 finalize_used.append(grant)
                 last_units = now_units
-                deadline = time.monotonic() + float(finalize_seconds)
+                deadline = operator_control.work_clock() + float(finalize_seconds)
                 record.update(decision="extended_to_finish_verification", finalize_extensions=list(finalize_used))
                 if evidence_path:
                     safe_write_json(Path(evidence_path), record)

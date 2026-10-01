@@ -37,6 +37,11 @@ from hip_id_agent.security import mask_sensitive_string
 from hip_id_agent.autowebglm_bridge import AutoWebGLMRecoveryBridge
 from hip_id_agent.mission_trace import read_mission_trace
 from hip_id_agent.agent_live_view import read_agent_live_view
+from hip_id_agent.agent_chat import FRAME_DIRNAME, FRAME_FILENAME, append_operator, read_chat
+from hip_id_agent.operator_chat import (
+    HELP_TEXT, hint_reply, interpret, left_reply, live_state, pending_review, status_reply,
+)
+from hip_id_agent.operator_control import write_control
 from hip_id_agent.website_world_model import WebsiteWorldModelMemory
 from hip_id_agent.browser_backend import validate_dual_browser_mcps
 from hip_id_agent.mlflow_async import mlflow_runtime_probe
@@ -783,6 +788,13 @@ class HumanPhaseReviewRequest(BaseModel):
     note: str = ""
     reviewer: str = "human"
     config: str = "config.yaml"
+
+
+class MissionChatRequest(BaseModel):
+    text: str
+    config: str = "config.yaml"
+    runs_dir: str = ""
+    run_id: str = ""
 
 
 class InteractiveTeachingStartRequest(BaseModel):
@@ -1962,6 +1974,118 @@ def mission_live_input_map(config: str = "config.yaml", runs_dir: str = "", run_
     except Exception as exc:
         return {"found": False, "run_id": run_dir.name, "map": {}, "error": mask_sensitive_string(str(exc))[:300]}
     return {"found": bool(data), "run_id": run_dir.name, "path": str(path), "map": data}
+
+
+def _mission_active(run_dir: Path, state: Dict[str, Any], process: Dict[str, Any]) -> bool:
+    """A mission is running: the Control Center's process, or a mission started
+    elsewhere (a terminal) whose run is in progress and still narrating."""
+    if process.get("running"):
+        return True
+    age = state.get("chat_age_seconds")
+    return state.get("mission_status") == "in_progress" and age is not None and float(age) < 900
+
+
+@app.get("/api/mission/chat")
+def mission_chat(config: str = "config.yaml", runs_dir: str = "", run_id: str = "", cursor: str = "") -> Dict[str, Any]:
+    """V243R35: the live agent chat -- every action the agent takes, and the operator's messages."""
+    run_dir = _resolve_trace_run_dir(config=config, runs_dir=runs_dir, run_id=run_id)
+    if run_dir is None:
+        return {"found": False, "run_id": run_id or "", "messages": [], "cursor": "", "state": {}, "frame_url": ""}
+    data = read_chat(run_dir, cursor=cursor)
+    state = live_state(run_dir)
+    process = _process_state()
+    state["running"] = _mission_active(run_dir, state, process)
+    state["process_paused"] = bool(process.get("running") and process.get("paused"))
+    try:
+        cfg = _cfg(config)
+        review = pending_review(human_phase_review_from_config(cfg), run_dir.name)
+        state["review"] = {k: review.get(k) for k in ("request_id", "phase", "reason", "automated_verdict", "request_type")} if review else None
+        assistance = human_teaching_from_config(cfg).pending(run_id=run_dir.name)
+        state["assistance"] = ({"count": len(assistance), "reason": str((assistance[0] or {}).get("reason") or "")[:300]}
+                               if assistance else None)
+    except Exception:
+        state["review"], state["assistance"] = None, None
+    frame = run_dir / FRAME_DIRNAME / FRAME_FILENAME
+    frame_url = ""
+    if frame.is_file():
+        frame_url = "/api/mission/chat/frame?" + urlencode({
+            "config": config, "runs_dir": runs_dir, "run_id": run_dir.name, "t": int(frame.stat().st_mtime * 1000)})
+    return {"found": True, "run_id": run_dir.name, "messages": data["messages"], "cursor": data["cursor"],
+            "state": state, "frame_url": frame_url}
+
+
+@app.post("/api/mission/chat")
+def mission_chat_post(req: MissionChatRequest) -> Dict[str, Any]:
+    """V243R35: the operator talks to the agent: status, what's left, pause / resume / stop, review answers, hints."""
+    text = str(req.text or "").strip()[:1200]
+    if not text:
+        raise HTTPException(status_code=400, detail="Type a message for the agent.")
+    intent = interpret(text)
+    run_dir = _resolve_trace_run_dir(config=req.config, runs_dir=req.runs_dir, run_id=req.run_id)
+    if run_dir is None:
+        reply = HELP_TEXT if intent == "help" else "No mission run yet — start one and I'll narrate it here, step by step."
+        return {"found": False, "intent": intent, "reply": reply, "action": {}}
+    append_operator(run_dir, text, role="user", kind=intent)
+    state = live_state(run_dir)
+    process = _process_state()
+    running = _mission_active(run_dir, state, process)
+    action: Dict[str, Any] = {}
+    if intent == "help":
+        reply = HELP_TEXT
+    elif intent == "status":
+        reply = status_reply(state, running=running)
+    elif intent == "left":
+        reply = left_reply(run_dir)
+    elif intent == "pause":
+        if running:
+            write_control(run_dir, "paused")
+            reply = "⏸ Pausing: I finish the field in hand, then wait (paused time does not count against the phase). Say “resume” to continue."
+        else:
+            reply = "Nothing to pause — no mission is running."
+    elif intent == "resume":
+        write_control(run_dir, "running")
+        if process.get("running") and process.get("paused"):
+            action = _resume_cli()
+        reply = "▶ Resuming." if running else "Nothing is paused — no mission is running."
+    elif intent == "stop":
+        if process.get("running"):
+            action = _stop_cli()
+            write_control(run_dir, "running")
+            reply = "⏹ Stopped the mission. Stopping saves nothing on the portal; the run's evidence stays in the run folder."
+        else:
+            reply = ("There is no mission process started from the Control Center to stop. "
+                     "If it runs in a terminal, stop it there (Ctrl+C), or say “pause”.")
+    elif intent in {"accept", "reject"}:
+        store = human_phase_review_from_config(_cfg(req.config))
+        review = pending_review(store, run_dir.name)
+        if not review:
+            reply = "Nothing is waiting for your review right now."
+        else:
+            try:
+                store.resolve(request_id=str(review.get("request_id")), verdict="pass" if intent == "accept" else "needs_correction",
+                              note=f"from the live chat: {text}", reviewer="control-center-chat")
+                phase_name = str(review.get("phase") or "the phase")
+                reply = (f"✅ Recorded: {phase_name} looks correct. The agent continues and learns from your approval."
+                         if intent == "accept" else
+                         f"Recorded: {phase_name} needs correction. The agent treats it as supervised failure evidence and repairs it.")
+                action = {"review": review.get("request_id"), "verdict": intent}
+            except ValueError as exc:
+                reply = f"Could not record that answer: {exc}"
+    else:
+        reply = hint_reply(state)
+    append_operator(run_dir, reply, role="agent", kind=f"reply_{intent}")
+    return {"found": True, "run_id": run_dir.name, "intent": intent, "reply": reply, "action": action}
+
+
+@app.get("/api/mission/chat/frame")
+def mission_chat_frame(config: str = "config.yaml", runs_dir: str = "", run_id: str = "", t: str = ""):
+    run_dir = _resolve_trace_run_dir(config=config, runs_dir=runs_dir, run_id=run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    frame = run_dir / FRAME_DIRNAME / FRAME_FILENAME
+    if not frame.is_file():
+        raise HTTPException(status_code=404, detail="No live frame yet")
+    return FileResponse(str(frame), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/mission/live-view/screenshot")

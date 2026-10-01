@@ -348,7 +348,44 @@
         </div>
       </section>
     </main>
+
+    <!-- V243R35: the live agent chat, docked on the right -->
+    <aside class="chat-dock" id="chatDock" aria-label="Live agent chat">
+      <div class="chat-head">
+        <div class="chat-title"><span class="chat-dot" id="chatDot"></span><div><strong>Live agent</strong><small id="chatSubtitle">Waiting for a mission</small></div></div>
+        <button id="chatCollapseBtn" class="icon-button chat-collapse" title="Hide the chat" aria-label="Hide the chat">⟩</button>
+      </div>
+      <div class="chat-frame" id="chatFrame">
+        <img id="chatFrameImg" class="hidden" alt="The agent's browser, live" />
+        <div id="chatFrameEmpty" class="chat-frame-empty">The agent's browser appears here while a mission runs.</div>
+        <span id="chatFrameAge" class="chat-frame-age hidden"></span>
+      </div>
+      <div class="chat-progress">
+        <div class="chat-progress-row"><span id="chatPhase">No phase yet</span><span id="chatCount"></span></div>
+        <div class="learning-progress"><span id="chatBar" style="width:0%"></span></div>
+      </div>
+      <div id="chatBanner" class="chat-banner hidden"></div>
+      <div class="chat-log-wrap">
+        <div class="chat-log" id="chatLog" role="log" aria-live="polite">
+          <div class="chat-empty">Start a mission and the agent tells you here what it opens, clicks, types and selects, and what it verifies — as it happens. You can talk to it below.</div>
+        </div>
+        <button id="chatJump" class="chat-jump hidden" type="button">↓ New actions</button>
+      </div>
+      <div class="chat-chips" id="chatChips">
+        <button type="button" data-chat="status">Status</button>
+        <button type="button" data-chat="what's left">What's left?</button>
+        <button type="button" data-chat="pause">Pause</button>
+        <button type="button" data-chat="resume">Resume</button>
+        <button type="button" data-chat="stop" class="chip-danger">Stop</button>
+        <button type="button" data-chat="help">Help</button>
+      </div>
+      <form class="chat-input" id="chatForm">
+        <textarea id="chatText" rows="2" maxlength="1200" placeholder="Ask the agent, or give it a hint… (Enter to send)"></textarea>
+        <button type="submit" class="primary" id="chatSend">Send</button>
+      </form>
+    </aside>
   </div>
+  <button id="chatOpenBtn" class="chat-open hidden" type="button" title="Show the live agent chat">💬 Live agent <b id="chatUnread" class="hidden">0</b></button>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

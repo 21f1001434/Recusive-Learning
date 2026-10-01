@@ -2197,6 +2197,19 @@ class BrowserSession:
             except Exception:
                 # Trace is evidence-only and must never break the browser mission.
                 pass
+        # V243R35: the live agent chat ("Opened …", "Clicked “Create”").  Actions the
+        # DDS broker drives are narrated by the broker, which knows the field.
+        try:
+            from . import agent_chat
+
+            dispatch = getattr(self, "_last_click_dispatch", None) or {}
+            agent_chat.session_action(
+                ev, phase=self._trace_phase_override or self._active_phase_name or "",
+                label=str(dispatch.get("action") or "") if ev.type == "click" else "",
+                in_broker=bool(getattr(self.page, "_hip_in_broker", False)),
+            )
+        except Exception:
+            pass
         live_view = getattr(self, "agent_live_view", None)
         if live_view is not None:
             try:

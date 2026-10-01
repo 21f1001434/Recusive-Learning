@@ -327,6 +327,18 @@ class AutonomousFormConfig(BaseModel):
     transition_plan_requires_live_reproof: bool = True
     mutation_governance_always_required: bool = True
 
+class AgentChatConfig(BaseModel):
+    """V243R35: the live agent chat on the right of the Control Center."""
+    # Narrate every action (open, click, type, select, verify, self-heal) in
+    # runs/<run>/agent_chat.jsonl for the chat panel.
+    enabled: bool = True
+    # A JPEG frame of the browser for the panel; 0 turns it off.
+    live_frame_seconds: float = 3.0
+    live_frame_quality: int = 55
+    # How often a paused agent checks for "resume".
+    pause_poll_seconds: float = 0.5
+
+
 class RuntimeSelfHealConfig(BaseModel):
     # Closed-loop runtime recovery. Repairs are safe browser/session operations
     # only; final portal mutations remain prohibited.
@@ -1271,6 +1283,7 @@ class AppConfig(BaseModel):
     portal_learning: PortalLearningConfig = Field(default_factory=PortalLearningConfig)
     autonomous_form: AutonomousFormConfig = Field(default_factory=AutonomousFormConfig)
     runtime_self_heal: RuntimeSelfHealConfig = Field(default_factory=RuntimeSelfHealConfig)
+    agent_chat: AgentChatConfig = Field(default_factory=AgentChatConfig)
     portal_skills: PortalSkillsConfig = Field(default_factory=PortalSkillsConfig)
     portal_operations: PortalOperationsConfig = Field(default_factory=PortalOperationsConfig)
     api: APIConfig = Field(default_factory=APIConfig)

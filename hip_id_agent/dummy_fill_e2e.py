@@ -11,6 +11,7 @@ import re
 import shutil
 import time
 import zipfile
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, Iterable, List, Optional, Sequence
@@ -51,7 +52,8 @@ from .mission_controller import (
     PHASE_JUDGE_RESULT_FILENAME,
     PHASE_VERIFICATION_FILENAME,
 )
-from .mission_trace import MissionTraceLedger
+from .mission_trace import MissionTraceLedger, phase_display
+from . import agent_chat, operator_control
 from .live_witness import build_live_witness_report
 from .form_api_agent import FormAPIAgentQRuntime
 from .mission_assurance import capture_mcp_evidence_quorum, build_phase_assurance_report
@@ -2513,6 +2515,15 @@ class FullDummyFillE2EFlow:
         )
         mission_trace = MissionTraceLedger(root_dir, run_id=ctx.run_id, phases=phases)
         mission.trace = mission_trace
+        # V243R35: the live agent chat narrates this run, and the operator's chat
+        # controls (pause / resume / hints) apply to it.
+        chat_cfg = getattr(self.config, "agent_chat", None)
+        mission_trace.chat.enabled = bool(getattr(chat_cfg, "enabled", True))
+        agent_chat.activate(mission_trace.chat)
+        operator_control.bind(root_dir, poll_seconds=float(getattr(chat_cfg, "pause_poll_seconds", 0.5) or 0.5))
+        mission_trace.chat.post(
+            f"Starting the mission: {', '.join(phase_display(p) for p in phases)}. "
+            "I'll tell you here what I open, click, type and select, and what I verify.", kind="mission")
         mlflow_tracker = AsyncMLflowTracker(
             self.config.mlflow,
             run_id=ctx.run_id,
@@ -3161,6 +3172,15 @@ class FullDummyFillE2EFlow:
                     "phase_display": PHASE_DISPLAY.get(phase_name, phase_name), "at": utc_now(),
                     "status": str(probe.get("status") or ""), "busy": probe.get("status") == "busy",
                 }
+                if (current is not None and not current.get("complete")
+                        and (current.get("exact"), current.get("different")) != (previous.get("exact"), previous.get("different"))):
+                    # V243R35: the live count, said in the chat as it changes.
+                    different = [str(r.get("label") or r.get("field") or "") for r in (current.get("rows") or [])
+                                 if isinstance(r, dict) and r.get("status") == "different"]
+                    agent_chat.say(
+                        f"Live check: {current.get('exact')}/{current.get('total')} input.json values are on the form"
+                        + (f" — different: {', '.join(different[:3])}" if different else ""),
+                        kind="progress", phase=phase_name, group="live_check")
                 if current is not None and current.get("complete") and not previous.get("complete"):
                     record["complete_at"] = record["at"]
                     try:
@@ -3231,6 +3251,13 @@ class FullDummyFillE2EFlow:
                 pass
             return record
 
+        # V243R35: a live frame of the browser for the chat panel, every few seconds.
+        live_frame_task = None
+        if mission_trace.chat.enabled and float(getattr(chat_cfg, "live_frame_seconds", 3.0) or 0.0) > 0:
+            live_frame_task = asyncio.ensure_future(agent_chat.live_frame_loop(
+                lambda: shared_browser.page, root_dir,
+                seconds=float(getattr(chat_cfg, "live_frame_seconds", 3.0) or 3.0),
+                quality=int(getattr(chat_cfg, "live_frame_quality", 55) or 55)))
         try:
             for phase_index, phase in enumerate(phases):
                 phase_dir = root_dir / phase
@@ -3368,6 +3395,8 @@ class FullDummyFillE2EFlow:
                         break
                     attempt_no = attempt_index + 1
                     attempt_index += 1
+                    # V243R35: a pause from the live chat takes effect before an attempt.
+                    await operator_control.checkpoint(phase=phase, where=f"{phase_display(phase)} attempt {attempt_no}")
                     # R10: a live read-only reproof is valid only for the stable
                     # browser state in the attempt that created it.  Any new
                     # execution/repair attempt invalidates that proof before the
@@ -4883,6 +4912,10 @@ class FullDummyFillE2EFlow:
                     phase_judge_results.append(judge_result)
 
         finally:
+            if live_frame_task is not None:
+                live_frame_task.cancel()
+                with suppress(asyncio.CancelledError, Exception):
+                    await live_frame_task
             safe_write_json(root_dir / "browser_session_final_state.json", {
                 "session_id": shared_browser.session_id,
                 "start_count": shared_browser._start_count,
@@ -5016,6 +5049,8 @@ class FullDummyFillE2EFlow:
             mission_trace.finalize(complete=bool(mission_report.get("application_complete")))
         except Exception:
             pass
+        agent_chat.deactivate(mission_trace.chat)
+        operator_control.unbind()
         runtime_self_heal_summary = runtime_self_healer.write_summary()
         form_api_summary = form_api_agent.write_run_summary()
         aggregate = {

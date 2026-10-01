@@ -22,6 +22,35 @@ _MUTATING_TOKENS = {
 }
 
 
+_HEAL_WORDS = {
+    "reauthenticate": "signing in again",
+    "route_target": "opening the phase page again",
+    "resync_mcp": "reconnecting the browser tools",
+    "clear_transient_ui_and_reopen": "closing leftover pop-ups and reopening the form",
+    "reassess_page_health": "re-checking the page",
+    "recover_page_and_route": "recovering the page and opening the phase again",
+    "refresh_page_and_reopen": "refreshing the page and reopening the form",
+    "rejudge_after_evidence_refresh": "refreshing the evidence and judging again",
+    "restart_browser_session": "closing the browser, opening a fresh one and starting this stage again",
+    "stop_fail_closed": "stopping safely",
+}
+
+
+def _say_self_heal(decision: "RuntimeSelfHealDecision") -> None:
+    """V243R35: what the self-heal does, said in the live agent chat."""
+    try:
+        from .agent_chat import humanize, say
+
+        what = _HEAL_WORDS.get(decision.action, humanize(decision.action).lower())
+        cause = humanize(decision.classification).lower()
+        if decision.action == "stop_fail_closed" or not decision.retry:
+            say(f"⛔ Could not recover automatically ({cause}): {decision.reason[:300]}", kind="blocked", phase=decision.phase)
+        else:
+            say(f"♻ Self-heal ({cause}): {what}; then I continue from input.json", kind="heal", phase=decision.phase)
+    except Exception:
+        pass
+
+
 @dataclass
 class RuntimeSelfHealDecision:
     phase: str
@@ -1437,6 +1466,7 @@ class RuntimeSelfHealController:
         self._trace.append(decision.to_dict())
         safe_write_json(attempt_dir / "self_heal_decision.json", decision.to_dict())
         self.write_summary()
+        _say_self_heal(decision)
         return decision
 
     async def capture_success_evidence(

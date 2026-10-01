@@ -1,3 +1,33 @@
+# V243R35 — The live agent chat (2026-10-01)
+
+- New `hip_id_agent/agent_chat.py`:
+  - `AgentChatFeed`: append-only `runs/<run>/agent_chat.jsonl`; consecutive repeats within 3 s are dropped;
+  - the active feed (`activate` / `say`);
+  - hooks: `executor_step`, `field_ready` (form labels; radio question via `group_label`), `broker_action` (dropdown / option / search / text / radio / checkbox / switch / tab / key lines), `session_action` (pages, buttons; quiet while the broker drives);
+  - `read_chat(cursor)` (both sides, by byte offsets), `append_operator`, `live_frame_loop` (read-only JPEG, `caret="initial"`);
+  - values masked by `display_value`.
+- New `hip_id_agent/operator_control.py`:
+  - `bind`, `checkpoint` (pause between fields / before attempts; hint acknowledgement), `notes` (hints for the planner);
+  - `paused_seconds` / `work_clock` from the control file's own pause account;
+  - `write_control` writes atomically.
+- New `hip_id_agent/operator_chat.py`: `interpret` (status, left, pause, resume, stop, accept, reject, help, hint), `live_state`, `status_reply`, `left_reply`, `hint_reply`.
+- Wiring:
+  - `stateful_form_runtime`: a checkpoint per field, `field_ready` after control preparation, `executor_step` from `publish_executor_progress`;
+  - `dds_control_driver._remember_broker_execution(value=)` narrates each action, and the broker marks `_hip_in_broker`;
+  - `browser_session._finish_action` narrates session actions;
+  - `mission_trace.MissionTraceLedger.chat` narrates phases, hand-offs, observations, warnings and the finish;
+  - `runtime_self_heal._say_self_heal`;
+  - `phase_progress`: the watchdog and wall budget run on `operator_control.work_clock()` (paused time excluded) and say why they stop or extend;
+  - `dummy_fill_e2e` activates the feed, binds the operator control, runs the live frame, checkpoints before each attempt and says the live count;
+  - `llm_form_planner` / `autonomous_form_runtime`: `before_state.operator_notes` (advisory; the prompt says so).
+- Backend: `GET /api/mission/chat` (messages after a cursor, state, pending review / assistance, frame URL), `POST /api/mission/chat`, `GET /api/mission/chat/frame`.
+- Control Center:
+  - the Live agent dock on the right: status dot, live frame (click to enlarge), progress bar, banner for review / assistance / pause, conversation with phase dividers and folded similar lines, quick chips, message box;
+  - a drawer under 1350 px with an unread count; full width on a phone;
+  - `#rowPlan` scrolls inside its panel on a phone.
+- Config: `agent_chat.enabled` (true), `live_frame_seconds` (3), `live_frame_quality` (55), `pause_poll_seconds` (0.5).
+- Tests: `tests/test_v243r35_live_agent_chat.py` (11).
+
 # V243R34 — Live input.json map, real learning status, faster fill; WebMCP removed (2026-10-01)
 
 - WebMCP (R33) removed: `hip_id_agent/webmcp.py`, its replicas and tests, the engine page-tool pass, the browser-context script, the `webmcp` config, the `webmcp-tools` CLI, `GET /api/webmcp` and the tile. `APPLY_V243R34_IN_PLACE.ps1` moves R33's files to the backup.

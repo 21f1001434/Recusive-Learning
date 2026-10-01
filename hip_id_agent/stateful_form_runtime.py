@@ -27,6 +27,7 @@ from .dds_control_driver import (
     read_last_control_execution,
 )
 from .security import mask_sensitive_data, mask_sensitive_string
+from . import agent_chat, operator_control
 from .deployment_group_policy import resolve_transport_deployment_group
 from .repeatable_row_identity import (
     annotate_controls_with_repeatable_bindings,
@@ -1815,6 +1816,8 @@ def publish_executor_progress(page: Any, *, phase: str, node: Dict[str, Any], st
             verified.add(f"{phase}|{node.get('node_id')}")
     except Exception:
         pass
+    # V243R35: the same lifecycle, said in the live agent chat.
+    agent_chat.executor_step(page, phase=phase, node=node, stage=stage, retry=retry)
 
 
 def _node_time_budget_seconds(profile: Dict[str, Any]) -> float:
@@ -1971,6 +1974,8 @@ async def execute_document_type_state_graph(
     for order, node in enumerate(graph.get("nodes", []) if isinstance(graph.get("nodes"), list) else [], start=1):
         if not isinstance(node, dict):
             continue
+        # V243R35: a pause from the live chat takes effect between fields.
+        await operator_control.checkpoint(phase=phase, where=agent_chat.field_name(node))
         publish_executor_progress(page, phase=phase, node=node, stage="start")
         expected = node.get("expected_value")
         if expected is None or expected == "" or expected == []:
@@ -2060,6 +2065,8 @@ async def execute_document_type_state_graph(
                 control, before, binding_before, preparation = await _prepare_phase_control_for_action(
                     page, graph, node, phase=phase, controls=before, profile=interaction_profile, document_type=True
                 )
+        agent_chat.field_ready(page, phase=phase, node=node, control=control,
+                               already=control is not None and _value_equal(node, control))
         if control is None:
             success = not bool(node.get("required"))
             attempts.append({
@@ -3486,6 +3493,8 @@ async def execute_phase_state_graph(
             current_controls = initial_controls
 
     for order, node in enumerate(selected_nodes, start=1):
+        # V243R35: a pause from the live chat takes effect between fields.
+        await operator_control.checkpoint(phase=phase, where=agent_chat.field_name(node))
         publish_executor_progress(page, phase=phase, node=node, stage="start")
         expected = node.get("expected_value")
         node_id = str(node.get("node_id") or "")
@@ -3602,6 +3611,8 @@ async def execute_phase_state_graph(
                 control, before, binding_before, preparation = await _prepare_phase_control_for_action(
                     page, graph, node, phase=phase, controls=before, profile=interaction_profile, document_type=False
                 )
+        agent_chat.field_ready(page, phase=phase, node=node, control=control,
+                               already=control is not None and _stateful_value_equal(node, control))
         protected_before = _snapshot_stateful_node_states(graph, before, completed_node_ids)
         dom_cursor = await _mark_dom_transition_cursor(page)
         transaction_proof: Dict[str, Any] = {

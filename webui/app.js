@@ -1058,8 +1058,203 @@ function wire() {
   document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 }
 
+// V243R35: the live agent chat on the right -- every action the agent takes, as it
+// takes it, and the operator's side of the conversation (status, pause, hints...).
+const CHAT_ICONS = {navigate:"🌐",click:"🖱",type:"⌨",select:"☑",key:"⌨",field:"✎",verified:"✓",failed:"✗",retry:"↻",heal:"♻",warn:"⚠",stop:"🛑",blocked:"⛔",complete:"✅",phase:"▶",progress:"📊",observe:"👁",wait:"⏳",paused:"⏸",resumed:"▶",ack:"📝",mission:"🚀",info:"ℹ"};
+const CHAT_PHASES = {data_map:"Data Map",source_document_type:"Source Document Type",target_document_type:"Target Document Type",rule:"Rule",source_transport_profile:"Source Transport Profile",target_transport_profile:"Target Transport Profile",biz_flow:"BizFlow"};
+function chatPhaseName(phase) { return CHAT_PHASES[phase] || String(phase||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()); }
+function chatParams() { return new URLSearchParams({config:$("configPath").value||"config.yaml", runs_dir:$("runsDir").value||"./runs"}); }
+function chatTime(at) { try { return new Date(at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}); } catch { return ""; } }
+function chatStrip(text) { return String(text||"").replace(/^[←-⯿\u{1F300}-\u{1FAFF}]️?\s+/u, ""); }
+function chatAtBottom() { const log=$("chatLog"); return !log || log.scrollHeight-log.scrollTop-log.clientHeight < 40; }
+function chatScrollToEnd() { const log=$("chatLog"); if (!log) return; log.scrollTop = log.scrollHeight; state.chat.follow = true; $("chatJump")?.classList.add("hidden"); }
+function chatCollapsed() { return !!document.querySelector(".shell")?.classList.contains("chat-collapsed"); }
+
+function initAgentChat() {
+  state.chat = {cursor:"", runId:"", count:0, loaded:false, follow:true, lastPhase:"", groupKey:"", groupEl:null, unread:0, frameUrl:"", busy:false, again:false, banner:"", timer:null};
+  let stored = null; try { stored = localStorage.getItem("hipChatCollapsed"); } catch { stored = null; }
+  setChatCollapsed(stored === null ? window.innerWidth <= 1350 : stored === "1", false);
+  $("chatCollapseBtn")?.addEventListener("click", () => setChatCollapsed(true));
+  $("chatOpenBtn")?.addEventListener("click", () => setChatCollapsed(false));
+  $("chatForm")?.addEventListener("submit", (e) => { e.preventDefault(); sendChat($("chatText").value); });
+  $("chatText")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat($("chatText").value); } });
+  document.querySelectorAll("#chatChips [data-chat]").forEach(b => b.addEventListener("click", () => sendChat(b.dataset.chat)));
+  // Follow new lines while the reader is at the bottom; only the reader scrolling up
+  // stops following (not the log resizing when a banner appears).
+  const log = $("chatLog");
+  ["wheel", "touchstart", "pointerdown", "keydown"].forEach(ev => log?.addEventListener(ev, () => { state.chat.userScrollAt = Date.now(); }, {passive: true}));
+  log?.addEventListener("scroll", () => {
+    if (Date.now() - (state.chat.userScrollAt || 0) < 1500) state.chat.follow = chatAtBottom();
+    if (chatAtBottom()) $("chatJump")?.classList.add("hidden");
+  });
+  if (window.ResizeObserver && log) new ResizeObserver(() => { if (state.chat.follow) log.scrollTop = log.scrollHeight; }).observe(log);
+  $("chatJump")?.addEventListener("click", () => chatScrollToEnd());
+  $("chatFrameImg")?.addEventListener("click", () => $("chatFrame")?.classList.toggle("zoom"));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("chatFrame")?.classList.remove("zoom"); });
+  pollChat();
+  clearInterval(state.chat.timer); state.chat.timer = setInterval(pollChat, 1500);
+}
+
+function setChatCollapsed(collapsed, remember = true) {
+  document.querySelector(".shell")?.classList.toggle("chat-collapsed", !!collapsed);
+  $("chatOpenBtn")?.classList.toggle("hidden", !collapsed);
+  if (!collapsed && state.chat) { state.chat.unread = 0; renderChatUnread(); chatScrollToEnd(); }
+  if (remember) { try { localStorage.setItem("hipChatCollapsed", collapsed ? "1" : "0"); } catch {} }
+}
+
+function renderChatUnread() {
+  const b = $("chatUnread"); if (!b) return;
+  const n = state.chat?.unread || 0;
+  b.textContent = n > 99 ? "99+" : String(n); b.classList.toggle("hidden", !n);
+}
+
+async function pollChat() {
+  if (!state.chat) return;
+  if (state.chat.busy) { state.chat.again = true; return; }
+  state.chat.busy = true;
+  try {
+    for (let pass = 0; pass < 2; pass++) {
+      const qs = chatParams(); if (state.chat.cursor) qs.set("cursor", state.chat.cursor);
+      const data = await api(`/api/mission/chat?${qs}`, {timeoutMs: 10000});
+      if (!data.found) { renderChatState(null, ""); return; }
+      if (data.run_id !== state.chat.runId) {
+        const stale = !!state.chat.cursor;
+        resetChatLog(data.run_id);
+        if (stale) continue;  // those offsets belonged to the previous run
+      }
+      state.chat.cursor = data.cursor || "";
+      appendChatMessages(data.messages || []);
+      renderChatState(data.state || {}, data.frame_url || "");
+      return;
+    }
+  } catch (e) {
+    // The status poll reports a backend outage; the chat simply waits for it.
+  } finally {
+    state.chat.busy = false;
+    if (state.chat.again) { state.chat.again = false; setTimeout(pollChat, 50); }
+  }
+}
+
+function resetChatLog(runId) {
+  Object.assign(state.chat, {runId, cursor:"", count:0, loaded:false, follow:true, lastPhase:"", groupKey:"", groupEl:null, frameUrl:""});
+  const log = $("chatLog"); if (log) log.innerHTML = "";
+}
+
+function renderChatMessage(m) {
+  const el = document.createElement("div");
+  const role = m.role === "user" ? "user" : (m.source === "operator" ? "reply" : "agent");
+  const kind = String(m.kind || "info").replace(/[^a-z_]/gi, "");
+  el.className = `chat-msg ${role} k-${kind}`;
+  const icon = role === "user" ? "🧑" : role === "reply" ? "💬" : (CHAT_ICONS[kind] || "•");
+  el.innerHTML = `<span class="chat-icon" aria-hidden="true">${icon}</span><div class="chat-bubble"><p>${esc(role === "user" ? m.text : chatStrip(m.text))}</p><time>${esc(chatTime(m.at))}</time></div>`;
+  return el;
+}
+
+function updateChatGroup(el, m) {
+  // A run of similar lines (fields already correct, key presses, live counts)
+  // folds into one bubble: the newest line, the rest under "N similar".
+  el._items = (el._items || []).concat([m]);
+  const items = el._items, last = items[items.length - 1];
+  el.querySelector(".chat-bubble").innerHTML = `<p>${esc(chatStrip(last.text))}</p><details><summary>+${items.length - 1} similar</summary>${items.slice(0, -1).reverse().slice(0, 60).map(x => `<p>${esc(chatStrip(x.text))}</p>`).join("")}</details><time>${esc(chatTime(last.at))}</time>`;
+}
+
+function appendChatMessages(rows) {
+  const log = $("chatLog"); if (!log || !rows.length) { if (state.chat) state.chat.loaded = true; return; }
+  // Your own message (and the answer to it) always comes into view.
+  const stick = state.chat.follow || !state.chat.loaded || rows.some(r => r.role === "user");
+  if (!state.chat.count) log.innerHTML = "";
+  for (const m of rows) {
+    state.chat.count += 1;
+    const phase = m.phase || "";
+    if (phase && phase !== state.chat.lastPhase && m.role !== "user") {
+      state.chat.lastPhase = phase; state.chat.groupKey = ""; state.chat.groupEl = null;
+      const d = document.createElement("div"); d.className = "chat-divider"; d.textContent = chatPhaseName(phase); log.appendChild(d);
+    }
+    const group = m.group || "";
+    if (group && group === state.chat.groupKey && state.chat.groupEl) { updateChatGroup(state.chat.groupEl, m); continue; }
+    const el = renderChatMessage(m); el._items = [m];
+    log.appendChild(el);
+    state.chat.groupKey = group; state.chat.groupEl = group ? el : null;
+  }
+  if (stick) chatScrollToEnd(); else $("chatJump")?.classList.remove("hidden");
+  if (state.chat.loaded && chatCollapsed()) { state.chat.unread += rows.filter(r => r.role !== "user").length; renderChatUnread(); }
+  state.chat.loaded = true;
+}
+
+function appendLocalChat(text, reply) {
+  appendChatMessages([{role:"user", kind:"message", text, at:new Date().toISOString(), source:"operator"},
+                      {role:"agent", kind:"reply", text:reply, at:new Date().toISOString(), source:"operator"}]);
+}
+
+function renderChatState(st, frameUrl) {
+  const dot = $("chatDot"), sub = $("chatSubtitle"); if (!dot || !sub) return;
+  if (!st) { dot.className = "chat-dot"; sub.textContent = "Waiting for a mission"; renderChatBanner({}); return; }
+  const paused = st.running && (st.paused || st.process_paused);
+  let text, cls = "";
+  if (paused) { text = `Paused on ${st.phase_display || "the mission"} — say “resume”`; cls = "paused"; }
+  else if (st.running) { text = st.phase_display ? `Working on ${st.phase_display}${st.attempt > 1 ? ` (attempt ${st.attempt})` : ""}` : "Starting the mission"; cls = "running"; }
+  else if (st.mission_status === "blocked") { text = `Stopped — ${st.phase_display || "a phase"} is blocked`; cls = "blocked"; }
+  else if (st.mission_status === "complete") { text = "Mission complete"; }
+  else { text = `Idle — last run ${st.run_id || ""}`; }
+  dot.className = `chat-dot ${cls}`; sub.textContent = text; sub.title = st.activity || text;
+  const lm = st.live_map || {}, total = Number(lm.total || 0), exact = Number(lm.exact || 0);
+  $("chatPhase").textContent = lm.phase_display || st.phase_display || "No phase yet";
+  $("chatCount").textContent = total ? (lm.complete ? `${exact}/${total} ✓ complete` : `${exact}/${total} on the form`) : "";
+  $("chatBar").style.width = total ? `${Math.round(100 * exact / total)}%` : "0%";
+  renderChatBanner(st);
+  const url = frameUrl || state.agentLiveViewScreenshotUrl || "";
+  const img = $("chatFrameImg");
+  if (url && url !== state.chat.frameUrl && img) {
+    state.chat.frameUrl = url; img.src = url; img.classList.remove("hidden"); $("chatFrameEmpty")?.classList.add("hidden");
+  }
+  const age = $("chatFrameAge");
+  const t = Number(new URLSearchParams((frameUrl || "").split("?")[1] || "").get("t") || 0);
+  if (age && t) {
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    age.textContent = st.running ? (s < 10 ? "● live" : `${s}s ago`) : `last frame ${chatTime(new Date(t).toISOString())}`;
+    age.classList.remove("hidden");
+  } else if (age) { age.classList.add("hidden"); }
+}
+
+function renderChatBanner(st) {
+  const b = $("chatBanner"); if (!b) return;
+  let html = "", cls = "chat-banner";
+  if (st.review) {
+    html = `<b>The agent asks you:</b> is <b>${esc(chatPhaseName(st.review.phase))}</b> correct?${st.review.automated_verdict ? ` <span class="muted">(automated: ${esc(st.review.automated_verdict)})</span>` : ""}<div class="button-row"><button class="small-button" data-chat-send="accept">✅ Accept</button><button class="small-button" data-chat-send="reject">✗ Needs correction</button></div>`;
+  } else if (st.assistance) {
+    html = `<b>The agent needs your help</b> finding ${esc(st.assistance.count)} field(s)${st.assistance.reason ? `: ${esc(st.assistance.reason)}` : ""}<div class="button-row"><button class="small-button" data-chat-teach="1">Open the Teach panel</button></div>`;
+  } else if (st.running && (st.paused || st.process_paused)) {
+    cls += " paused";
+    html = `⏸ The agent is paused${st.process_paused ? " (process paused)" : ""} — it finished the field in hand and waits.<div class="button-row"><button class="small-button" data-chat-send="resume">▶ Resume</button></div>`;
+  }
+  if (!html) { b.className = "chat-banner hidden"; b.innerHTML = ""; state.chat.banner = ""; return; }
+  if (state.chat.banner === html) return;
+  state.chat.banner = html; b.className = cls; b.innerHTML = html;
+  b.querySelectorAll("[data-chat-send]").forEach(x => x.onclick = () => sendChat(x.dataset.chatSend));
+  b.querySelectorAll("[data-chat-teach]").forEach(x => x.onclick = () => {
+    const panel = $("humanAssistState")?.closest(".panel"), tab = panel?.closest(".tab-panel");
+    if (tab) showTab(tab.id); panel?.scrollIntoView({behavior: "smooth", block: "start"});
+  });
+}
+
+async function sendChat(text) {
+  const msg = String(text || "").trim(); if (!msg) return;
+  if (/^\s*(stop|abort|cancel|kill)\b/i.test(msg) && msg.split(/\s+/).length <= 3
+      && !confirm("Stop the running mission? Stopping saves nothing on the portal.")) return;
+  const input = $("chatText"), btn = $("chatSend"); if (btn) btn.disabled = true;
+  try {
+    const data = await api("/api/mission/chat", {method: "POST", timeoutMs: 20000,
+      body: JSON.stringify({text: msg, config: $("configPath").value || "config.yaml", runs_dir: $("runsDir").value || "./runs"})});
+    if (input && input.value.trim() === msg) input.value = "";
+    if (state.chat) state.chat.follow = true;
+    if (!data.found) appendLocalChat(msg, data.reply || ""); else await pollChat();
+  } catch (e) { toast(e.message, "bad"); }
+  finally { if (btn) btn.disabled = false; }
+}
+
 async function boot() {
   wire();
+  initAgentChat();
   syncWitnessMode();
   try { await loadSections(); } catch(e){ toast(`Could not load sections: ${e.message}`,"bad"); }
   await Promise.all([refreshStatus(), runPreflight(true)]);
