@@ -143,7 +143,6 @@
         <article><span>Recursive Improvement</span><strong id="recursiveMetric">—</strong><small id="recursiveDetail">bounded self-improvement</small></article>
         <article><span>Learned from past runs</span><strong id="runHistoryMetric">—</strong><small id="runHistoryDetail">run folders + MLflow</small></article>
         <article><span>Edit / action sections known</span><strong id="editSectionsMetric">—</strong><small id="editSectionsDetail">listing › expand › Edit</small></article>
-        <article><span>WebMCP tools</span><strong id="webmcpMetric">—</strong><small id="webmcpDetail">navigator.modelContext</small></article>
       </section>
 
       <nav class="tabs" id="tabs">
@@ -212,6 +211,12 @@
             <div id="runsList" class="run-list"></div>
           </article>
         </div>
+        <article class="panel" id="liveInputMapPanel">
+          <div class="panel-head"><h2>Live input.json ↔ HIP form</h2><div><span id="liveInputMapState" class="badge neutral">Waiting</span></div></div>
+          <p class="help">Every input.json value of the phase being filled, the form field it maps to and what the form holds right now (refreshed every few seconds, read without touching the page). When every value is exact the phase is complete and filling stops.</p>
+          <div id="liveInputMapSummary" class="kv"></div>
+          <div class="table-wrap"><table class="table"><thead><tr><th>input.json</th><th>Form field</th><th>Expected</th><th>Live</th><th>State</th></tr></thead><tbody id="liveInputMapRows"><tr><td colspan="5" class="empty">Starts with the next phase that is filled.</td></tr></tbody></table></div>
+        </article>
         <article class="panel agent-live-view" id="agentLiveViewPanel">
           <div class="panel-head"><h2>Agent Live View</h2><div><span id="agentLiveViewState" class="badge neutral">Waiting</span> <span class="badge">What the agent sees / selects</span></div></div>
           <p class="help">Browser-Use-style observability: the same live semantic gate that authorizes HIP actions drives these transient overlays. Private model chain-of-thought, selectors, coordinates and customer values are not stored.</p>

@@ -1,4 +1,26 @@
-# V243R33 — WebMCP: the tools a page offers the agent help complete the task (2026-09-30)
+# V243R34 — Live input.json map, real learning status, faster fill; WebMCP removed (2026-10-01)
+
+- WebMCP (R33) removed: `hip_id_agent/webmcp.py`, its replicas and tests, the engine page-tool pass, the browser-context script, the `webmcp` config, the `webmcp-tools` CLI, `GET /api/webmcp` and the tile. `APPLY_V243R34_IN_PLACE.ps1` moves R33's files to the backup.
+- `backend/app.py`:
+  - `_runtime_status_payload` computes every part on its own (`_status_part`): a failing part returns `{"available": false, "status_error": …}`, is listed in `section_errors` and logged with its traceback to `.backend_runtime/runtime_status_errors.json`; nothing else is lost (before, one error blanked the status and every learning tile read "Off");
+  - `GET /api/mission/live-input-map`.
+- Control Center:
+  - the backend badge names the failed parts;
+  - tiles show "Error" with the message, "—" for a missing part, and "Off" only when disabled;
+  - the AutoGen badge says "status unavailable" instead of "blocked" when its part failed;
+  - new Mission panel *Live input.json ↔ HIP form*.
+- `phase_live_reproof.live_input_field_map`: every input.json value with the form field it maps to (the form's own label), expected and live value, and state (exact / different / not_on_screen / invalid / not_checked); `complete`. `_prove_surface(field_rows_out=)`; `section_judge` matched values carry the control label.
+- `input_json_authority.quiet_completion_probe` returns the map.
+- `dummy_fill_e2e` writes `input_json_live_map.json` (run and phase folders) on each refresh and records "Every input.json value is on the form" in the mission trace.
+- `phase_progress.run_with_progress_watchdog`:
+  - `live_map_seconds` cadence;
+  - `filled_again_after_complete`: a complete form refilled for `post_complete_fill_seconds` is stopped as complete; a complete form only finishing is left alone.
+- Goal engine: `single_pass_when_input_json_exact` — after a successful first pass with an exact live proof, no second full fill (learning path unchanged).
+- `stateful_form_runtime._wait_for_dom_transition_activity` does not wait out its timeout on a page without the DOM observer (TP replica fill ~86 s → ~25 s).
+- Config: `runtime_self_heal.live_map_seconds` (5), `post_complete_fill_seconds` (30), `autonomous_form.single_pass_when_input_json_exact` (true).
+- Tests: `tests/test_v243r34_live_input_map_and_status.py` (7).
+
+# V243R33 — WebMCP: the tools a page offers the agent help complete the task (2026-09-30) — removed in V243R34
 
 - New `hip_id_agent/webmcp.py`:
   - `WEBMCP_INIT_JS`, added to every page before its own scripts:

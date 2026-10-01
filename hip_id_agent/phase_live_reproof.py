@@ -141,6 +141,86 @@ async def _live_file_proof(page: Any, uploads: List[Dict[str, Any]]) -> Dict[str
     }
 
 
+def _field_label(fact: Mapping[str, Any]) -> str:
+    """The human label a fact is matched by ("Profile Name"), else its key."""
+    aliases = [str(a) for a in (fact.get("aliases") or []) if str(a).strip()]
+    human = [a for a in aliases if " " in a or a[:1].isupper()]
+    return max(human, key=lambda a: len(a.split())) if human else (aliases or [str(fact.get("field") or "")])[0]
+
+
+def _short_path(path: Any) -> str:
+    text = str(path or "")
+    return text.split(".objects.", 1)[1] if ".objects." in text else text.lstrip("$.")
+
+
+def _field_rows(
+    expected: Mapping[str, Any], deterministic: Mapping[str, Any], uploads: Sequence[Mapping[str, Any]],
+    upload_proof: Mapping[str, Any], invalid_fields: Sequence[str],
+) -> List[Dict[str, Any]]:
+    """One row per input.json value: which form field, expected vs live, and its state (V243R34)."""
+    matched = [m for m in (deterministic.get("matched_values") or []) if isinstance(m, dict)]
+    missing = [m for m in (deterministic.get("missing_values") or []) if isinstance(m, dict)]
+    invalid = {str(x).lower().rstrip(" *") for x in invalid_fields}
+    rows: List[Dict[str, Any]] = []
+    for fact in [f for f in (expected.get("facts") or []) if isinstance(f, dict)]:
+        value = fact.get("value")
+        if fact.get("required", True) is False or value is None or str(value).strip() == "":
+            continue
+        label = _field_label(fact)
+        row = {"field": str(fact.get("field") or ""), "input_path": _short_path(fact.get("input_path")), "label": label,
+               "section": str(fact.get("section") or ""), "row": fact.get("row_index"), "expected": value}
+        if str(value).lower().startswith("disabled(") or str(value).lower() in {"not enabled", "false"}:
+            # The completion judge requires nothing for an "off" value (as the proof does).
+            rows.append(dict(row, live="", status="not_checked"))
+            continue
+        hit = next((m for m in matched if m.get("field") == fact.get("field") and m.get("input_path") == fact.get("input_path")
+                    and m.get("row_index") == fact.get("row_index")), None)
+        if hit is not None:
+            matched.remove(hit)
+            label = str(hit.get("label") or label).rstrip(" *")
+            row.update(label=label, live=hit.get("actual"), status="invalid" if label.lower() in invalid else "exact")
+        else:
+            miss = next((m for m in missing if m.get("field") == fact.get("field")), None)
+            if miss is not None:
+                missing.remove(miss)
+            seen = list((miss or {}).get("actual_candidates") or [])
+            row.update(live=seen[0] if seen else "", status="different" if seen else "not_on_screen")
+        rows.append(row)
+    matched_uploads = set((upload_proof or {}).get("matched_fields") or [])
+    for up in uploads:
+        field = str(up.get("field") or "")
+        rows.append({"field": field, "input_path": _short_path(up.get("input_path")), "label": field.replace("_", " "),
+                     "section": str(up.get("section") or ""), "row": None, "expected": up.get("expected_basename"),
+                     "live": up.get("expected_basename") if field in matched_uploads else "",
+                     "status": "exact" if field in matched_uploads else "not_on_screen", "kind": "upload"})
+    return rows
+
+
+async def live_input_field_map(
+    *, page: Any, phase: str, phase_input: Dict[str, Any], judge: Optional[DualModelSectionJudge] = None,
+) -> Dict[str, Any]:
+    """V243R34: the live map of input.json onto the form, read without touching anything.
+
+    Every input.json value with the form field it maps to, the value the form
+    holds right now and its state: ``exact`` (committed and equal), ``different``
+    (the field shows another value), ``not_on_screen`` (no field yet: another tab,
+    a section not opened, a row not added) or ``invalid`` (the portal flags it).
+    ``complete`` is true when every value is exact -- the moment to stop filling.
+    """
+    rows: List[Dict[str, Any]] = []
+    proof = await _prove_surface(page=page, phase=phase, phase_input=phase_input, judge=judge, field_rows_out=rows)
+    counts = {k: sum(1 for r in rows if r.get("status") == k) for k in ("exact", "different", "not_on_screen", "invalid", "not_checked")}
+    checked = len(rows) - counts["not_checked"]
+    from .security import mask_sensitive_data
+
+    return {
+        "schema_version": "hip.live-input-json-map.v1", "phase": phase, "total": checked, **counts,
+        "complete": checked > 0 and counts["exact"] == checked and bool(proof.get("pass")),
+        "proof_status": proof.get("status"), "invalid_fields": proof.get("invalid_fields") or [],
+        "rows": mask_sensitive_data(rows), "read_only": True,
+    }
+
+
 def _chip_values(controls: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """V243R32: a chip multi-select with an empty text value reads as its chosen chips."""
     out: List[Dict[str, Any]] = []
@@ -224,8 +304,12 @@ async def _prove_surface(
     phase_input: Dict[str, Any],
     judge: Optional[DualModelSectionJudge] = None,
     section: Optional[str] = None,
+    field_rows_out: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Prove the *current* live form without taking any physical action.
+
+    V243R34: ``field_rows_out`` (the live input.json map) receives one row per
+    input.json value: the form field it maps to, expected and live value, status.
 
     V243R32: ``section`` proves one section of a wizard (a Business Flow tab):
     only that section's input.json facts and uploads are compared, because a
@@ -306,6 +390,8 @@ async def _prove_surface(
     })
     field_pass = bool(deterministic.get("pass"))
     passed = bool(field_pass and upload_proof.get("pass") and not invalid_fields)
+    if field_rows_out is not None:
+        field_rows_out.extend(_field_rows(expected_for_fields, deterministic, uploads, upload_proof, invalid_fields))
     return {
         "schema_version": "hip.live-read-only-phase-reproof.v1",
         "phase": phase,

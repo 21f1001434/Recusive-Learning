@@ -851,14 +851,6 @@ class BrowserSession:
         self.context.set_default_timeout(self.config.portal.timeout_ms)
         await self.context.add_init_script(CLICK_LISTENER_SCRIPT)
         await self.context.add_init_script(DOM_EVENT_OBSERVER_SCRIPT)
-        # V243R33: WebMCP (navigator.modelContext) on every page, also after a restart.
-        try:
-            from .webmcp import install_on_context, webmcp_policy
-
-            self.webmcp_installed = await install_on_context(self.context, webmcp_policy(self.config))
-        except Exception as exc:
-            self.webmcp_installed = False
-            self.webmcp_install_error = mask_sensitive_string(str(exc))[:300]
         self.context.on("page", lambda p: asyncio.create_task(self._observe_new_page(p)))
         await self._start_playwright_trace()
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()

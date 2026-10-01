@@ -7,13 +7,14 @@ param(
 $ErrorActionPreference = "Stop"
 $PatchRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$backupRoot = Join-Path $TargetRoot ".hip_patch_backups\V243R33_$timestamp"
+$backupRoot = Join-Path $TargetRoot ".hip_patch_backups\V243R34_$timestamp"
 New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
 
-# User/environment/runtime state is intentionally preserved. R33 (which includes
-# R13-R32) needs no config.yaml changes: every new setting has a default
-# (R33 the webmcp section: enabled / inject_polyfill / agent_tools / use_page_tools_for_fill /
-# min_input_coverage / tool_timeout_seconds / max_calls_per_phase / settle_ms;
+# User/environment/runtime state is intentionally preserved. R34 (which includes
+# R13-R32; R33 WebMCP is removed) needs no config.yaml changes: every new setting has a default
+# (R34 runtime_self_heal.live_map_seconds / post_complete_fill_seconds and
+# autonomous_form.single_pass_when_input_json_exact; a kept config.yaml may still hold
+# R33's webmcp section -- it is ignored;
 # R32 exploration.explore_branches_after_fill (false: a filled form is not changed again),
 # autonomous_form.stop_when_input_json_exact, runtime_self_heal.refill_probe_seconds /
 # refill_loop_seconds / whitelabel_browser_restarts;
@@ -72,7 +73,7 @@ $files = @(
   "V243R30_EDIT_SECTIONS_EVERY_PHASE_20260929.md", "APPLY_V243R30_IN_PLACE.ps1", "VERIFY_V243R30_INSTALL.ps1",
   "V243R31_CLONE_DEPLOY_MIGRATE_EVERY_PHASE_20260929.md", "APPLY_V243R31_IN_PLACE.ps1", "VERIFY_V243R31_INSTALL.ps1",
   "V243R32_STOP_WHEN_COMPLETE_AND_WHITELABEL_RESTART_20260930.md", "APPLY_V243R32_IN_PLACE.ps1", "VERIFY_V243R32_INSTALL.ps1",
-  "V243R33_WEBMCP_TOOLS_HELP_COMPLETE_THE_TASK_20260930.md", "APPLY_V243R33_IN_PLACE.ps1", "VERIFY_V243R33_INSTALL.ps1",
+  "V243R34_LIVE_INPUT_MAP_REAL_STATUS_NO_WEBMCP_20261001.md", "APPLY_V243R34_IN_PLACE.ps1", "VERIFY_V243R34_INSTALL.ps1",
   "hip_portal_id_agent-2.4.3-py3-none-any.whl"
 )
 
@@ -107,10 +108,21 @@ foreach ($rel in $files) {
   Copy-Item -Force $src $dst
 }
 
+# R34: WebMCP (R33) is removed -- delete its files from a tree that had R33 applied.
+foreach ($gone in @("hip_id_agent\webmcp.py", "tests\test_v243r33_webmcp.py", "tests\webmcp_portal_support.py",
+                     "APPLY_V243R33_IN_PLACE.ps1", "VERIFY_V243R33_INSTALL.ps1", "V243R33_WEBMCP_TOOLS_HELP_COMPLETE_THE_TASK_20260930.md")) {
+  $path = Join-Path $TargetRoot $gone
+  if (Test-Path $path) {
+    $backup = Join-Path $backupRoot $gone
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
+    Move-Item -Force $path $backup
+  }
+}
+
 $wheel = Join-Path $TargetRoot "hip_portal_id_agent-2.4.3-py3-none-any.whl"
 if (-not $SkipWheelInstall) {
   if (-not (Test-Path $wheel)) { throw "R20 wheel missing after patch copy: $wheel" }
-  Write-Host "Installing exact V243R33 wheel..." -ForegroundColor Cyan
+  Write-Host "Installing exact V243R34 wheel..." -ForegroundColor Cyan
   & python -m pip install --force-reinstall --no-deps $wheel
   if ($LASTEXITCODE -ne 0) { throw "Wheel installation failed: $LASTEXITCODE" }
   # R27: MLflow is recorded and learned from. The wheel is installed without its
@@ -127,11 +139,10 @@ if (-not $SkipWheelInstall) {
 
 if (-not $SkipSmokeCheck) {
   Push-Location $TargetRoot
-  try { & .\VERIFY_V243R33_INSTALL.ps1 } finally { Pop-Location }
+  try { & .\VERIFY_V243R34_INSTALL.ps1 } finally { Pop-Location }
 }
-Write-Host "V243R33 WebMCP: page tools (navigator.modelContext) help complete the task (includes R13-R32) applied in place." -ForegroundColor Green
-Write-Host "Next: restart the Control Center (bun run platform). See what each HIP page offers (read-only):"
-Write-Host "  python -m hip_id_agent.cli webmcp-tools"
+Write-Host "V243R34 live input.json map, real learning status, faster fill; WebMCP removed (includes R13-R32) applied in place." -ForegroundColor Green
+Write-Host "Next: restart the Control Center (bun run platform). Mission tab -> 'Live input.json <-> HIP form' shows every value as the form fills."
 Write-Host "Target: $TargetRoot"
 Write-Host "Backup: $backupRoot"
 Write-Host "Preserved: config.yaml, .env, input.json, runs, data\hip_memory, .backend_runtime, .hip_runtime"

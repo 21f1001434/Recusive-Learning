@@ -951,6 +951,31 @@ def runtime_status(config: str = "config.yaml") -> Dict[str, Any]:
         _RUNTIME_STATUS_LOCK.release()
 
 
+_STATUS_ERROR_LOG: Dict[str, Any] = {}
+
+
+def _status_part(errors: Dict[str, str], name: str, compute: Any, fallback: Any = "__section__") -> Any:
+    """V243R34: compute one part of the runtime status; a failure is that part's error only."""
+    try:
+        return compute()
+    except Exception as exc:
+        import traceback
+
+        message = mask_sensitive_string(f"{type(exc).__name__}: {exc}")[:300]
+        errors[name] = message
+        _STATUS_ERROR_LOG[name] = {"error": message, "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                                   "traceback": mask_sensitive_string(traceback.format_exc())[-4000:]}
+        try:
+            log_dir = ROOT / ".backend_runtime"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            (log_dir / "runtime_status_errors.json").write_text(json.dumps(_STATUS_ERROR_LOG, indent=1), encoding="utf-8")
+        except Exception:
+            pass
+        if fallback != "__section__":
+            return fallback
+        return {"available": False, "status_error": message}
+
+
 def _runtime_status_payload(config: str = "config.yaml") -> Dict[str, Any]:
     # A freshly installed wheel may be launched before the operator has copied a
     # project config beside it.  The Control Center must still boot and explain
@@ -1001,161 +1026,167 @@ def _runtime_status_payload(config: str = "config.yaml") -> Dict[str, Any]:
                 "served_by_backend": True,
             },
         }
-    latest = latest_certification(cfg.reporting.runs_dir)
-    # Built once per status (each used to be constructed two or three times).
-    portfolio = model_portfolio_from_config(cfg)
-    replay = replay_policy_engine_from_config(cfg)
-    skills = _skill_library(cfg)
-    return {
-        "runtime_env": {
-            "loaded": bool((RUNTIME_ENV_STATUS or {}).get("loaded")),
-            "loaded_file_count": len((RUNTIME_ENV_STATUS or {}).get("loaded_files") or []),
-            "explicit_env_file_configured": bool((RUNTIME_ENV_STATUS or {}).get("explicit_env_file")),
-        },
-        "autogen": autogen_runtime_status(verify_imports=True),
-        "mlflow": mlflow_runtime_probe(cfg.mlflow),
-        "skill_induction": {
-            "enabled": bool(cfg.skill_induction.enabled),
-            "fast_replay_enabled": bool(cfg.skill_induction.fast_replay_enabled),
-            **skills.manifest(),
-        },
-        "replay_policy": {
-            "enabled": bool(cfg.replay_policy.enabled),
-            "dreaming_enabled": bool(cfg.replay_policy.dreaming_enabled),
-            **replay.manifest(),
-        },
-        "model_portfolio": portfolio.manifest(),
-        "run_history_learning": _run_history_summary(cfg),
-        "edit_sections": _edit_sections_summary(cfg),
-        "webmcp": _webmcp_summary(cfg),
-        "portal_skills": _portal_skills_totals(cfg),
-        "recursive_self_improvement": recursive_improvement_from_config(
-            cfg, replay_policy=replay, model_portfolio=portfolio, skill_library=skills
-        ).manifest(),
-        "trace_self_repair": trace_self_repair_from_config(cfg, model_portfolio=portfolio).manifest(),
-        "deterministic_recipe": deterministic_recipe_from_config(cfg).manifest(),
-        "human_in_the_loop": human_teaching_from_config(cfg).manifest(),
-        "human_phase_review": human_phase_review_from_config(cfg).manifest(),
-        "pyautogui": PyAutoGUIFallbackTool(cfg, ROOT / ".backend_runtime" / "pyautogui_status").status(),
-        "process": _process_state(),
-        "capability_graph": graph.manifest(),
-        "full_deep_readiness": (latest.get("certification") or {}) if latest.get("found") else HIPCapabilityCertifier(graph).certify(),
-        "mutation_confirmation": MUTATION_CONFIRMATION,
-        "independent_sections": section_catalog(),
-        "expert_skills": {
-            "enabled": bool(cfg.expert_skills.enabled),
-            "description_trigger_enabled": bool(cfg.expert_skills.description_trigger_enabled),
-            "require_skill_vetting": bool(cfg.expert_skills.require_skill_vetting),
-            "deterministic_first": bool(cfg.expert_skills.deterministic_first),
-            "primary_browser_framework": "autowebglm" if bool(cfg.autowebglm.primary_framework) else "deterministic",
-            "deterministic_drivers_role": "verified_tool_adapters",
-            "context_max_chars": int(cfg.expert_skills.context_max_chars),
-            "recovery_context_max_chars": int(cfg.expert_skills.recovery_context_max_chars),
-            "catalog": expert_skill_catalog(),
-        },
-        "playwright_mcp": {
-            "enabled": bool(cfg.mcp.use_playwright_mcp),
-            "required_when_mcp_required": bool(cfg.mcp.playwright_mcp_required_when_require_mcp),
-            "primary_for_safe_actions": bool(cfg.mcp.playwright_mcp_primary_for_safe_actions),
-            "verify_every_action": bool(cfg.mcp.playwright_mcp_verify_every_action),
-            "snapshot_after_action": bool(cfg.mcp.playwright_mcp_snapshot_after_action),
-            "same_browser_cdp_port": int(cfg.mcp.playwright_mcp_remote_debugging_port),
-            "execution_contract": "AutoWebGLM planner -> semantic target proof -> PyAutoGUI MCP primary physical interaction -> Playwright MCP fallback/verification -> deterministic Python Playwright last compatibility fallback",
-        },
-        "browser_use": {
-            "enabled": bool(cfg.browser_use.enabled),
-            "same_browser_cdp": bool(cfg.browser_use.attach_same_browser),
-            "recovery_context": bool(cfg.expert_skills.browser_use_recovery_context),
-            "role": "same-CDP recovery perception; optional browser-use/web-ui sidecar is observational/debugging, while PyAutoGUI MCP is the primary physical interaction engine",
-        },
-        "browser": {
-            "channel": str(cfg.portal.chromium_channel or "chrome"),
-            "primary_name": ("Google Chrome" if str(cfg.portal.chromium_channel or "").strip().lower() == "chrome" else "Microsoft Edge" if str(cfg.portal.chromium_channel or "").strip().lower() == "msedge" else str(cfg.portal.chromium_channel or "Chromium")),
-            "chrome_primary": str(cfg.portal.chromium_channel or "").strip().lower() == "chrome",
-            "edge_primary": str(cfg.portal.chromium_channel or "").strip().lower() == "msedge",
-            "user_data_dir": str(cfg.portal.browser_user_data_dir),
-            "chrome_executable_configured": bool(str(getattr(cfg.portal, "chrome_executable_path", "") or "").strip()),
-            "edge_executable_configured": bool(str(getattr(cfg.portal, "edge_executable_path", "") or "").strip()),
-            "fallback_to_edge": bool(getattr(cfg.portal, "fallback_to_edge", True)),
-            "cdp_shared_session": bool(cfg.browser_use.attach_same_browser),
-        },
-        "vision_runtime": {
-            **VisionRuntimeBridge(cfg.vision_runtime, aia_config=cfg.aia).status(),
-            "use_for_recovery": bool(cfg.vision_runtime.use_for_recovery),
-            "use_for_loading_watchdog": bool(cfg.vision_runtime.use_for_loading_watchdog),
-            "loading_refresh_after_seconds": int(cfg.vision_runtime.loading_refresh_after_seconds),
-            "loading_confidence_threshold": float(cfg.vision_runtime.loading_confidence_threshold),
-            "loading_fail_closed": bool(cfg.vision_runtime.fail_closed_when_unavailable),
-        },
-        "autowebglm": {
-            **AutoWebGLMRecoveryBridge(cfg.autowebglm, aia_config=cfg.aia).status(),
-            "reward_gate_required": bool(cfg.autowebglm.require_agentq_reward_gate),
-            "allowed_actions": list(cfg.autowebglm.allowed_actions),
-            "official_action_count": len(list(cfg.autowebglm.allowed_actions)),
-        },
-        "semantic_affordances": {
-            **semantic_affordance_status(),
-            "repeatable_row_semantic_identity": True,
-            "exact_add_effect": "N -> N+1",
-            "row_rebind_after_angular_generation": True,
-            "autowebglm_primary_policy": bool(cfg.autowebglm.primary_framework),
-        },
-        "semantic_understanding": {
-            **semantic_control_mcp_status(),
-            "enabled": bool(cfg.semantic_understanding.enabled),
-            "execute_confidence_threshold": float(cfg.semantic_understanding.execute_confidence_threshold),
-            "reobserve_confidence_threshold": float(cfg.semantic_understanding.reobserve_confidence_threshold),
-            "ambiguity_margin": float(cfg.semantic_understanding.ambiguity_margin),
-            "fail_closed": bool(cfg.semantic_understanding.fail_closed),
-            "revalidate_before_dispatch": bool(cfg.semantic_understanding.revalidate_before_dispatch),
-            "require_post_action_effect": bool(cfg.semantic_understanding.require_post_action_effect),
-            "playwright_mcp_evidence_required": bool(cfg.semantic_understanding.require_playwright_mcp_evidence),
-            "devtools_mcp_evidence_required": bool(cfg.semantic_understanding.require_devtools_evidence),
-            "hip_intelligence_mcp_consensus": bool(cfg.semantic_understanding.use_hip_intelligence_mcp_consensus),
-            "hip_intelligence_mcp_evidence_required": bool(cfg.semantic_understanding.require_hip_intelligence_mcp_evidence),
-            "vision_role": "ambiguity confirmation only; never coordinate execution",
-            "execution_contract": "AutoWebGLM intent -> HIP semantic evidence fusion -> Playwright MCP execute -> exact semantic effect verification",
-        },
-        "langchain_browser_toolkit": {
-            "enabled": bool(cfg.langchain_browser_toolkit.enabled),
-            "same_browser_cdp": bool(cfg.langchain_browser_toolkit.attach_same_browser),
-            "read_only": bool(cfg.langchain_browser_toolkit.read_only),
-            "allowed_tools": list(cfg.langchain_browser_toolkit.allowed_tools),
-            "role": "read-only recovery perception under AutoWebGLM primary policy; navigation/click tools are not exposed",
-        },
-        "production_e2e": {
-            "enabled": bool(cfg.production_e2e.enabled),
-            "single_active_browser_session": bool(cfg.production_e2e.single_active_browser_session),
-            "lock_filename": str(cfg.production_e2e.lock_filename),
-            "lock_stale_seconds": int(cfg.production_e2e.lock_stale_seconds),
-            "lock_heartbeat_seconds": int(cfg.production_e2e.lock_heartbeat_seconds),
-            "require_autogen_075": bool(cfg.production_e2e.require_autogen_075),
-            "require_input_json_when_fill_requested": bool(cfg.production_e2e.require_input_json_when_fill_requested),
-            "require_live_runtime_certificate_for_mutation": bool(cfg.production_e2e.require_live_runtime_certificate_for_mutation),
-            "require_golden_reference_for_known_phase_tasks": bool(cfg.production_e2e.require_golden_reference_for_known_phase_tasks),
-            "require_operator_role_for_mutation": bool(cfg.production_e2e.require_operator_role_for_mutation),
-            "require_approval_id_for_mutation": bool(cfg.production_e2e.require_approval_id_for_mutation),
-            "require_execution_input_immutability": bool(cfg.production_e2e.require_execution_input_immutability),
-            "require_governance_ledger_integrity_for_mutation": bool(cfg.production_e2e.require_governance_ledger_integrity_for_mutation),
-            "capture_mutation_before_after_evidence": bool(cfg.production_e2e.capture_mutation_before_after_evidence),
-            "create_safe_review_bundle": bool(cfg.production_e2e.create_safe_review_bundle),
-            "safe_review_bundle_name": str(cfg.production_e2e.safe_review_bundle_name),
-            "safe_review_strict_allowlist": bool(cfg.production_e2e.safe_review_strict_allowlist),
-            "execution_integrity_receipt": bool(cfg.production_e2e.write_execution_integrity_receipt),
-            "failure_diagnostics": bool(cfg.production_e2e.write_failure_diagnostics),
-            "hash_chained_journal": bool(cfg.production_e2e.write_hash_chained_journal),
-            "same_process_control_center": True,
-            "one_command_entrypoint": "hip-agent run-production-e2e",
-        },
-        "governance": {
-            "enabled": bool(cfg.governance.enabled),
-            "operator_role_env_var": cfg.governance.operator_role_env_var,
-            "default_operator_role": cfg.governance.default_operator_role,
-            "require_approval_id_for_mutation": cfg.governance.require_approval_id_for_mutation,
-            "mutation_roles": cfg.governance.mutation_roles,
-            "duplicate_window_hours": cfg.governance.duplicate_window_hours,
-        },
-    }
+    # V243R34: every part of the status is computed on its own. One failing part
+    # (a corrupt memory file, an unavailable package ...) used to blank the whole
+    # status, so every learning tile read "Off" and AutoGen "blocked".
+    section_errors: Dict[str, str] = {}
+    latest = _status_part(section_errors, 'latest', lambda: latest_certification(cfg.reporting.runs_dir), None)
+    portfolio = _status_part(section_errors, 'portfolio', lambda: model_portfolio_from_config(cfg), None)
+    replay = _status_part(section_errors, 'replay', lambda: replay_policy_engine_from_config(cfg), None)
+    skills = _status_part(section_errors, 'skills', lambda: _skill_library(cfg), None)
+    payload: Dict[str, Any] = {}
+    payload["runtime_env"] = _status_part(section_errors, "runtime_env", lambda: {
+                    "loaded": bool((RUNTIME_ENV_STATUS or {}).get("loaded")),
+                    "loaded_file_count": len((RUNTIME_ENV_STATUS or {}).get("loaded_files") or []),
+                    "explicit_env_file_configured": bool((RUNTIME_ENV_STATUS or {}).get("explicit_env_file")),
+                })
+    payload["autogen"] = _status_part(section_errors, "autogen", lambda: autogen_runtime_status(verify_imports=True))
+    payload["mlflow"] = _status_part(section_errors, "mlflow", lambda: mlflow_runtime_probe(cfg.mlflow))
+    payload["skill_induction"] = _status_part(section_errors, "skill_induction", lambda: {
+                    "enabled": bool(cfg.skill_induction.enabled),
+                    "fast_replay_enabled": bool(cfg.skill_induction.fast_replay_enabled),
+                    **skills.manifest(),
+                })
+    payload["replay_policy"] = _status_part(section_errors, "replay_policy", lambda: {
+                    "enabled": bool(cfg.replay_policy.enabled),
+                    "dreaming_enabled": bool(cfg.replay_policy.dreaming_enabled),
+                    **replay.manifest(),
+                })
+    payload["model_portfolio"] = _status_part(section_errors, "model_portfolio", lambda: portfolio.manifest())
+    payload["run_history_learning"] = _status_part(section_errors, "run_history_learning", lambda: _run_history_summary(cfg))
+    payload["edit_sections"] = _status_part(section_errors, "edit_sections", lambda: _edit_sections_summary(cfg))
+    payload["portal_skills"] = _status_part(section_errors, "portal_skills", lambda: _portal_skills_totals(cfg))
+    payload["recursive_self_improvement"] = _status_part(section_errors, "recursive_self_improvement", lambda: recursive_improvement_from_config(
+                    cfg, replay_policy=replay, model_portfolio=portfolio, skill_library=skills
+                ).manifest())
+    payload["trace_self_repair"] = _status_part(section_errors, "trace_self_repair", lambda: trace_self_repair_from_config(cfg, model_portfolio=portfolio).manifest())
+    payload["deterministic_recipe"] = _status_part(section_errors, "deterministic_recipe", lambda: deterministic_recipe_from_config(cfg).manifest())
+    payload["human_in_the_loop"] = _status_part(section_errors, "human_in_the_loop", lambda: human_teaching_from_config(cfg).manifest())
+    payload["human_phase_review"] = _status_part(section_errors, "human_phase_review", lambda: human_phase_review_from_config(cfg).manifest())
+    payload["pyautogui"] = _status_part(section_errors, "pyautogui", lambda: PyAutoGUIFallbackTool(cfg, ROOT / ".backend_runtime" / "pyautogui_status").status())
+    payload["process"] = _status_part(section_errors, "process", lambda: _process_state())
+    payload["capability_graph"] = _status_part(section_errors, "capability_graph", lambda: graph.manifest())
+    payload["full_deep_readiness"] = _status_part(section_errors, "full_deep_readiness", lambda: (latest.get("certification") or {}) if latest.get("found") else HIPCapabilityCertifier(graph).certify())
+    payload["mutation_confirmation"] = _status_part(section_errors, "mutation_confirmation", lambda: MUTATION_CONFIRMATION)
+    payload["independent_sections"] = _status_part(section_errors, "independent_sections", lambda: section_catalog())
+    payload["expert_skills"] = _status_part(section_errors, "expert_skills", lambda: {
+                    "enabled": bool(cfg.expert_skills.enabled),
+                    "description_trigger_enabled": bool(cfg.expert_skills.description_trigger_enabled),
+                    "require_skill_vetting": bool(cfg.expert_skills.require_skill_vetting),
+                    "deterministic_first": bool(cfg.expert_skills.deterministic_first),
+                    "primary_browser_framework": "autowebglm" if bool(cfg.autowebglm.primary_framework) else "deterministic",
+                    "deterministic_drivers_role": "verified_tool_adapters",
+                    "context_max_chars": int(cfg.expert_skills.context_max_chars),
+                    "recovery_context_max_chars": int(cfg.expert_skills.recovery_context_max_chars),
+                    "catalog": expert_skill_catalog(),
+                })
+    payload["playwright_mcp"] = _status_part(section_errors, "playwright_mcp", lambda: {
+                    "enabled": bool(cfg.mcp.use_playwright_mcp),
+                    "required_when_mcp_required": bool(cfg.mcp.playwright_mcp_required_when_require_mcp),
+                    "primary_for_safe_actions": bool(cfg.mcp.playwright_mcp_primary_for_safe_actions),
+                    "verify_every_action": bool(cfg.mcp.playwright_mcp_verify_every_action),
+                    "snapshot_after_action": bool(cfg.mcp.playwright_mcp_snapshot_after_action),
+                    "same_browser_cdp_port": int(cfg.mcp.playwright_mcp_remote_debugging_port),
+                    "execution_contract": "AutoWebGLM planner -> semantic target proof -> PyAutoGUI MCP primary physical interaction -> Playwright MCP fallback/verification -> deterministic Python Playwright last compatibility fallback",
+                })
+    payload["browser_use"] = _status_part(section_errors, "browser_use", lambda: {
+                    "enabled": bool(cfg.browser_use.enabled),
+                    "same_browser_cdp": bool(cfg.browser_use.attach_same_browser),
+                    "recovery_context": bool(cfg.expert_skills.browser_use_recovery_context),
+                    "role": "same-CDP recovery perception; optional browser-use/web-ui sidecar is observational/debugging, while PyAutoGUI MCP is the primary physical interaction engine",
+                })
+    payload["browser"] = _status_part(section_errors, "browser", lambda: {
+                    "channel": str(cfg.portal.chromium_channel or "chrome"),
+                    "primary_name": ("Google Chrome" if str(cfg.portal.chromium_channel or "").strip().lower() == "chrome" else "Microsoft Edge" if str(cfg.portal.chromium_channel or "").strip().lower() == "msedge" else str(cfg.portal.chromium_channel or "Chromium")),
+                    "chrome_primary": str(cfg.portal.chromium_channel or "").strip().lower() == "chrome",
+                    "edge_primary": str(cfg.portal.chromium_channel or "").strip().lower() == "msedge",
+                    "user_data_dir": str(cfg.portal.browser_user_data_dir),
+                    "chrome_executable_configured": bool(str(getattr(cfg.portal, "chrome_executable_path", "") or "").strip()),
+                    "edge_executable_configured": bool(str(getattr(cfg.portal, "edge_executable_path", "") or "").strip()),
+                    "fallback_to_edge": bool(getattr(cfg.portal, "fallback_to_edge", True)),
+                    "cdp_shared_session": bool(cfg.browser_use.attach_same_browser),
+                })
+    payload["vision_runtime"] = _status_part(section_errors, "vision_runtime", lambda: {
+                    **VisionRuntimeBridge(cfg.vision_runtime, aia_config=cfg.aia).status(),
+                    "use_for_recovery": bool(cfg.vision_runtime.use_for_recovery),
+                    "use_for_loading_watchdog": bool(cfg.vision_runtime.use_for_loading_watchdog),
+                    "loading_refresh_after_seconds": int(cfg.vision_runtime.loading_refresh_after_seconds),
+                    "loading_confidence_threshold": float(cfg.vision_runtime.loading_confidence_threshold),
+                    "loading_fail_closed": bool(cfg.vision_runtime.fail_closed_when_unavailable),
+                })
+    payload["autowebglm"] = _status_part(section_errors, "autowebglm", lambda: {
+                    **AutoWebGLMRecoveryBridge(cfg.autowebglm, aia_config=cfg.aia).status(),
+                    "reward_gate_required": bool(cfg.autowebglm.require_agentq_reward_gate),
+                    "allowed_actions": list(cfg.autowebglm.allowed_actions),
+                    "official_action_count": len(list(cfg.autowebglm.allowed_actions)),
+                })
+    payload["semantic_affordances"] = _status_part(section_errors, "semantic_affordances", lambda: {
+                    **semantic_affordance_status(),
+                    "repeatable_row_semantic_identity": True,
+                    "exact_add_effect": "N -> N+1",
+                    "row_rebind_after_angular_generation": True,
+                    "autowebglm_primary_policy": bool(cfg.autowebglm.primary_framework),
+                })
+    payload["semantic_understanding"] = _status_part(section_errors, "semantic_understanding", lambda: {
+                    **semantic_control_mcp_status(),
+                    "enabled": bool(cfg.semantic_understanding.enabled),
+                    "execute_confidence_threshold": float(cfg.semantic_understanding.execute_confidence_threshold),
+                    "reobserve_confidence_threshold": float(cfg.semantic_understanding.reobserve_confidence_threshold),
+                    "ambiguity_margin": float(cfg.semantic_understanding.ambiguity_margin),
+                    "fail_closed": bool(cfg.semantic_understanding.fail_closed),
+                    "revalidate_before_dispatch": bool(cfg.semantic_understanding.revalidate_before_dispatch),
+                    "require_post_action_effect": bool(cfg.semantic_understanding.require_post_action_effect),
+                    "playwright_mcp_evidence_required": bool(cfg.semantic_understanding.require_playwright_mcp_evidence),
+                    "devtools_mcp_evidence_required": bool(cfg.semantic_understanding.require_devtools_evidence),
+                    "hip_intelligence_mcp_consensus": bool(cfg.semantic_understanding.use_hip_intelligence_mcp_consensus),
+                    "hip_intelligence_mcp_evidence_required": bool(cfg.semantic_understanding.require_hip_intelligence_mcp_evidence),
+                    "vision_role": "ambiguity confirmation only; never coordinate execution",
+                    "execution_contract": "AutoWebGLM intent -> HIP semantic evidence fusion -> Playwright MCP execute -> exact semantic effect verification",
+                })
+    payload["langchain_browser_toolkit"] = _status_part(section_errors, "langchain_browser_toolkit", lambda: {
+                    "enabled": bool(cfg.langchain_browser_toolkit.enabled),
+                    "same_browser_cdp": bool(cfg.langchain_browser_toolkit.attach_same_browser),
+                    "read_only": bool(cfg.langchain_browser_toolkit.read_only),
+                    "allowed_tools": list(cfg.langchain_browser_toolkit.allowed_tools),
+                    "role": "read-only recovery perception under AutoWebGLM primary policy; navigation/click tools are not exposed",
+                })
+    payload["production_e2e"] = _status_part(section_errors, "production_e2e", lambda: {
+                    "enabled": bool(cfg.production_e2e.enabled),
+                    "single_active_browser_session": bool(cfg.production_e2e.single_active_browser_session),
+                    "lock_filename": str(cfg.production_e2e.lock_filename),
+                    "lock_stale_seconds": int(cfg.production_e2e.lock_stale_seconds),
+                    "lock_heartbeat_seconds": int(cfg.production_e2e.lock_heartbeat_seconds),
+                    "require_autogen_075": bool(cfg.production_e2e.require_autogen_075),
+                    "require_input_json_when_fill_requested": bool(cfg.production_e2e.require_input_json_when_fill_requested),
+                    "require_live_runtime_certificate_for_mutation": bool(cfg.production_e2e.require_live_runtime_certificate_for_mutation),
+                    "require_golden_reference_for_known_phase_tasks": bool(cfg.production_e2e.require_golden_reference_for_known_phase_tasks),
+                    "require_operator_role_for_mutation": bool(cfg.production_e2e.require_operator_role_for_mutation),
+                    "require_approval_id_for_mutation": bool(cfg.production_e2e.require_approval_id_for_mutation),
+                    "require_execution_input_immutability": bool(cfg.production_e2e.require_execution_input_immutability),
+                    "require_governance_ledger_integrity_for_mutation": bool(cfg.production_e2e.require_governance_ledger_integrity_for_mutation),
+                    "capture_mutation_before_after_evidence": bool(cfg.production_e2e.capture_mutation_before_after_evidence),
+                    "create_safe_review_bundle": bool(cfg.production_e2e.create_safe_review_bundle),
+                    "safe_review_bundle_name": str(cfg.production_e2e.safe_review_bundle_name),
+                    "safe_review_strict_allowlist": bool(cfg.production_e2e.safe_review_strict_allowlist),
+                    "execution_integrity_receipt": bool(cfg.production_e2e.write_execution_integrity_receipt),
+                    "failure_diagnostics": bool(cfg.production_e2e.write_failure_diagnostics),
+                    "hash_chained_journal": bool(cfg.production_e2e.write_hash_chained_journal),
+                    "same_process_control_center": True,
+                    "one_command_entrypoint": "hip-agent run-production-e2e",
+                })
+    payload["governance"] = _status_part(section_errors, "governance", lambda: {
+                    "enabled": bool(cfg.governance.enabled),
+                    "operator_role_env_var": cfg.governance.operator_role_env_var,
+                    "default_operator_role": cfg.governance.default_operator_role,
+                    "require_approval_id_for_mutation": cfg.governance.require_approval_id_for_mutation,
+                    "mutation_roles": cfg.governance.mutation_roles,
+                    "duplicate_window_hours": cfg.governance.duplicate_window_hours,
+                })
+    payload["section_errors"] = section_errors
+    if section_errors:
+        payload["degraded"] = True
+        payload["status_error"] = "; ".join(f"{k}: {v}" for k, v in section_errors.items())[:600]
+    return payload
 
 
 
@@ -1673,44 +1704,6 @@ def _edit_sections_summary(cfg: Any) -> Dict[str, Any]:
     }
 
 
-def _webmcp_summary(cfg: Any) -> Dict[str, Any]:
-    """V243R33: WebMCP policy and what the latest runs found (tool names and kinds only)."""
-    from hip_id_agent.webmcp import webmcp_policy
-
-    policy = webmcp_policy(cfg)
-    out: Dict[str, Any] = {"enabled": policy.enabled, "policy": policy.to_dict(), "last": None}
-    try:
-        runs = sorted((d for d in Path(cfg.reporting.runs_dir).iterdir() if d.is_dir()),
-                      key=lambda d: d.stat().st_mtime, reverse=True)[:30]
-    except Exception:
-        return out
-    for run in runs:
-        found = sorted(list(run.rglob("webmcp_page_tools.json")) + list(run.rglob("webmcp_tools.json")),
-                       key=lambda f: f.stat().st_mtime, reverse=True)
-        for f in found:
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-            except Exception:
-                continue
-            pages = data.get("pages") if isinstance(data.get("pages"), list) else [data]
-            tools = [t for page in pages for t in (page.get("tools") or []) if isinstance(t, dict)]
-            page_tools = [t for t in tools if t.get("source") != "hip-agent"]
-            out["last"] = {
-                "run": run.name, "file": f.name, "phase": data.get("phase") or ", ".join(str(p.get("phase")) for p in pages),
-                "page_tools": len(page_tools), "agent_tools": len(tools) - len(page_tools),
-                "tools": [{"name": t.get("name"), "kind": t.get("classification"), "source": t.get("source")} for t in page_tools][:20],
-                "filled_by_page_tool": bool(data.get("filled")), "tool_used": data.get("tool"),
-            }
-            return out
-    return out
-
-
-@app.get("/api/webmcp")
-def webmcp_status(config: str = "config.yaml") -> Dict[str, Any]:
-    """V243R33: the WebMCP layer and the page tools the latest run found."""
-    return _webmcp_summary(_cfg(config))
-
-
 @app.get("/api/learning/edit-sections")
 def edit_sections_status(config: str = "config.yaml") -> Dict[str, Any]:
     """V243R30: the learned Edit sections (structure only; values stay in the run folders)."""
@@ -1955,6 +1948,20 @@ def mission_world_model(config: str = "config.yaml", phase: str = "") -> Dict[st
         "summary": model.summary(phase=phase),
         "recommendations": model.recommend_actions(phase=phase or "standalone", limit=20) if phase else [],
     }
+
+
+@app.get("/api/mission/live-input-map")
+def mission_live_input_map(config: str = "config.yaml", runs_dir: str = "", run_id: str = "") -> Dict[str, Any]:
+    """V243R34: the running phase's live input.json map (value, form field, live value, state)."""
+    run_dir = _resolve_trace_run_dir(config=config, runs_dir=runs_dir, run_id=run_id)
+    if run_dir is None:
+        return {"found": False, "run_id": run_id or "", "map": {}}
+    path = run_dir / "input_json_live_map.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except Exception as exc:
+        return {"found": False, "run_id": run_dir.name, "map": {}, "error": mask_sensitive_string(str(exc))[:300]}
+    return {"found": bool(data), "run_id": run_dir.name, "path": str(path), "map": data}
 
 
 @app.get("/api/mission/live-view/screenshot")

@@ -1,9 +1,0 @@
-$ErrorActionPreference = "Stop"
-& .\VERIFY_V243R32_INSTALL.ps1
-if ($LASTEXITCODE -ne 0) { throw "R32 baseline verification failed" }
-python -c "from hip_id_agent.config import AppConfig; from hip_id_agent.webmcp import webmcp_policy, classify_tool as c, map_input_to_tool as m, init_script; p = webmcp_policy(AppConfig()); assert p.enabled and p.use_page_tools_for_fill; assert c({'name': 'save_transport_profile'}) == 'mutating' and c({'name': 'fill_create_transport_profile_form', 'description': 'does not save'}) == 'form_edit' and c({'name': 'x', 'source': 'declarative', 'autosubmit': True}) == 'mutating'; r = m({'name': 'f', 'inputSchema': {'properties': {'postTransferAction': {'type': 'string', 'enum': ['Move To Archive']}}}}, [{'input_path': '$.o.p.post_transfer_action', 'field_key': 'post_transfer_action', 'value': 'Move to Archive'}]); assert r['args'] == {'postTransferAction': 'Move To Archive'}; js = init_script(p); assert 'modelContextTesting' in js and 'registerTool' in js; assert 'hip_page_state' in js and 'form[toolname]' in js; print('R33_WEBMCP_OK')"
-if ($LASTEXITCODE -ne 0) { throw "R33 WebMCP smoke failed" }
-python -c "import inspect; from hip_id_agent import autonomous_form_runtime as a, browser_session as b, cli; assert 'fill_with_page_tools' in inspect.getsource(a.execute_autonomous_phase_goal) and 'webmcp_page_tool_then_input_json_proof' in inspect.getsource(a.execute_autonomous_phase_goal); assert 'install_on_context' in inspect.getsource(b.BrowserSession.start); assert hasattr(cli, 'webmcp_tools_cmd'); print('R33_WEBMCP_WIRED_OK')"
-if ($LASTEXITCODE -ne 0) { throw "R33 WebMCP wiring smoke failed" }
-Write-Host "V243R33 install verification PASS" -ForegroundColor Green
-Write-Host "WebMCP is on every page (native or polyfill); a page's form tool that covers input.json fills the form, the live proof decides."

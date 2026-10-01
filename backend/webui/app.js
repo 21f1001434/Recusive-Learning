@@ -488,6 +488,25 @@ function visualStage(cur) {
   return "waiting";
 }
 
+function renderLiveInputMap(payload) {
+  // V243R34: input.json mapped onto the live HIP form, as the agent fills it.
+  if (!$("liveInputMapRows")) return;
+  const m = (payload && payload.map) || {};
+  const rows = m.rows || [];
+  if (!payload || !payload.found || !rows.length) { $("liveInputMapState").textContent = "Waiting"; $("liveInputMapState").className = "badge neutral"; return; }
+  const state = m.complete ? ["Complete — filling stopped", "good"] : m.busy ? ["Agent is selecting…", "info"] : ["Filling", "info"];
+  $("liveInputMapState").textContent = state[0]; $("liveInputMapState").className = `badge ${state[1]}`;
+  $("liveInputMapSummary").innerHTML = `<b>Phase</b><span>${esc(m.phase_display || m.phase || "")}</span>`
+    + `<b>Exact</b><span>${esc(m.exact || 0)} / ${esc(m.total || 0)}${m.different ? ` • ${esc(m.different)} different` : ""}${m.not_on_screen ? ` • ${esc(m.not_on_screen)} not on screen yet` : ""}${m.invalid ? ` • ${esc(m.invalid)} flagged invalid` : ""}</span>`
+    + `<b>Updated</b><span>${esc(String(m.at || "").replace("T", " ").slice(0, 19))}${m.complete_at ? ` • complete at ${esc(String(m.complete_at).replace("T", " ").slice(11, 19))}` : ""}</span>`;
+  const badge = { exact: ["✓ exact", "good"], different: ["≠ different", "bad"], not_on_screen: ["… not on screen yet", "neutral"], invalid: ["! invalid", "bad"], not_checked: ["– not checked", "neutral"] };
+  $("liveInputMapRows").innerHTML = rows.map(r => {
+    const b = badge[r.status] || [r.status, "neutral"];
+    const row = r.row === null || r.row === undefined ? "" : ` [row ${Number(r.row) + 1}]`;
+    return `<tr><td>${esc(r.input_path || r.field)}</td><td>${esc(r.label || "")}${esc(row)}</td><td>${esc(r.expected ?? "")}</td><td>${esc(r.live ?? "")}</td><td><span class="badge ${b[1]}">${esc(b[0])}</span></td></tr>`;
+  }).join("");
+}
+
 function renderAgentLiveView(payload) {
   const panel=$("agentLiveViewPanel"), badge=$("agentLiveViewState"), image=$("agentLiveScreenshot"), imageEmpty=$("agentLiveScreenshotEmpty");
   const intent=$("agentLiveIntent"), surface=$("agentLiveSurface"), selected=$("agentLiveSelected"), candidates=$("agentLiveCandidates"), options=$("agentLiveOptions"), memory=$("agentLiveMemory"), memoryHints=$("agentLiveMemoryHints"), planner=$("agentLivePlanner"), execution=$("agentLiveExecution"), verification=$("agentLiveVerification");
@@ -605,13 +624,14 @@ async function refreshStatus() {
   if (state.refreshing) return;
   state.refreshing = true;
   try {
-    const [runtime, process, runs, tracePayload, liveViewPayload, worldModelPayload] = await Promise.all([
+    const [runtime, process, runs, tracePayload, liveViewPayload, worldModelPayload, liveInputMapPayload] = await Promise.all([
       api(`/api/runtime/status?config=${encodeURIComponent($("configPath").value || "config.yaml")}`, {timeoutMs:20000}),
       api("/api/discovery/status", {timeoutMs:20000}),
       api(`/api/runs?config=${encodeURIComponent($("configPath").value || "config.yaml")}&runs_dir=${encodeURIComponent($("runsDir").value || "./runs")}&limit=25`).catch(()=>({runs:[],count:0})),
       api(`/api/mission/trace?config=${encodeURIComponent($("configPath").value || "config.yaml")}&runs_dir=${encodeURIComponent($("runsDir").value || "./runs")}`).catch(()=>({found:false,trace:{}})),
       api(`/api/mission/live-view?config=${encodeURIComponent($("configPath").value || "config.yaml")}&runs_dir=${encodeURIComponent($("runsDir").value || "./runs")}`).catch(()=>({found:false,live_view:{},screenshot_url:""})),
       api(`/api/mission/world-model?config=${encodeURIComponent($("configPath").value || "config.yaml")}`).catch(()=>({found:false,summary:{}})),
+      api(`/api/mission/live-input-map?config=${encodeURIComponent($("configPath").value || "config.yaml")}&runs_dir=${encodeURIComponent($("runsDir").value || "./runs")}`).catch(()=>({found:false,map:{}})),
     ]);
     state.runtime = runtime; state.process = process; state.runs = runs.runs || []; state.missionTrace = tracePayload.trace || null; state.worldModel = worldModelPayload || null;
     state.statusFailures = 0;
@@ -621,10 +641,16 @@ async function refreshStatus() {
         if (job?.status==="running") { renderCertificationJob(job); followCertificationJob(); }
       }).catch(()=>{});
     }
-    $("backendBadge").textContent = runtime.degraded ? "Backend ready (partial status)" : "Backend ready"; $("backendBadge").className = `badge ${runtime.degraded ? "info" : "good"}`;
+    // V243R34: name the status parts that failed (each part is computed on its own).
+    const failedParts = Object.keys(runtime.section_errors || {});
+    $("backendBadge").textContent = runtime.degraded
+      ? (failedParts.length ? `Backend ready (${failedParts.length} status part${failedParts.length>1?"s":""} failed)` : "Backend ready (partial status)")
+      : "Backend ready";
+    $("backendBadge").className = `badge ${runtime.degraded ? "info" : "good"}`;
     if ($("backendBadge")) $("backendBadge").title = runtime.status_error || "";
     const ag = runtime.autogen || {};
-    $("autogenBadge").textContent = ag.pass ? "AutoGen 0.7.5" : "AutoGen blocked";
+    $("autogenBadge").textContent = ag.pass ? "AutoGen 0.7.5" : (ag.status_error || !runtime.autogen ? "AutoGen status unavailable" : "AutoGen blocked");
+    if ($("autogenBadge")) $("autogenBadge").title = ag.status_error || (ag.errors || []).join("; ") || "";
     $("autogenBadge").className = `badge ${ag.pass ? "good" : "bad"}`;
     const procText = process.paused ? "Paused" : process.running ? "Running" : "Stopped";
     $("processMetric").textContent = procText;
@@ -686,23 +712,25 @@ async function refreshStatus() {
         ? known.slice(0,2).map(p=>`${p.title||p.phase}: ${p.fields||0} fields${(p.tabs||[]).length?`, ${p.tabs.length} tabs`:""}`).join(" • ") + (actLine?` • ${actLine}`:"")
         : (actLine || "learn-action-sections, or ask: capture the edit values of <object>");
     }
-    if ($("webmcpMetric")) {
-      // V243R33: tools the portal pages offer through WebMCP (navigator.modelContext).
-      const wm=runtime.webmcp||{};
-      const last=wm.last;
-      $("webmcpMetric").textContent = wm.enabled===false ? "Off" : (last ? `${last.page_tools||0} page tools` : "On");
-      $("webmcpDetail").textContent = wm.enabled===false ? "WebMCP disabled" : (last
-        ? (last.filled_by_page_tool ? `filled by ${last.tool_used}` : ((last.tools||[]).slice(0,3).map(t=>`${t.name} (${t.kind})`).join(" • ") || `none on ${last.phase||"the page"}`))
-        : "native or polyfill; + agent in-page tools");
-    }
     if ($("recursiveMetric")) {
       $("recursiveMetric").textContent = !ri.enabled ? "Off" : `Cycle ${ri.cycle||0}`;
       $("recursiveDetail").textContent = ri.enabled ? `best ${Number(ri.best_reward||0).toFixed(3)} • plateau ${ri.plateau_count||0}` : "recursive improvement disabled";
     }
+    // V243R34: "Off" only when a feature is really switched off. A status part that
+    // failed shows its error; a part the backend did not send shows "—".
+    for (const [metric, detail, part] of [
+      ["skillsMetric", "skillsDetail", runtime.skill_induction], ["mlflowMetric", "mlflowDetail", runtime.mlflow],
+      ["policyMetric", "policyDetail", runtime.replay_policy], ["modelPortfolioMetric", "modelPortfolioDetail", runtime.model_portfolio],
+      ["recursiveMetric", "recursiveDetail", runtime.recursive_self_improvement], ["runHistoryMetric", "runHistoryDetail", runtime.run_history_learning],
+      ["editSectionsMetric", "editSectionsDetail", runtime.edit_sections]]) {
+      if (!$(metric)) continue;
+      if (part && part.status_error) { $(metric).textContent = "Error"; $(detail).textContent = `status part failed: ${part.status_error}`.slice(0, 180); }
+      else if (part === undefined) { $(metric).textContent = "—"; $(detail).textContent = "status not available (see the backend badge)"; }
+    }
     $("console").textContent = process.console_tail || "Waiting for mission output…";
     $("console").scrollTop = $("console").scrollHeight;
     $("processDetails").innerHTML = `<b>Status</b><span>${esc(procText)}</span><b>PID</b><span>${esc(process.pid || "—")}</span><b>Runs dir</b><span>${esc(process.runs_dir || "—")}</span><b>Command</b><span>${esc((process.command || []).join(" "))}</span>`;
-    renderRuns(); renderMissionTrace(tracePayload); renderAgentLiveView(liveViewPayload); renderAdaptiveMetric(worldModelPayload?.summary||{}); updateButtons();
+    renderRuns(); renderMissionTrace(tracePayload); renderAgentLiveView(liveViewPayload); renderLiveInputMap(liveInputMapPayload); renderAdaptiveMetric(worldModelPayload?.summary||{}); updateButtons();
   } catch (error) {
     // V243R25: "offline" only when the backend is really unreachable or three
     // polls in a row failed; one slow answer shows "Backend busy".

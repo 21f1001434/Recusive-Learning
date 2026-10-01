@@ -1,11 +1,22 @@
-## V243R33 — WebMCP: the tools a page offers the agent help complete the task (2026-09-30)
+## V243R34 — Live input.json map, real learning status, faster fill; WebMCP removed (2026-10-01)
 
-- **WebMCP on every page.** Pages can offer tools to agents through `navigator.modelContext`: registered tools, or forms marked `toolname`. The agent uses Chrome's native WebMCP when it is there, and otherwise a polyfill. It also has its own in-page tools: page state (including the Whitelabel page), read form, form matches, open tab, fill text.
-- **Page tools complete the task.** When a page offers a fill tool that takes the phase's input.json values, one call fills the form, mapped onto the page's own option spellings. The live input.json proof then decides: exact means done (about 4 s instead of about 30 s on the replica); otherwise the normal fill finishes and corrects it.
-- **Safe.** Save / submit / deploy tools, auto-submitting forms and unknown tools are mutating: they need the three-part mutation gate and are never used to fill.
-- **See what a page offers:** `python -m hip_id_agent.cli webmcp-tools`, the Control Center *WebMCP tools* tile, and `GET /api/webmcp`.
+- **Learning was on; the status was failing.** One status part that raised an error used to blank the whole Control Center status, so every learning tile showed "Off" and AutoGen "blocked". Each part is now computed on its own:
+  - a failure shows as "Error" on its tile and is named on the backend badge;
+  - "Off" means really switched off.
+- **Watch input.json being filled.** The Mission tab's *Live input.json ↔ HIP form* lists every input.json value with:
+  - the form field it maps to;
+  - the expected and live values;
+  - ✓ exact / ≠ different / … not on screen yet.
 
-See `V243R33_WEBMCP_TOOLS_HELP_COMPLETE_THE_TASK_20260930.md`. Apply with `APPLY_V243R33_IN_PLACE.ps1`; it includes R13–R32.
+  It is refreshed every 5 s. When every value is exact, the phase is complete and filling stops; refilling a complete form is stopped.
+- **Faster:**
+  - no second full fill when the first pass already left the form exact;
+  - no waiting for a DOM observer a page does not have.
+
+  The Transport Profile replica now fills in about 25 s instead of about 86 s.
+- **WebMCP removed:** the HIP portal does not offer it.
+
+See `V243R34_LIVE_INPUT_MAP_REAL_STATUS_NO_WEBMCP_20261001.md`. Apply with `APPLY_V243R34_IN_PLACE.ps1`; it includes R13–R32.
 
 ## V243R32 — Stop filling once the form is complete; a Whitelabel Error restarts the stage (2026-09-30)
 

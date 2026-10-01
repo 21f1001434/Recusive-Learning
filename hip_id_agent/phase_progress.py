@@ -42,6 +42,8 @@ async def run_with_progress_watchdog(
     completion_probe: Optional[Callable[[], Any]] = None,
     refill_probe_seconds: float = 120.0,
     refill_loop_seconds: float = 600.0,
+    live_map_seconds: float = 0.0,
+    post_complete_fill_seconds: float = 30.0,
 ) -> Any:
     """Run ``operation`` while requiring new structural state within a time bound.
 
@@ -63,6 +65,12 @@ async def run_with_progress_watchdog(
     is open); two exact probes in a row stop the attempt as complete.  When they
     stop growing for ``refill_loop_seconds`` the attempt is a refill loop and is
     stopped (exact -> complete, otherwise the stall recovery ladder).
+
+    V243R34 live map: with ``live_map_seconds`` the probe (the live input.json
+    map) also runs on that cadence, so the Control Center sees the form fill in
+    real time.  A form that stays complete while fields keep being filled again
+    for ``post_complete_fill_seconds`` is stopped as complete; a complete form
+    that is only finishing its checks (no more fills) is left to finish.
     """
     task = asyncio.ensure_future(operation)
     started = time.monotonic()
@@ -128,6 +136,10 @@ async def run_with_progress_watchdog(
     units_since = started
     exact_probes = 0
     probes: list[Dict[str, Any]] = []
+    live_every = max(poll, float(live_map_seconds or 0.0)) if live_map_seconds else None
+    last_probe_at = started
+    complete_since: Optional[float] = None
+    fills_at_complete = 0
 
     def units_progressed(row: Dict[str, Any], now: float) -> None:
         nonlocal best_units, units_since, exact_probes
@@ -204,9 +216,12 @@ async def run_with_progress_watchdog(
             stop_reason = ""
             refill_idle = now - units_since
             if not loader_blocking and best_units >= 0:
+                idle_probe_due = probe_after is not None and refill_idle >= probe_after
+                live_probe_due = live_every is not None and now - last_probe_at >= live_every
                 if refill_limit is not None and refill_idle >= refill_limit:
                     stop_reason = "refill_loop"
-                elif completion_probe is not None and probe_after is not None and refill_idle >= probe_after:
+                elif completion_probe is not None and (idle_probe_due or live_probe_due):
+                    last_probe_at = now
                     try:
                         probe = completion_probe()
                         if inspect.isawaitable(probe):
@@ -215,12 +230,21 @@ async def run_with_progress_watchdog(
                     except Exception as exc:
                         probe = {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
                     exact_probes = exact_probes + 1 if probe.get("pass") is True else 0
+                    fills_now = int(row.get("successful_fill_count") or 0)
+                    if probe.get("pass") is True:
+                        if complete_since is None:
+                            complete_since, fills_at_complete = now, fills_now
+                    elif str(probe.get("status") or "") != "busy":
+                        complete_since = None
                     probes.append({"at_seconds": round(now - started, 3), "pass": probe.get("pass") is True,
                                    "status": str(probe.get("status") or "")[:80]})
                     if len(probes) > 10:
                         del probes[:-10]
-                    if exact_probes >= 2:
+                    if exact_probes >= 2 and idle_probe_due:
                         stop_reason = "input_json_complete"
+                    elif (exact_probes >= 2 and complete_since is not None and fills_now > fills_at_complete
+                          and now - complete_since >= max(0.0, float(post_complete_fill_seconds or 0.0))):
+                        stop_reason = "filled_again_after_complete"
 
             no_progress_for = now - last_novel
             if not stop_reason and no_progress_for < (loader_wait if loader_blocking else threshold):

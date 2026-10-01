@@ -3137,14 +3137,47 @@ class FullDummyFillE2EFlow:
                 })
             return phase_exact_completion_checkpoint(phase_name, phase_dir)
 
+        live_maps: Dict[str, Dict[str, Any]] = {}
+
         async def _quiet_completion_probe(phase_name: str, phase_input_path: Path) -> Dict[str, Any]:
-            """V243R32: read-only, non-intrusive "is the form complete?" while the attempt runs."""
+            """V243R32: read-only, non-intrusive "is the form complete?" while the attempt runs.
+
+            V243R34: it is the live input.json map -- every input.json value, the
+            form field it maps to, the live value and its state -- written to the
+            run folder each time, so the Control Center shows the fill in real time.
+            """
             try:
                 payload = read_json_any(phase_input_path)
-                return await quiet_completion_probe(
+                probe = await quiet_completion_probe(
                     page=shared_browser.page, phase=phase_name, phase_input=payload if isinstance(payload, dict) else {})
             except Exception as exc:
-                return {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
+                probe = {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
+            try:
+                previous = live_maps.get(phase_name) or {}
+                current = probe.get("map") if isinstance(probe.get("map"), dict) else None
+                record = {
+                    **(current or {k: v for k, v in previous.items() if k not in {"at", "busy", "status"}}),
+                    "schema_version": "hip.live-input-json-map.v1", "run_id": ctx.run_id, "phase": phase_name,
+                    "phase_display": PHASE_DISPLAY.get(phase_name, phase_name), "at": utc_now(),
+                    "status": str(probe.get("status") or ""), "busy": probe.get("status") == "busy",
+                }
+                if current is not None and current.get("complete") and not previous.get("complete"):
+                    record["complete_at"] = record["at"]
+                    try:
+                        mission_trace.record_observation(
+                            phase_name, source="input_json_live_map",
+                            summary=f"Every input.json value is on the form ({current.get('exact')}/{current.get('total')}); no more filling",
+                            details={"exact": current.get("exact"), "total": current.get("total")})
+                    except Exception:
+                        pass
+                elif previous.get("complete_at") and record.get("complete"):
+                    record["complete_at"] = previous.get("complete_at")
+                live_maps[phase_name] = record
+                safe_write_json(root_dir / phase_name / "input_json_live_map.json", record)
+                safe_write_json(root_dir / "input_json_live_map.json", record)
+            except Exception:
+                pass
+            return probe
 
         async def _input_json_authority(
             phase_name: str,
@@ -3425,6 +3458,9 @@ class FullDummyFillE2EFlow:
                                 completion_probe=lambda: _quiet_completion_probe(phase, input_path),
                                 refill_probe_seconds=float(getattr(self.config.runtime_self_heal, "refill_probe_seconds", 120.0) or 0.0),
                                 refill_loop_seconds=float(getattr(self.config.runtime_self_heal, "refill_loop_seconds", 600.0) or 0.0),
+                                # V243R34: the live input.json map, refreshed for the Control Center.
+                                live_map_seconds=float(getattr(self.config.runtime_self_heal, "live_map_seconds", 5.0) or 0.0),
+                                post_complete_fill_seconds=float(getattr(self.config.runtime_self_heal, "post_complete_fill_seconds", 30.0) or 0.0),
                             ),
                             phase=phase,
                             budget_seconds=remaining_phase_seconds,

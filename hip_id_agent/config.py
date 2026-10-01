@@ -304,6 +304,9 @@ class AutonomousFormConfig(BaseModel):
     # read-only against input.json; when every value is filled and committed the
     # goal is achieved and nothing is filled again.
     stop_when_input_json_exact: bool = True
+    # V243R34: after a first pass that left the live form exactly as input.json
+    # asks, the goal is checked by that proof instead of filling every field again.
+    single_pass_when_input_json_exact: bool = True
     use_autowebglm_live_observation: bool = True
     use_dell_aia_binding_advisor_on_ambiguity: bool = True
     rediscover_controls_before_every_action: bool = True
@@ -366,6 +369,12 @@ class RuntimeSelfHealConfig(BaseModel):
     # field while still filling is a refill loop (stopped, then recovered).
     refill_probe_seconds: float = 120.0
     refill_loop_seconds: float = 600.0
+    # V243R34: the live input.json map (every value, its form field, live value,
+    # state) is refreshed this often during an attempt and shown in the Control
+    # Center; a complete form whose fields keep being filled again for
+    # post_complete_fill_seconds is stopped as complete.
+    live_map_seconds: float = 5.0
+    post_complete_fill_seconds: float = 30.0
     # V243R32: a Spring "Whitelabel Error Page" -> close and reopen the browser,
     # open the same phase link and the form again, fill from input.json.
     whitelabel_browser_restarts: int = 3
@@ -864,28 +873,6 @@ class EditSectionsConfig(BaseModel):
     verify_by_reopening_edit: bool = True
 
 
-class WebMCPConfig(BaseModel):
-    """V243R33: WebMCP -- tools a web page offers an agent (``navigator.modelContext``).
-
-    The native API is used when the browser has it; otherwise a standards-shaped
-    polyfill is added to every page so a page that registers tools can be used.
-    The agent adds its own in-page tools (page state, read form, form matches,
-    open tab, fill text).  A page's form-edit tool that covers input.json fills
-    the form in one call; the live input.json proof decides whether it is done.
-    Mutating page tools (save / submit / deploy ...) need the mutation gate and
-    are never called by a fill.
-    """
-    enabled: bool = True
-    inject_polyfill: bool = True
-    agent_tools: bool = True
-    use_page_tools_for_fill: bool = True
-    # Share of the phase's input.json values a page tool must take to be used.
-    min_input_coverage: float = 0.6
-    tool_timeout_seconds: float = 20.0
-    max_calls_per_phase: int = 20
-    settle_ms: int = 400
-
-
 class RunHistoryLearningConfig(BaseModel):
     """V243R27: learn from past runs (run folders and MLflow) at mission start.
 
@@ -1300,7 +1287,6 @@ class AppConfig(BaseModel):
     mlflow: MLflowConfig = Field(default_factory=MLflowConfig)
     run_history_learning: RunHistoryLearningConfig = Field(default_factory=RunHistoryLearningConfig)
     edit_sections: EditSectionsConfig = Field(default_factory=EditSectionsConfig)
-    webmcp: WebMCPConfig = Field(default_factory=WebMCPConfig)
     universal_operator: UniversalOperatorConfig = Field(default_factory=UniversalOperatorConfig)
     skill_induction: SkillInductionConfig = Field(default_factory=SkillInductionConfig)
     replay_policy: ReplayPolicyConfig = Field(default_factory=ReplayPolicyConfig)

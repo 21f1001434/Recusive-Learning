@@ -484,6 +484,8 @@ autonomous_form:
   no_progress_cycle_limit: 2
   # V243R32: stop once the live form holds every input.json value (read-only proof).
   stop_when_input_json_exact: true
+  # V243R34: a first pass that left the form exact is not followed by a second full fill.
+  single_pass_when_input_json_exact: true
   use_autowebglm_live_observation: true
   use_dell_aia_binding_advisor_on_ambiguity: true
   rediscover_controls_before_every_action: true
@@ -551,6 +553,9 @@ runtime_self_heal:
   # after 120 s without a newly verified field; 600 s of refilling = refill loop).
   refill_probe_seconds: 120
   refill_loop_seconds: 600
+  # V243R34: live input.json map refresh; stop when a complete form keeps being refilled.
+  live_map_seconds: 5
+  post_complete_fill_seconds: 30
   # V243R32: Whitelabel Error Page -> close/reopen browser, same phase link, refill.
   whitelabel_browser_restarts: 3
   # V243R18: if the portal's own loading indicator stays up past the loading
@@ -860,21 +865,6 @@ production_e2e:
   failure_diagnostics_filename: "production_failure_diagnostics.json"
   write_final_summary: true
   final_summary_filename: "production_final_summary.json"
-
-webmcp:
-  # V243R33: WebMCP (navigator.modelContext) -- tools a page offers an agent.
-  # Native when the browser has it, otherwise a polyfill on every page; plus the
-  # agent's own in-page tools. A page's form-edit tool that covers input.json
-  # fills the form in one call; the live input.json proof decides. Mutating page
-  # tools (save/submit/deploy ...) need the mutation gate and are never used to fill.
-  enabled: true
-  inject_polyfill: true
-  agent_tools: true
-  use_page_tools_for_fill: true
-  min_input_coverage: 0.6
-  tool_timeout_seconds: 20
-  max_calls_per_phase: 20
-  settle_ms: 400
 
 edit_sections:
   # V243R30: every phase's Edit section (listing -> search -> expand -> Edit) is

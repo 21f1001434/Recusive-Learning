@@ -467,6 +467,7 @@ class DualModelSectionJudge:
                         "field": fact.get("field"), "input_path": fact.get("input_path"), "expected": value, "actual": actual_value,
                         "selector": c.get("selector"), "evidence": c.get("evidence"),
                         "section": c.get("section"), "row_kind": c.get("row_kind"), "row_index": c.get("row_index"),
+                        "label": c.get("label"),
                     })
                     break
             if not found:

@@ -126,9 +126,14 @@ async def quiet_completion_probe(*, page: Any, phase: str, phase_input: Dict[str
         return {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
     if any(int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")):
         return {"pass": False, "status": "busy", **{k: int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")}}
-    proof = await prove_input_json_completion(page=page, phase=phase, phase_input=phase_input, blur=False, walk_tabs=False)
-    return {"pass": bool(proof.get("pass")), "status": proof.get("status"),
-            "matched_count": proof.get("matched_count"), "missing_count": len(proof.get("missing_fields") or [])}
+    # V243R34: the live input.json map -- every value, the form field it maps to,
+    # what the form holds now -- read without touching the page.
+    from .phase_live_reproof import live_input_field_map
+
+    live_map = await live_input_field_map(page=page, phase=phase, phase_input=phase_input)
+    return {"pass": bool(live_map.get("complete")), "status": "complete" if live_map.get("complete") else "filling",
+            "matched_count": live_map.get("exact"), "missing_count": int(live_map.get("total") or 0) - int(live_map.get("exact") or 0),
+            "map": live_map}
 
 
 def model_judge_verdicts(judge_result: Mapping[str, Any]) -> List[Dict[str, Any]]:

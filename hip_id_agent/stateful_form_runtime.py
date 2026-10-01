@@ -251,7 +251,8 @@ async def _collect_dom_transition_window(page: Page, cursor: Dict[str, int]) -> 
         payload = await page.evaluate("""
 ({eventSeq, mutationSeq}) => ({
  events:(window.__HIP_DOM_EVENT_LOG||[]).filter(x=>Number(x.seq||0)>Number(eventSeq||0)),
- mutations:(window.__HIP_DOM_MUTATION_LOG||[]).filter(x=>Number(x.seq||0)>Number(mutationSeq||0))
+ mutations:(window.__HIP_DOM_MUTATION_LOG||[]).filter(x=>Number(x.seq||0)>Number(mutationSeq||0)),
+ observer: Array.isArray(window.__HIP_DOM_MUTATION_LOG) || Array.isArray(window.__HIP_DOM_EVENT_LOG)
 })
 """, {"eventSeq": int(cursor.get("event_seq", 0)), "mutationSeq": int(cursor.get("mutation_seq", 0))})
         return mask_sensitive_data(payload or {"events": [], "mutations": []})
@@ -267,6 +268,11 @@ async def _wait_for_dom_transition_activity(page: Page, cursor: Dict[str, int], 
         last = await _collect_dom_transition_window(page, cursor)
         summary = summarize_dom_transition_window(last)
         if summary.get("mutation_count") or summary.get("commit_events_seen"):
+            return last
+        if last.get("observer") is False:
+            # V243R34: no DOM observer on this page (a page the browser session did
+            # not set up): nothing can be seen, so do not wait the whole timeout --
+            # the transaction stability check that follows reads the control itself.
             return last
         await page.wait_for_timeout(60)
     return last
