@@ -3435,6 +3435,15 @@ class FullDummyFillE2EFlow:
                                 phase, phase_dir, input_path,
                                 reason="no_progress_watchdog_terminal_reproof",
                             )
+                        # V243R32: how often the watchdog asks "is every input.json value on the form?";
+                        # V243R34: the live input.json map is refreshed for the Control Center, and a
+                        # complete form that keeps being refilled is stopped as complete.
+                        completion_cadence = dict(
+                            refill_probe_seconds=float(getattr(self.config.runtime_self_heal, "refill_probe_seconds", 120.0) or 0.0),
+                            refill_loop_seconds=float(getattr(self.config.runtime_self_heal, "refill_loop_seconds", 600.0) or 0.0),
+                            live_map_seconds=float(getattr(self.config.runtime_self_heal, "live_map_seconds", 5.0) or 0.0),
+                            post_complete_fill_seconds=float(getattr(self.config.runtime_self_heal, "post_complete_fill_seconds", 30.0) or 0.0),
+                        )
                         # Legacy/source-audit marker retained for ordering tests: summary = await _execute_phase_once
                         # The real call is bounded (formerly asyncio.wait_for) so one stuck portal phase cannot run for
                         # hours; V243R22: an attempt still verifying new fields earns bounded extra time instead of
@@ -3456,11 +3465,7 @@ class FullDummyFillE2EFlow:
                                 blocking_wait_seconds=runtime_self_healer.watchdog_blocking_wait_seconds(),
                                 # V243R32: once every input.json value is filled, stop filling.
                                 completion_probe=lambda: _quiet_completion_probe(phase, input_path),
-                                refill_probe_seconds=float(getattr(self.config.runtime_self_heal, "refill_probe_seconds", 120.0) or 0.0),
-                                refill_loop_seconds=float(getattr(self.config.runtime_self_heal, "refill_loop_seconds", 600.0) or 0.0),
-                                # V243R34: the live input.json map, refreshed for the Control Center.
-                                live_map_seconds=float(getattr(self.config.runtime_self_heal, "live_map_seconds", 5.0) or 0.0),
-                                post_complete_fill_seconds=float(getattr(self.config.runtime_self_heal, "post_complete_fill_seconds", 30.0) or 0.0),
+                                **completion_cadence,
                             ),
                             phase=phase,
                             budget_seconds=remaining_phase_seconds,
