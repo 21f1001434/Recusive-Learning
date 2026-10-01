@@ -326,6 +326,7 @@ def test_cli_backend_and_control_center_wiring():
     result = CliRunner().invoke(app, ["learn-edit-sections", "--help"])
     assert result.exit_code == 0 and "Edit section" in result.output
     backend = (ROOT / "backend" / "app.py").read_text(encoding="utf-8")
-    assert '"edit_sections": _edit_sections_summary(cfg)' in backend and "/api/learning/edit-sections" in backend
+    # V243R34: every runtime-status part is computed on its own (_status_part).
+    assert '"edit_sections", lambda: _edit_sections_summary(cfg))' in backend and "/api/learning/edit-sections" in backend
     for ui in (ROOT / "webui" / "app.js", ROOT / "backend" / "webui" / "app.js"):
         assert "editSectionsMetric" in ui.read_text(encoding="utf-8")
