@@ -25,19 +25,36 @@ from .agent_chat import CHAT_FILENAME, display_value, humanize, last_agent_messa
 
 _INTENTS = [
     ("help", re.compile(r"^\s*(help|\?|commands|what can i (say|do))\s*\??\s*$", re.I)),
-    ("pause", re.compile(r"^\s*(pause|hold( on)?|wait( a (moment|minute|sec(ond)?))?|hang on)\b[\s.!]*$", re.I)),
-    ("resume", re.compile(r"^\s*(resume|continue|go( on| ahead)?|carry on|unpause|proceed|keep going)\b[\s.!]*$", re.I)),
     ("stop", re.compile(r"^\s*(stop|abort|cancel|kill)( the)?( mission| run| agent)?[\s.!]*$", re.I)),
+    ("pause", re.compile(r"^\s*(pause|hold( on)?|wait( a (moment|minute|sec(ond)?))?|hang on)\b[\s.!]*$", re.I)),
     ("left", re.compile(r"(what'?s|what is) (left|remaining|missing)|which (fields|values) (are )?(left|remaining|missing|not)|\bremaining\b|\bleft to (fill|do)\b", re.I)),
-    ("status", re.compile(r"^\s*(status|progress|update|where are you|what are you doing|what'?s happening|what is happening|how (is it|far|are you) ?(going)?)\b.*$", re.I)),
-    ("accept", re.compile(r"^\s*(accept|approve|approved|looks (good|correct|right)|lgtm|correct|yes,? (that'?s|it'?s|it is) (right|correct))\b[\s.!]*$", re.I)),
-    ("reject", re.compile(r"^\s*(reject|needs? (a )?(fix|correction)|wrong|incorrect|not correct)\b.*$", re.I)),
+    # "status" alone asks for the status; "Status is enabled" talks about the Status field.
+    ("status", re.compile(r"^\s*(status|progress|update)( please| now| update)?[\s?.!]*$|^\s*(where are you|what are you doing|what'?s happening|what is happening|how (is it|far|are you)( going)?)\b", re.I)),
 ]
+
+# V243R36: "everything is filled correctly", "all fields are correct", "the form is
+# complete", "looks good, move on" -- the operator confirms the phase.
+_NEGATION = re.compile(r"\b(not|n't|no longer|missing|wrong|incorrect|isnt|arent|wasnt|fail(ed|s)?|error)\b", re.I)
+_CONFIRM = [
+    re.compile(r"^\s*(accept(ed)?|approve(d)?|confirm(ed)?|lgtm|correct|perfect|all good|done|complete(d)?)\b", re.I),
+    re.compile(r"\blooks? (good|correct|right|fine|ok|okay|perfect)\b", re.I),
+    re.compile(r"\b(every ?thing|all( the)?( fields| values| of it)?|the form|this form|the phase|this phase|it|that|form)\b"
+               r"[^.?!]{0,40}?\b(is |are |was |were |got |has been |have been )?(all )?"
+               r"(filled( in| out)?( correctly| properly| right| fine)?|correct(ly)?|complete(d)?|done|fine|good|ok(ay)?|right|perfect)\b", re.I),
+    re.compile(r"\b(filled|entered|done) (correctly|properly|right)\b", re.I),
+    re.compile(r"\bmark (it|this|the phase|the form)? ?(as )?(complete|completed|done)\b", re.I),
+    re.compile(r"\b(move|go) (on )?to the next( phase)?\b|\bnext phase\b|\bproceed to (the )?next\b", re.I),
+]
+_REJECT = re.compile(r"^\s*(reject|needs? (a )?(fix|correction)|wrong|incorrect|not correct|that'?s wrong)\b", re.I)
+_SHORT_YES = re.compile(r"^\s*(yes|yep|yeah|y|ok|okay|sure|fine|go ahead|go on|continue|proceed|carry on|keep going|resume|unpause)\b[\s.!]*$", re.I)
+_SHORT_NO = re.compile(r"^\s*(no|nope|n)\b[\s.!]*$", re.I)
+_RESUME_WORDS = re.compile(r"^\s*(resume|continue|go( on| ahead)?|carry on|unpause|proceed|keep going)\b[\s.!]*$", re.I)
 
 HELP_TEXT = (
     "You can type: “status” (what I'm doing now), “what's left” (values not on the form yet), "
     "“pause” / “resume” (I finish the field in hand, then wait), “stop” (end the mission), "
-    "“accept” / “reject” (answer a phase review I'm waiting on). Anything else is a hint for me "
+    "“everything is filled correctly” / “accept” (you confirm the phase: I stop filling, prove the form and finish it "
+    "without reopening it), “reject” (answer a phase review). Anything else is a hint for me "
     "— e.g. “Interface Type is on the Connection tab” — I use it to find controls; input.json stays "
     "the source of every value and nothing is saved without your Save confirmation."
 )
@@ -46,15 +63,67 @@ HELP_TEXT = (
 _ACTION_KINDS = {"navigate", "click", "type", "select", "key", "field", "verified", "failed", "retry", "heal",
                  "complete", "blocked", "phase", "stop"}
 
+INTENTS = ("help", "stop", "pause", "resume", "left", "status", "accept", "reject", "ack", "hint")
 
-def interpret(text: str) -> str:
+
+def interpret(text: str, *, review_pending: bool = False, paused: bool = False) -> str:
+    """The operator's intent.  Short replies depend on what the agent is waiting for."""
     clean = str(text or "").strip()
     if not clean:
         return ""
     for name, pattern in _INTENTS:
         if pattern.search(clean):
             return name
+    if _SHORT_YES.search(clean):
+        # "yes" / "go ahead": answers the review the agent waits on, else resumes a pause.
+        if review_pending:
+            return "accept"
+        if paused or _RESUME_WORDS.search(clean):
+            return "resume"
+        return "ack"
+    if _SHORT_NO.search(clean):
+        return "reject" if review_pending else "ack"
+    if _REJECT.search(clean) or (review_pending and _NEGATION.search(clean)):
+        return "reject"
+    if not clean.rstrip().endswith("?") and not _NEGATION.search(clean) and any(p.search(clean) for p in _CONFIRM):
+        return "accept"
     return "hint"
+
+
+_MODEL_SYSTEM = (
+    "You classify one message an operator typed to a web-form automation agent that fills Dell HIP portal forms. "
+    "Return ONLY JSON: {\"intent\": one of [\"status\", \"left\", \"pause\", \"resume\", \"accept\", \"reject\", \"help\", \"hint\"], "
+    "\"confidence\": 0..1}. accept = the operator says the current form/phase is filled correctly or should be completed. "
+    "reject = the operator says something on the form is wrong. hint = advice about where a field is or what to watch for. "
+    "status/left = asks what the agent is doing / what is still missing. Never output stop."
+)
+
+
+def interpret_with_model(text: str, *, review_pending: bool = False, paused: bool = False, client: Any = None) -> Dict[str, Any]:
+    """Patterns first; for a message they read as a plain hint, the configured model may classify it.
+
+    The model is advisory and bounded: "stop" is never taken from it, only a
+    confident answer (>= 0.8) among the known intents is used.
+    """
+    intent = interpret(text, review_pending=review_pending, paused=paused)
+    result = {"intent": intent, "source": "patterns"}
+    if intent != "hint" or client is None or len(str(text or "")) > 400:
+        return result
+    try:
+        decision = client.json_decision(_MODEL_SYSTEM, json.dumps({
+            "message": str(text)[:400], "agent_waits_for_review": bool(review_pending), "agent_paused": bool(paused)}))
+    except Exception as exc:
+        return dict(result, model_error=str(exc)[:200])
+    if not isinstance(decision, dict):
+        return result
+    model_intent = str(decision.get("intent") or "").strip().lower()
+    try:
+        confidence = float(decision.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        confidence = 0.0
+    if model_intent in {"status", "left", "pause", "resume", "accept", "reject", "help"} and confidence >= 0.8:
+        return {"intent": model_intent, "source": "model", "confidence": confidence}
+    return dict(result, model_intent=model_intent, model_confidence=confidence)
 
 
 def _read_json(path: Path) -> Dict[str, Any]:

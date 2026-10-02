@@ -13,6 +13,12 @@ Paused time is excluded from the no-progress watchdog and the phase wall budget
 Hints are advisory: the agent acknowledges each one in the chat and hands the
 recent ones to the form planner as context.  They never change an input.json
 value and never authorize Save / Submit / Deploy.
+
+V243R36: the operator can confirm a phase ("everything is filled correctly",
+Accept).  The agent then stops filling, proves the live form read-only and
+completes the phase without reopening it; values it could not read back
+itself are recorded as confirmed by the operator (never a field the portal
+flags invalid).  This never authorizes Save / Submit / Deploy either.
 """
 from __future__ import annotations
 
@@ -36,20 +42,26 @@ class _State:
         self.hints_seen = 0
         self.last_hint_check = 0.0
         self.poll_seconds = 0.5
+        self.bound_at = 0.0
+        self.confirm_said: set = set()
+        self.max_confirmed_unread = 3
+        self.refusal_said: Dict[str, str] = {}
 
 
 _S = _State()
 
 
-def bind(run_dir: str | Path, *, poll_seconds: float = 0.5) -> None:
+def bind(run_dir: str | Path, *, poll_seconds: float = 0.5, max_confirmed_unread: int = 3) -> None:
     """Attach this process (one mission) to its run folder."""
     global _S
     _S = _State()
     _S.run_dir = Path(run_dir)
     _S.poll_seconds = max(0.05, float(poll_seconds or 0.5))
+    _S.max_confirmed_unread = max(0, int(max_confirmed_unread))
     # Hints and pauses from before this mission started belong to an earlier run.
     _S.hints_seen = len(agent_chat.iter_operator_messages(_S.run_dir))
     _S.baseline = _file_paused_seconds(read_control(_S.run_dir))
+    _S.bound_at = time.time()
 
 
 def unbind() -> None:
@@ -157,14 +169,34 @@ async def checkpoint(*, phase: str = "", where: str = "") -> Dict[str, Any]:
     return {"paused": True, "seconds": seconds}
 
 
+def _write_row(run_dir: str | Path, row: Dict[str, Any]) -> None:
+    import os
+
+    target = Path(run_dir) / CONTROL_FILENAME
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temp = target.with_suffix(".tmp")
+    text = json.dumps(row, indent=1)
+    temp.write_text(text, encoding="utf-8")
+    for attempt in range(6):
+        try:
+            os.replace(temp, target)  # the agent never reads half a file
+            return
+        except PermissionError:
+            # Windows: the mission has the file open for a moment.
+            time.sleep(0.05 * (attempt + 1))
+    target.write_text(text, encoding="utf-8")
+    try:
+        temp.unlink()
+    except OSError:
+        pass
+
+
 def write_control(run_dir: str | Path, state: str, *, by: str = "chat") -> Dict[str, Any]:
     """Backend side: set ``running`` / ``paused`` for the mission of ``run_dir``.
 
     The file also keeps the pause account: when the current pause began and the
     total of the finished ones.
     """
-    import os
-
     from .models import utc_now
 
     previous = read_control(run_dir)
@@ -177,26 +209,92 @@ def write_control(run_dir: str | Path, state: str, *, by: str = "chat") -> Dict[
     elif state != "paused" and was_paused:
         total += max(0.0, now - float(previous.get("paused_at_epoch") or now))
         paused_at = None
-    row = {"schema_version": "hip.operator-control.v1", "state": str(state), "at": utc_now(), "by": str(by),
+    row = {**previous, "schema_version": "hip.operator-control.v1", "state": str(state), "at": utc_now(), "by": str(by),
            "paused_at_epoch": paused_at, "paused_total_seconds": round(total, 3)}
-    target = Path(run_dir) / CONTROL_FILENAME
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temp = target.with_suffix(".tmp")
-    text = json.dumps(row, indent=1)
-    temp.write_text(text, encoding="utf-8")
-    for attempt in range(6):
-        try:
-            os.replace(temp, target)  # the agent never reads half a file
-            return row
-        except PermissionError:
-            # Windows: the mission has the file open for a moment.
-            time.sleep(0.05 * (attempt + 1))
-    target.write_text(text, encoding="utf-8")
-    try:
-        temp.unlink()
-    except OSError:
-        pass
+    _write_row(run_dir, row)
     return row
+
+
+def confirm_complete(run_dir: str | Path, phase: str, *, text: str = "", by: str = "chat") -> Dict[str, Any]:
+    """Backend side: the operator confirms ``phase`` is filled correctly (V243R36)."""
+    from .models import utc_now
+    from .security import mask_sensitive_string
+
+    previous = read_control(run_dir)
+    confirmations = dict(previous.get("confirmations") or {})
+    confirmations[str(phase)] = {"at": utc_now(), "epoch": time.time(), "by": str(by),
+                                 "text": mask_sensitive_string(str(text or ""))[:300]}
+    row = {"schema_version": "hip.operator-control.v1", "state": "running", **previous, "confirmations": confirmations}
+    _write_row(run_dir, row)
+    return confirmations[str(phase)]
+
+
+def confirmed_complete(phase: str) -> Optional[Dict[str, Any]]:
+    """Agent side: the operator confirmed ``phase`` during this mission."""
+    if _S.run_dir is None or not phase:
+        return None
+    row = (_read_control().get("confirmations") or {}).get(str(phase))
+    if not isinstance(row, dict) or float(row.get("epoch") or 0.0) < _S.bound_at - 1.0:
+        return None
+    return row
+
+
+def confirmed_proof(phase: str, proof: Dict[str, Any]) -> Dict[str, Any]:
+    """A read-only proof, completed by the operator's confirmation where it falls short (V243R36).
+
+    Only a proof of a form that is on screen (controls were read) is completed;
+    a field the portal itself flags invalid is never overridden.  What the agent
+    could not read back is listed as ``operator_confirmed_fields``.
+    """
+    if not isinstance(proof, dict) or proof.get("pass") is True:
+        return proof
+    confirmation = confirmed_complete(phase)
+    if not confirmation:
+        return proof
+    unread = [*(proof.get("missing_fields") or []), *(proof.get("row_issue_fields") or [])]
+    upload = proof.get("required_upload_proof") or {}
+    if upload and upload.get("pass") is False:
+        unread.extend(upload.get("missing_fields") or ["upload"])
+    unread = list(dict.fromkeys(str(x) for x in unread if str(x)))
+    refused = ""
+    if proof.get("invalid_fields"):
+        refused = (f"the portal flags {', '.join(str(x) for x in proof['invalid_fields'])}. Fix it on screen "
+                   "(or tell me what is wrong); I keep working on it")
+    elif int(proof.get("actual_control_count") or 0) <= 0:
+        refused = "the form of this phase is not on screen. I keep working on it"
+    elif len(unread) > _S.max_confirmed_unread:
+        # Many values are still not on the form: the confirmation is most likely
+        # early.  Keep filling; the confirmation stays valid.
+        names = ", ".join(unread[:8]) + (f" and {len(unread) - 8} more" if len(unread) > 8 else "")
+        refused = (f"{len(unread)} input.json values are not on the form yet ({names}). I keep filling them and "
+                   "finish on your confirmation once only values I can't read back remain")
+    if refused:
+        key = str(phase)
+        if _S.refusal_said.get(key) != refused:
+            _S.refusal_said[key] = refused
+            agent_chat.say(f"I can't finish this phase on your confirmation yet: {refused}.", kind="warn", phase=key)
+        return dict(proof, operator_confirmation_refused=refused)
+    out = dict(proof)
+    out.update({
+        "pass": True, "deterministic_pass": True, "status": "exact_live_state_operator_confirmed",
+        "missing_fields": [], "row_issue_fields": [],
+        "required_upload_proof": dict(upload, **{"pass": True, "operator_confirmed": upload.get("pass") is False}) if upload else upload,
+        "operator_confirmed_fields": sorted(set(str(x) for x in unread)),
+        "operator_confirmation": confirmation,
+    })
+    key = str(phase)
+    if key not in _S.confirm_said:
+        _S.confirm_said.add(key)
+        names = ", ".join(out["operator_confirmed_fields"]) or "nothing"
+        agent_chat.say(
+            f"✅ You confirmed this phase is correct. I proved every other value myself; "
+            f"recorded as confirmed by you: {names}.", kind="complete", phase=key)
+    return out
+
+
+def confirmation_refusal(phase: str) -> str:
+    """Why the operator's confirmation of ``phase`` could not finish it (said in the chat), or ""."""
+    return _S.refusal_said.get(str(phase), "")
 
 
 def read_control(run_dir: str | Path) -> Dict[str, Any]:

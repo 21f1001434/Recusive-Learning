@@ -1,3 +1,29 @@
+## V243R36 — A filled form finishes, and the agent understands you (2026-10-02)
+
+- **A filled Source Document Type finishes instead of being refilled.**
+  - The live map no longer freezes at 0/29. The portal's permanent navigation menu made the form look "busy" forever.
+  - A switch (`<button role="switch">`, no value text) is judged by its checked state, as the executor reads it.
+  - A value the judge cannot pair is cross-checked with the executor's own reader.
+- **Confirm a phase in your own words.**
+  - "Everything is filled correctly", "the form is complete" or Accept: the agent stops filling, proves the form read-only and finishes the phase on the form on screen, without reopening it.
+  - What it could not read back itself is recorded as confirmed by you.
+  - A confirmation never covers a field the portal flags, and never saves anything.
+- **A nearly complete form is not thrown away.** A stall on a form that holds every value but one or two the agent cannot read back asks "Is the form correct?" instead of refreshing, reopening or restarting the browser.
+- **The chat reads messages in context.**
+  - "status is wrong" is about the Status field (a rejection while a review waits).
+  - "yes" / "no" answer what the agent waits on.
+  - A model may classify messages the patterns cannot (bounded, never "stop").
+  - Semantic-gate noise is gone.
+- **Self-recovery:**
+  - a leftover popup over a field is closed (Escape) and a toast is waited out;
+  - a browser restart waits for, or replaces, a DevTools port the old Chrome still holds.
+- **Model champion: a tie goes to the more capable model.** gpt-oss-20b won because latency broke ties on equal accuracy.
+  - Now gpt-oss-120b wins a tie; a more accurate model still wins whatever its size.
+  - A failed answer is asked again, and each model's result is explained.
+  - Your lock is re-validated once.
+
+See `V243R36_FILLED_FORM_FINISHES_OPERATOR_UNDERSTOOD_20261002.md`. Apply with `APPLY_V243R36_IN_PLACE.ps1`; it includes R13–R35.
+
 ## V243R35 — The live agent chat (2026-10-01)
 
 - **A Live agent chat on the right of the Control Center** narrates every action as it happens:

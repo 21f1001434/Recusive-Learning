@@ -240,12 +240,13 @@ def qualify_models_cmd(
 
 def _print_qualification(result: Dict[str, Any]) -> None:
     table = Table(title="Model qualification on a live task (navigation + completion judgments)")
-    for column in ("Model", "Correct", "Accuracy", "Judgments", "Latency ms", "Qualified"):
+    for column in ("Model", "Correct", "Accuracy", "Judgments", "Latency ms", "Qualified", "Why"):
         table.add_column(column)
     for row in result.get("ranking") or []:
         judged = "-" if row.get("judge_accuracy") is None else f"{float(row.get('judge_accuracy') or 0):.0%}"
         table.add_row(str(row.get("model")), f"{row.get('correct')}/{row.get('total')}", f"{float(row.get('accuracy') or 0):.0%}",
-                      judged, str(row.get("latency_ms")), "yes" if row.get("qualified") else ("error" if row.get("error") else "no"))
+                      judged, str(row.get("latency_ms")), "yes" if row.get("qualified") else ("error" if row.get("error") else "no"),
+                      str(row.get("why") or ""))
     console.print(table)
     console.print(f"Status: [bold]{result.get('status')}[/bold]  Champion: [bold]{result.get('selected_model') or '-'}[/bold]  "
                   f"Fallback: {', '.join(result.get('fallback_order') or []) or '-'}")

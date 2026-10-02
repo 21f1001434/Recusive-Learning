@@ -3147,6 +3147,18 @@ async def _prepare_phase_control_for_action(
                     raise_if_environment_fatal(exc)
                     preparation["interaction_guard_error"] = mask_sensitive_string(str(exc))
             if not state.get("hitTestPass"):
+                # V243R36: a popup left open by an earlier field is closed (Escape);
+                # a toast or loading layer is waited out.  A dialog is left alone.
+                try:
+                    from .form_interaction_policy import _clear_interceptor
+
+                    cleared = await _clear_interceptor(page, page.locator(probe).first)
+                    preparation["interceptor_cleared"] = cleared
+                    if cleared.get("pass"):
+                        state = await inspect_interaction_state(page, probe)
+                except Exception as exc:
+                    raise_if_environment_fatal(exc)
+            if not state.get("hitTestPass"):
                 preparation["blocked_reason"] = "target center intercepted"
                 return None, current_controls, diagnostic, mask_sensitive_data(preparation)
     return dict(control), current_controls, diagnostic, mask_sensitive_data(preparation)

@@ -531,6 +531,10 @@ agent_chat:
   live_frame_seconds: 3.0
   live_frame_quality: 55
   pause_poll_seconds: 0.5
+  model_intent_fallback: true
+  # V243R36: a confirmation finishes a phase with at most this many values the agent
+  # cannot read back; with more missing it names them and keeps filling.
+  operator_confirmation_max_unread: 3
 
 runtime_self_heal:
   enabled: true
@@ -565,6 +569,9 @@ runtime_self_heal:
   # V243R34: live input.json map refresh; stop when a complete form keeps being refilled.
   live_map_seconds: 5
   post_complete_fill_seconds: 30
+  # V243R36: a stalled form that holds every input.json value but one or two the
+  # agent cannot read back: ask the operator instead of reopening it blank (0 = off).
+  ask_before_reopening_max_missing: 2
   # V243R32: Whitelabel Error Page -> close/reopen browser, same phase link, refill.
   whitelabel_browser_restarts: 3
   # V243R18: if the portal's own loading indicator stays up past the loading
@@ -798,6 +805,9 @@ model_portfolio:
   qualification_min_judge_accuracy: 0.5
   qualification_max_age_days: 30
   qualification_revalidate_after_judge_errors: 3
+  # V243R36: on equal accuracy the more capable model wins (latency only between equals);
+  # a model that fails to answer is asked once more.
+  qualification_retries: 1
   persist_customer_values: false
   persist_selectors: false
   persist_coordinates: false

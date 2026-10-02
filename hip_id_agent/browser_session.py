@@ -482,6 +482,7 @@ class BrowserSession:
         self._external_browser = None
         self._owns_browser_context = True
         self._cdp_endpoint = ""
+        self._cdp_port_override = 0
         self._cdp_health: Dict[str, Any] = {}
         self._selected_browser: Dict[str, Any] = {}
         self._relaunching_selected_browser = False
@@ -796,7 +797,7 @@ class BrowserSession:
         self._start_count += 1
         self._playwright = await async_playwright().start()
         browser_use_cfg = getattr(self.config, "browser_use", None)
-        port = int(getattr(self.config.mcp, "playwright_mcp_remote_debugging_port", 9237) or 9237)
+        port = int(getattr(self, "_cdp_port_override", 0) or 0) or int(getattr(self.config.mcp, "playwright_mcp_remote_debugging_port", 9237) or 9237)
         configured_cdp = str(getattr(browser_use_cfg, "cdp_url", "") or "").strip() if browser_use_cfg else ""
         use_own_browser = bool(browser_use_cfg and getattr(browser_use_cfg, "use_own_browser", False))
         self._cdp_endpoint = configured_cdp if (use_own_browser and configured_cdp) else f"http://127.0.0.1:{port}"
@@ -842,6 +843,9 @@ class BrowserSession:
             )
             if needs_local_cdp:
                 remote_arg = f"--remote-debugging-port={port}"
+                if getattr(self, "_cdp_port_override", 0):
+                    # V243R36: relaunch on the free port chosen by restart().
+                    launch_kwargs["args"] = [a for a in launch_kwargs["args"] if not str(a).startswith("--remote-debugging-port=")]
                 if not any(str(arg).startswith("--remote-debugging-port=") for arg in launch_kwargs["args"]):
                     launch_kwargs["args"].append(remote_arg)
             self.context = await self._launch_managed_context_with_fallback(
@@ -879,6 +883,14 @@ class BrowserSession:
         if not endpoint:
             return {"ok": False, "error": "missing CDP endpoint"}
 
+        def _read_endpoint(base: str) -> Dict[str, Any]:
+            with urlopen(base.rstrip("/") + "/json/version", timeout=2.5) as response:
+                payload = json.loads(response.read(262144).decode("utf-8", errors="replace"))
+            ws = str(payload.get("webSocketDebuggerUrl") or "")
+            return {"ok": bool(ws.startswith("ws://") or ws.startswith("wss://")), "browser": str(payload.get("Browser") or "")[:200],
+                    "protocol_version": str(payload.get("Protocol-Version") or "")[:80], "websocket_present": bool(ws),
+                    "endpoint": self._evidence_url(base)}
+
         def _read() -> Dict[str, Any]:
             with urlopen(endpoint + "/json/version", timeout=2.5) as response:
                 raw = response.read(262144)
@@ -896,7 +908,66 @@ class BrowserSession:
         try:
             return await asyncio.wait_for(asyncio.to_thread(_read), timeout=3.5)
         except Exception as exc:
-            return {"ok": False, "endpoint": self._evidence_url(endpoint), "error": mask_sensitive_string(str(exc))[:500]}
+            failed = {"ok": False, "endpoint": self._evidence_url(endpoint), "error": mask_sensitive_string(str(exc))[:500]}
+        # V243R36: after a relaunch the new Chrome may not have got the configured
+        # port (the old one still held it); Chrome writes the port it really
+        # listens on to DevToolsActivePort in its profile.  Follow it.
+        actual = self._devtools_active_port_endpoint()
+        if actual and actual.rstrip("/") != endpoint:
+            previous = self._cdp_endpoint
+            self._cdp_endpoint = actual
+            try:
+                again = await asyncio.wait_for(asyncio.to_thread(_read_endpoint, actual), timeout=3.5)
+                if again.get("ok"):
+                    again["endpoint_rediscovered_from"] = "DevToolsActivePort"
+                    return again
+            except Exception:
+                pass
+            self._cdp_endpoint = previous
+        return failed
+
+    async def _release_or_replace_cdp_port(self, *, wait_seconds: float = 10.0) -> Dict[str, Any]:
+        """Before a relaunch: wait for the CDP port to be free, else pick a free one."""
+        import socket
+
+        configured = int(getattr(self.config.mcp, "playwright_mcp_remote_debugging_port", 9237) or 9237)
+        port = int(getattr(self, "_cdp_port_override", 0) or 0) or configured
+
+        def busy(candidate: int) -> bool:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.settimeout(0.3)
+                return probe.connect_ex(("127.0.0.1", int(candidate))) == 0
+
+        deadline = asyncio.get_event_loop().time() + max(0.0, float(wait_seconds))
+        while True:
+            try:
+                taken = await asyncio.to_thread(busy, port)
+            except Exception:
+                taken = False
+            if not taken:
+                return {"port": port, "status": "free"}
+            if asyncio.get_event_loop().time() >= deadline:
+                break
+            await asyncio.sleep(0.5)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            fresh = int(sock.getsockname()[1])
+        self._cdp_port_override = fresh
+        return {"port": fresh, "status": "replaced", "held_port": port}
+
+    def _devtools_active_port_endpoint(self) -> str:
+        """The CDP endpoint Chrome reports in its profile's DevToolsActivePort file (managed browsers only)."""
+        if not bool(getattr(self, "_owns_browser_context", True)):
+            return ""
+        profile = str((getattr(self, "_selected_browser", None) or {}).get("profile") or "")
+        if not profile:
+            return ""
+        try:
+            first = (Path(profile) / "DevToolsActivePort").read_text(encoding="utf-8").splitlines()[0].strip()
+            port = int(first)
+        except Exception:
+            return ""
+        return f"http://127.0.0.1:{port}" if 0 < port < 65536 else ""
 
     async def _wait_for_cdp_ready(self, *, timeout_seconds: float = 10.0) -> Dict[str, Any]:
         deadline = asyncio.get_event_loop().time() + max(1.0, float(timeout_seconds or 10.0))
@@ -1898,6 +1969,12 @@ class BrowserSession:
         self.pyautogui_tool.set_mcp_backend(None)
         self.browser_use_bridge: Optional[BrowserUseStateBridge] = None
         self.browser_use_capabilities: Dict[str, Any] = {}
+        # V243R36: the closed Chrome can keep its remote-debugging port for a while;
+        # a relaunch on a port still held never got a DevTools endpoint and every
+        # reconnect after it failed (HIP_RECONNECT_CDP_ENDPOINT_UNHEALTHY).  Wait for
+        # the port; if it stays taken, relaunch on a free one.
+        if not external:
+            info["cdp_port"] = await self._release_or_replace_cdp_port()
         # Relaunch the same selected browser + profile (never a different one).
         self._relaunching_selected_browser = True
         try:
@@ -2627,7 +2704,9 @@ class BrowserSession:
             }
             try:
                 timeout = max(2.0, float(getattr(self.config.mcp, "executor_rebind_timeout_seconds", 12.0) or 12.0))
-                health = await self._wait_for_cdp_ready(timeout_seconds=min(timeout, 8.0))
+                # V243R36: the full rebind budget (a busy Chrome answers slowly right
+                # after a relaunch); the probe also follows DevToolsActivePort.
+                health = await self._wait_for_cdp_ready(timeout_seconds=timeout)
                 result["cdp_health"] = health
                 if not health.get("ok"):
                     raise RuntimeError("HIP_RECONNECT_CDP_ENDPOINT_UNHEALTHY: existing browser CDP endpoint did not recover")

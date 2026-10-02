@@ -297,6 +297,72 @@ def _form_level_facts_relaxed(
     return dict(expected, facts=relaxed) if changed else None
 
 
+def _cross_check_with_executor_reader(
+    phase: str, phase_input: Dict[str, Any], expected: Mapping[str, Any], controls: Sequence[Dict[str, Any]],
+    deterministic: Dict[str, Any],
+) -> tuple:
+    """Re-read each judge-missing value with the executor's resolver and equality (V243R36).
+
+    Facts and executor nodes share their input.json path.  Only a control the
+    executor's resolver binds unambiguously, whose value its equality accepts,
+    turns a missing value into a matched one; row-count issues and failed
+    attempts are left as they are.
+    """
+    from .stateful_form_runtime import (
+        _apply_repeatable_row_bindings, _stateful_value_equal, _value_equal,
+        resolve_document_type_control_diagnostics, resolve_stateful_control_diagnostics,
+    )
+
+    try:
+        graph = compile_phase_state_graph(phase_input, phase)
+    except Exception:
+        return deterministic, []
+    document_type = "document_type" in str(phase or "")
+    nodes_by_path = {(str(n.get("input_path") or ""), n.get("row_index")): n
+                     for n in (graph.get("nodes") or []) if isinstance(n, dict)}
+    try:
+        bound, _proof = _apply_repeatable_row_bindings(list(controls), graph)
+    except Exception:
+        bound = [dict(c) for c in controls if isinstance(c, dict)]
+    facts = [f for f in (expected.get("facts") or []) if isinstance(f, dict)]
+    resolve = resolve_document_type_control_diagnostics if document_type else resolve_stateful_control_diagnostics
+    equal = _value_equal if document_type else _stateful_value_equal
+    still_missing: List[Dict[str, Any]] = []
+    matched = list(deterministic.get("matched_values") or [])
+    recovered: List[str] = []
+    used_facts: set = set()
+    for miss in deterministic.get("missing_values") or []:
+        if not isinstance(miss, dict):
+            continue
+        fact = next((f for i, f in enumerate(facts) if i not in used_facts and f.get("field") == miss.get("field")), None)
+        node = None
+        if fact is not None:
+            used_facts.add(facts.index(fact))
+            node = nodes_by_path.get((str(fact.get("input_path") or ""), fact.get("row_index")))
+        control = None
+        if node is not None and node.get("action") not in {"upload_file"}:
+            try:
+                diagnosis = resolve(bound, node)
+                control = diagnosis.get("control") if diagnosis.get("resolved") and isinstance(diagnosis.get("control"), dict) else None
+            except Exception:
+                control = None
+        if control is not None and equal(node, control):
+            recovered.append(str(miss.get("field") or ""))
+            matched.append({
+                "field": fact.get("field"), "input_path": fact.get("input_path"), "expected": fact.get("value"),
+                "actual": fact.get("value"), "evidence": "executor_reader_fresh_read",
+                "section": control.get("section"), "row_kind": control.get("row_kind"),
+                "row_index": fact.get("row_index"), "label": control.get("group_label") or control.get("label"),
+            })
+            continue
+        still_missing.append(miss)
+    if not recovered:
+        return deterministic, []
+    out = dict(deterministic, matched_values=matched, missing_values=still_missing)
+    out["pass"] = not still_missing and not out.get("row_issues") and not out.get("failed_attempts")
+    return out, recovered
+
+
 async def _prove_surface(
     *,
     page: Any,
@@ -382,6 +448,14 @@ async def _prove_surface(
             after = {str(x.get("field")) for x in again.get("missing_values") or [] if isinstance(x, dict)}
             relaxed_fields = sorted(before - after)
             deterministic = again
+    executor_read_fields: List[str] = []
+    if deterministic.get("missing_values"):
+        # V243R36: the executor and the proof must agree.  A value the judge missed
+        # is read again -- same fresh capture, nothing touched -- with the
+        # executor's own control resolver and equality (the reader that filled and
+        # verified it).  Equal there: matched.  Otherwise it stays missing.
+        deterministic, executor_read_fields = _cross_check_with_executor_reader(
+            phase, phase_input if isinstance(phase_input, dict) else {}, expected_for_fields, controls, deterministic)
     upload_proof = await _live_file_proof(page, uploads)
     invalid_fields = sorted({
         str(c.get("label") or c.get("framework_key") or c.get("semantic_key") or "control")
@@ -406,6 +480,7 @@ async def _prove_surface(
         "row_issue_fields": [str(x.get("field") or "") for x in (deterministic.get("row_issues") or []) if isinstance(x, dict)],
         "invalid_fields": invalid_fields,
         "form_level_section_matched_fields": relaxed_fields,
+        "executor_reader_matched_fields": executor_read_fields,
         "actual_control_count": int(deterministic.get("actual_control_count") or len(controls)),
         "row_counts": actual_state["row_counts"],
         "required_upload_proof": upload_proof,
@@ -448,6 +523,29 @@ async def _click_tab(page: Any, index: int) -> None:
 
 
 async def live_read_only_phase_reproof(
+    *,
+    page: Any,
+    phase: str,
+    phase_input: Dict[str, Any],
+    judge: Optional[DualModelSectionJudge] = None,
+    section: Optional[str] = None,
+    walk_tabs: bool = True,
+) -> Dict[str, Any]:
+    """The live proof of the phase; V243R36: completed by the operator's confirmation.
+
+    When the operator confirmed this phase ("everything is filled correctly"),
+    values the agent could not read back are recorded as confirmed by the
+    operator instead of reopening and refilling the form (see
+    :func:`operator_control.confirmed_proof`).
+    """
+    from .operator_control import confirmed_proof
+
+    proof = await _live_read_only_phase_reproof(
+        page=page, phase=phase, phase_input=phase_input, judge=judge, section=section, walk_tabs=walk_tabs)
+    return confirmed_proof(phase, proof) if not section else proof
+
+
+async def _live_read_only_phase_reproof(
     *,
     page: Any,
     phase: str,

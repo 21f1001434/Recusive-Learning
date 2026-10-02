@@ -697,6 +697,61 @@ def multiselect_exact_set_proof(
     }
 
 
+_INTERCEPTOR_JS = r"""
+el => {
+  const r = el.getBoundingClientRect();
+  const cx = Math.max(0, Math.min(innerWidth - 1, r.left + r.width / 2)), cy = Math.max(0, Math.min(innerHeight - 1, r.top + r.height / 2));
+  const h = document.elementFromPoint(cx, cy);
+  if (!h) return {pass: false, kind: 'nothing'};
+  if (h === el || el.contains(h) || h.contains(el)) return {pass: true};
+  const popup = h.closest('[role=listbox],[role=menu],[role=tooltip],.dds__tooltip,.dds__popover,.dds__dropdown__popup,.dds__dropdown__list,.dds__dropdown__menu');
+  const transient = h.closest('[role=alert],[role=status],.dds__toast,.dds__notification,.dds__notification-toast,.toast,.snackbar,.cdk-overlay-backdrop,.modal-backdrop,.dds__loading-indicator,.dds__progress-indicator,.spinner,.loading,[aria-busy=true]');
+  const dialog = h.closest('[role=dialog],[role=alertdialog],dialog,.dds__modal');
+  const kind = (dialog && !dialog.contains(el)) ? 'dialog' : popup && !popup.contains(el) ? 'popup' : transient && !transient.contains(el) ? 'transient' : 'other';
+  return {pass: false, kind, tag: (h.tagName || '').toLowerCase(), role: (h.getAttribute && h.getAttribute('role')) || ''};
+}
+"""
+
+
+async def _clear_interceptor(page: Page, target: Locator, *, wait_ms: int = 2500) -> Dict[str, Any]:
+    """V243R36: clear what covers a form control's centre, when that is safe.
+
+    Returns ``{"pass": bool, "interceptor": {...}, "hit": {...}, "action": ...}``.
+    Only an open popup is dismissed (Escape); a transient layer is waited out; a
+    dialog or anything else is left alone (value-free description only).
+    """
+    try:
+        first = await target.evaluate(_INTERCEPTOR_JS)
+    except Exception as exc:
+        return {"pass": False, "action": "none", "error": mask_sensitive_string(str(exc))[:200]}
+    if first.get("pass"):
+        return {"pass": True, "action": "none", "hit": {"pass": True}}
+    kind = str(first.get("kind") or "")
+    out: Dict[str, Any] = {"pass": False, "interceptor": {k: first.get(k) for k in ("kind", "tag", "role")}, "action": "none"}
+    if kind == "popup":
+        out["action"] = "escape_popup"
+        try:
+            await page.keyboard.press("Escape")
+        except Exception:
+            pass
+    elif kind == "transient":
+        out["action"] = "wait_transient"
+    else:
+        return out
+    deadline = asyncio.get_running_loop().time() + max(0.2, wait_ms / 1000.0)
+    while asyncio.get_running_loop().time() < deadline:
+        await asyncio.sleep(0.15)
+        try:
+            await scroll_locator_into_view(target)
+            now = await target.evaluate(_INTERCEPTOR_JS)
+        except Exception:
+            continue
+        if now.get("pass"):
+            out.update({"pass": True, "hit": {"pass": True, "after": out["action"]}})
+            return out
+    return out
+
+
 async def universal_locator_preflight(
     page: Page,
     locator: Locator,
@@ -820,9 +875,19 @@ el => {const r=el.getBoundingClientRect();const cx=Math.max(0,Math.min(innerWidt
             )
         except Exception as exc:
             hit = {"pass": False, "reason": mask_sensitive_string(str(exc))}
+    if not hit.get("pass"):
+        # V243R36: something still covers the target.  A popup left open by an
+        # earlier field (a dropdown list, menu, tooltip, popover) is closed with
+        # Escape (it commits nothing); a transient layer (toast, alert, backdrop,
+        # loading overlay) is waited out.  A dialog is never dismissed.
+        audit["interceptor_cleared"] = await _clear_interceptor(page, target)
+        if audit["interceptor_cleared"].get("pass"):
+            hit = dict(audit["interceptor_cleared"].get("hit") or hit)
     audit["hit_test"] = hit
     if not hit.get("pass"):
-        audit.update({"pass": False, "reason": "target center is intercepted"})
+        covering = (audit.get("interceptor_cleared") or {}).get("interceptor") or {}
+        described = " ".join(str(covering.get(k) or "") for k in ("kind", "role", "tag") if covering.get(k)).strip()
+        audit.update({"pass": False, "reason": "target center is intercepted" + (f" (by {described})" if described else "")})
         return mask_sensitive_data(audit)
 
     try:

@@ -39,9 +39,9 @@ from hip_id_agent.mission_trace import read_mission_trace
 from hip_id_agent.agent_live_view import read_agent_live_view
 from hip_id_agent.agent_chat import FRAME_DIRNAME, FRAME_FILENAME, append_operator, read_chat
 from hip_id_agent.operator_chat import (
-    HELP_TEXT, hint_reply, interpret, left_reply, live_state, pending_review, status_reply,
+    HELP_TEXT, hint_reply, interpret, interpret_with_model, left_reply, live_state, pending_review, status_reply,
 )
-from hip_id_agent.operator_control import write_control
+from hip_id_agent.operator_control import confirm_complete, write_control
 from hip_id_agent.website_world_model import WebsiteWorldModelMemory
 from hip_id_agent.browser_backend import validate_dual_browser_mcps
 from hip_id_agent.mlflow_async import mlflow_runtime_probe
@@ -1999,7 +1999,7 @@ def mission_chat(config: str = "config.yaml", runs_dir: str = "", run_id: str = 
     try:
         cfg = _cfg(config)
         review = pending_review(human_phase_review_from_config(cfg), run_dir.name)
-        state["review"] = {k: review.get(k) for k in ("request_id", "phase", "reason", "automated_verdict", "request_type")} if review else None
+        state["review"] = {k: review.get(k) for k in ("request_id", "phase", "reason", "automated_verdict", "request_type", "question")} if review else None
         assistance = human_teaching_from_config(cfg).pending(run_id=run_dir.name)
         state["assistance"] = ({"count": len(assistance), "reason": str((assistance[0] or {}).get("reason") or "")[:300]}
                                if assistance else None)
@@ -2016,19 +2016,40 @@ def mission_chat(config: str = "config.yaml", runs_dir: str = "", run_id: str = 
 
 @app.post("/api/mission/chat")
 def mission_chat_post(req: MissionChatRequest) -> Dict[str, Any]:
-    """V243R35: the operator talks to the agent: status, what's left, pause / resume / stop, review answers, hints."""
+    """V243R35: the operator talks to the agent: status, what's left, pause / resume / stop, review answers, hints.
+
+    V243R36: "everything is filled correctly" (or Accept) confirms the phase the
+    agent is on: it stops filling, proves the form read-only and finishes the
+    phase without reopening it; a waiting review is answered at the same time.
+    """
     text = str(req.text or "").strip()[:1200]
     if not text:
         raise HTTPException(status_code=400, detail="Type a message for the agent.")
-    intent = interpret(text)
     run_dir = _resolve_trace_run_dir(config=req.config, runs_dir=req.runs_dir, run_id=req.run_id)
     if run_dir is None:
+        intent = interpret(text)
         reply = HELP_TEXT if intent == "help" else "No mission run yet — start one and I'll narrate it here, step by step."
         return {"found": False, "intent": intent, "reply": reply, "action": {}}
-    append_operator(run_dir, text, role="user", kind=intent)
+    cfg = _cfg(req.config)
     state = live_state(run_dir)
     process = _process_state()
     running = _mission_active(run_dir, state, process)
+    review_store = human_phase_review_from_config(cfg)
+    review = pending_review(review_store, run_dir.name)
+    client = None
+    if bool(getattr(getattr(cfg, "agent_chat", None), "model_intent_fallback", True)):
+        try:
+            candidate = AIAClient(cfg.aia)
+            # Only with a configured endpoint: no endpoint, no model call.
+            client = candidate if candidate.enabled and candidate._endpoint() else None
+        except Exception:
+            client = None
+    understood = interpret_with_model(text, review_pending=bool(review), paused=bool(state.get("paused") or process.get("paused")),
+                                      client=client)
+    intent = str(understood.get("intent") or "hint")
+    # A complaint with no review waiting is passed on as a hint (the agent reads hints).
+    user_kind = "hint" if intent == "reject" and not review else intent
+    append_operator(run_dir, text, role="user", kind=user_kind, detail={"understood_by": understood.get("source")})
     action: Dict[str, Any] = {}
     if intent == "help":
         reply = HELP_TEXT
@@ -2036,6 +2057,8 @@ def mission_chat_post(req: MissionChatRequest) -> Dict[str, Any]:
         reply = status_reply(state, running=running)
     elif intent == "left":
         reply = left_reply(run_dir)
+    elif intent == "ack":
+        reply = "👍"
     elif intent == "pause":
         if running:
             write_control(run_dir, "paused")
@@ -2055,26 +2078,43 @@ def mission_chat_post(req: MissionChatRequest) -> Dict[str, Any]:
         else:
             reply = ("There is no mission process started from the Control Center to stop. "
                      "If it runs in a terminal, stop it there (Ctrl+C), or say “pause”.")
-    elif intent in {"accept", "reject"}:
-        store = human_phase_review_from_config(_cfg(req.config))
-        review = pending_review(store, run_dir.name)
-        if not review:
-            reply = "Nothing is waiting for your review right now."
+    elif intent == "accept":
+        phase_name = str((review or {}).get("phase") or state.get("phase") or "")
+        shown = str((review or {}).get("phase_display") or state.get("phase_display") or phase_name or "this phase")
+        if not phase_name and not review:
+            reply = "There is no phase to confirm right now."
         else:
+            if phase_name:
+                confirm_complete(run_dir, phase_name, text=text)
+                action["confirmed_phase"] = phase_name
+            if review:
+                try:
+                    review_store.resolve(request_id=str(review.get("request_id")), verdict="pass",
+                                         note=f"from the live chat: {text}", reviewer="control-center-chat")
+                    action["review"] = review.get("request_id")
+                except ValueError as exc:
+                    action["review_error"] = str(exc)
+            write_control(run_dir, "running")
+            reply = (f"✅ Understood — you confirmed {shown} is filled correctly. I stop filling, prove the form "
+                     "read-only and finish it without reopening it; anything I cannot read back myself is recorded "
+                     "as confirmed by you. (This never saves on the portal.)")
+    elif intent == "reject":
+        if review:
             try:
-                store.resolve(request_id=str(review.get("request_id")), verdict="pass" if intent == "accept" else "needs_correction",
-                              note=f"from the live chat: {text}", reviewer="control-center-chat")
-                phase_name = str(review.get("phase") or "the phase")
-                reply = (f"✅ Recorded: {phase_name} looks correct. The agent continues and learns from your approval."
-                         if intent == "accept" else
-                         f"Recorded: {phase_name} needs correction. The agent treats it as supervised failure evidence and repairs it.")
-                action = {"review": review.get("request_id"), "verdict": intent}
+                review_store.resolve(request_id=str(review.get("request_id")), verdict="needs_correction",
+                                     note=f"from the live chat: {text}", reviewer="control-center-chat")
+                reply = (f"Recorded: {review.get('phase_display') or review.get('phase')} needs correction. "
+                         "The agent repairs it; tell me which field is wrong if you can — I pass it on as a hint.")
+                action = {"review": review.get("request_id"), "verdict": "needs_correction"}
             except ValueError as exc:
                 reply = f"Could not record that answer: {exc}"
+        else:
+            reply = hint_reply(state) + " (Nothing is waiting for a review; I passed your note on as a hint.)"
     else:
         reply = hint_reply(state)
-    append_operator(run_dir, reply, role="agent", kind=f"reply_{intent}")
-    return {"found": True, "run_id": run_dir.name, "intent": intent, "reply": reply, "action": action}
+    append_operator(run_dir, reply, role="agent", kind=f"reply_{intent}", detail={"understood_by": understood.get("source")})
+    return {"found": True, "run_id": run_dir.name, "intent": intent, "understood_by": understood.get("source"),
+            "reply": reply, "action": action}
 
 
 @app.get("/api/mission/chat/frame")
@@ -2147,7 +2187,19 @@ def human_phase_review_resolve(req: HumanPhaseReviewRequest) -> Dict[str, Any]:
         row = store.resolve(request_id=req.request_id, verdict=req.verdict, note=req.note, reviewer=req.reviewer)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return {"status": "recorded", "review": row, "manifest": store.manifest()}
+    confirmed = ""
+    if str(row.get("human_verdict") or "") == "pass" and row.get("run_id") and row.get("phase"):
+        # V243R36: Accept confirms the phase for the running mission, as in the chat:
+        # it finishes the form on screen instead of reopening and filling it again.
+        try:
+            run_dir = _resolve_trace_run_dir(config=req.config, runs_dir="", run_id=str(row["run_id"]))
+            if run_dir is not None and run_dir.name == str(row["run_id"]):
+                confirm_complete(run_dir, str(row["phase"]), text=str(req.note or "Accepted in the Phase Review panel"),
+                                 by=str(req.reviewer or "human"))
+                confirmed = str(row["phase"])
+        except Exception:
+            confirmed = ""
+    return {"status": "recorded", "review": row, "manifest": store.manifest(), "confirmed_phase": confirmed}
 
 
 @app.get("/api/interactive-teaching")

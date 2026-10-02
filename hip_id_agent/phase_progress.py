@@ -151,6 +151,9 @@ async def run_with_progress_watchdog(
             units_since = now
             exact_probes = 0
 
+    # V243R36: an operator confirmation that cannot finish the form yet is
+    # re-checked after new progress (at most every 10 s) or every 30 s, never dropped.
+    confirm_recheck_units, confirm_next_min, confirm_next_max = -1, 0.0, 0.0
     first = await sample()
     if first.get("signature"):
         recent.append(first["signature"])
@@ -217,6 +220,11 @@ async def run_with_progress_watchdog(
             units_progressed(row, now)
             stop_reason = ""
             refill_idle = now - units_since
+            if (now >= confirm_next_min and (best_units > confirm_recheck_units or now >= confirm_next_max)
+                    and operator_control.confirmed_complete(str(phase))):
+                # V243R36: the operator confirmed the form ("everything is filled
+                # correctly") -- stop filling; the read-only proof decides below.
+                stop_reason = "operator_confirmed"
             if not loader_blocking and best_units >= 0:
                 idle_probe_due = probe_after is not None and refill_idle >= probe_after
                 live_probe_due = live_every is not None and now - last_probe_at >= live_every
@@ -261,6 +269,15 @@ async def run_with_progress_watchdog(
             except Exception as exc:
                 checkpoint = {"pass": False, "error": mask_sensitive_string(str(exc))[:500]}
             exact = checkpoint.get("pass") is True
+            if stop_reason == "operator_confirmed" and not exact:
+                # The confirmation cannot finish the form yet (values still missing, a
+                # field the portal flags, no form on screen): the proof said why in the
+                # chat.  Keep working, never tear down; re-check after new progress.
+                confirm_recheck_units, confirm_next_min, confirm_next_max = best_units, now + 10.0, now + 30.0
+                if not operator_control.confirmation_refusal(str(phase)):
+                    agent_chat.say("I can't finish this phase on your confirmation yet: the live form does not hold "
+                                   "it. I keep working on it.", kind="warn", phase=str(phase))
+                continue
             loader_stuck = bool(loader_blocking and not exact)
             code = (
                 "HIP_PHASE_EXACT_STATE_POST_COMPLETION_STALL" if exact
@@ -309,7 +326,8 @@ async def run_with_progress_watchdog(
             if evidence_path:
                 safe_write_json(Path(evidence_path), payload)
             agent_chat.say(
-                ("🛑 Every input.json value is on the form — I stop filling and go on to verification"
+                ("🛑 You confirmed the form — I stop filling and finish this phase" if stop_reason == "operator_confirmed"
+                 else "🛑 Every input.json value is on the form — I stop filling and go on to verification"
                  if exact else "⚠ " + str(payload["message"])[:300]),
                 kind="complete" if exact else "stop", phase=str(phase))
             task.cancel()

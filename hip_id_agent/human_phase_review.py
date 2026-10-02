@@ -131,6 +131,7 @@ class HumanPhaseReviewStore:
         exact_checkpoint: Optional[Mapping[str, Any]] = None,
         automated_judge: Optional[Mapping[str, Any]] = None,
         verification: Optional[Mapping[str, Any]] = None,
+        question: str = "",
     ) -> Dict[str, Any]:
         """Create a resumable operator checkpoint for an incomplete phase.
 
@@ -166,6 +167,8 @@ class HumanPhaseReviewStore:
             "model_consensus": {},
             "judge_summary": {},
             "reason": mask_sensitive_string(str(reason or ""))[:2000],
+            # V243R36: what the agent asks the operator, in plain words (shown in the chat).
+            "question": mask_sensitive_string(str(question or ""))[:1000],
             "screenshot_path": str(screenshot_path or ""),
             "instruction": (
                 "The phase is incomplete and the browser is intentionally being kept open. "

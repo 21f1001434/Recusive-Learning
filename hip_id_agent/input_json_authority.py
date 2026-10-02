@@ -100,14 +100,28 @@ async def prove_input_json_completion(
 
 
 _BUSY_JS = r"""() => {
+  // V243R36: only a popup that is open makes the form "busy" -- a combobox (or a
+  // popup trigger) expanded right now, a list it owns, or a visible loader.  The
+  // portal's own navigation menu, a chip list or an expanded accordion are always
+  // on screen and kept the live map frozen at 0/N on the live portal.
   const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
     return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
-  const open = document.querySelectorAll('[role=combobox][aria-expanded=true]').length;
-  const lists = Array.from(document.querySelectorAll('[role=listbox],[role=menu]')).filter(shown).length;
+  const shell = 'nav,header,aside,[role=navigation],[role=menubar],[role=banner]';
+  const expanded = Array.from(document.querySelectorAll('[aria-expanded=true]')).filter(shown)
+    .filter((t) => !t.closest(shell))
+    .filter((t) => t.getAttribute('role') === 'combobox' || /^(listbox|menu|tree|grid|dialog|true)$/i.test(t.getAttribute('aria-haspopup') || ''));
+  const owned = new Set();
+  for (const t of expanded) for (const a of ['aria-controls', 'aria-owns'])
+    for (const id of String(t.getAttribute(a) || '').split(/\s+/)) if (id) owned.add(id);
+  const lists = Array.from(document.querySelectorAll('[role=listbox],[role=menu]')).filter(shown)
+    .filter((l) => owned.has(l.id) || !!(l.closest('dds-dropdown,.dds__dropdown') && l.closest('dds-dropdown,.dds__dropdown').querySelector('[aria-expanded=true]'))).length;
   const busy = Array.from(document.querySelectorAll('[aria-busy=true],.dds__loading-indicator,.dds__progress-indicator,.spinner,.loading'))
-    .filter(shown).length;
-  return {open, lists, busy};
+    .filter(shown).filter((el) => !el.closest(shell)).length;
+  return {open: expanded.length, lists, busy};
 }"""
+
+
+_PERSISTENT_BUSY_SECONDS = 20.0
 
 
 async def quiet_completion_probe(*, page: Any, phase: str, phase_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -124,16 +138,39 @@ async def quiet_completion_probe(*, page: Any, phase: str, phase_input: Dict[str
         state = await page.evaluate(_BUSY_JS)
     except Exception as exc:
         return {"pass": False, "status": "probe_error", "error": mask_sensitive_string(str(exc))[:200]}
-    if any(int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")):
-        return {"pass": False, "status": "busy", **{k: int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")}}
+    counts = {k: int((state or {}).get(k) or 0) for k in ("open", "lists", "busy")}
+    busy_ignored = False
+    if any(counts.values()):
+        # V243R36: something that never closes is not "busy" -- after 20 s of an
+        # unbroken busy signal the map is read anyway (reading touches nothing).
+        import time as _time
+
+        since = getattr(page, "_hip_quiet_busy_since", None)
+        now = _time.monotonic()
+        if since is None:
+            try:
+                setattr(page, "_hip_quiet_busy_since", now)
+            except Exception:
+                pass
+            since = now
+        if now - float(since) < _PERSISTENT_BUSY_SECONDS:
+            return {"pass": False, "status": "busy", **counts}
+        busy_ignored = True
+    else:
+        try:
+            setattr(page, "_hip_quiet_busy_since", None)
+        except Exception:
+            pass
     # V243R34: the live input.json map -- every value, the form field it maps to,
     # what the form holds now -- read without touching the page.
     from .phase_live_reproof import live_input_field_map
 
     live_map = await live_input_field_map(page=page, phase=phase, phase_input=phase_input)
+    if busy_ignored:
+        live_map["busy_ignored"] = counts
     return {"pass": bool(live_map.get("complete")), "status": "complete" if live_map.get("complete") else "filling",
             "matched_count": live_map.get("exact"), "missing_count": int(live_map.get("total") or 0) - int(live_map.get("exact") or 0),
-            "map": live_map}
+            "map": live_map, **({"busy_ignored": counts} if busy_ignored else {})}
 
 
 def model_judge_verdicts(judge_result: Mapping[str, Any]) -> List[Dict[str, Any]]:

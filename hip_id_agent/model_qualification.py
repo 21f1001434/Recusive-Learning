@@ -16,7 +16,10 @@ the real HIP page and scored on what it answered:
 * each model answers every question with a control id; answers are checked
   against the page, never against another model or a model's own confidence.
 
-The most accurate model (latency breaks ties) is selected and locked.  Every
+The most accurate model is selected and locked (V243R36: on equal accuracy
+the more capable model -- gpt-oss-120b over gpt-oss-20b -- and only between
+equally capable models the faster one; before R36 latency broke every tie, so
+gpt-oss-20b won whenever both answered the same).  Every
 later call -- default calls, action selection, judges -- uses it, with the other
 models that also passed as its fall-back order when it is down.  It runs again
 only when asked (``--requalify-models`` / ``qualify-models --force``).
@@ -41,7 +44,11 @@ SCHEMA = "hip.model-qualification.v1"
 # exactly the expected record?) graded against the page.  A lock from an older
 # version is re-validated once: every model is asked again and the champion is
 # chosen anew; the old champion stays in use until then.
-QUALIFICATION_VERSION = 2
+# V243R36: version 3 ranks a tie on accuracy by capability (not latency), asks a
+# model that failed to answer (error, timeout, an answer that is not JSON) once
+# more, and reads a reasoning model's answer when its final text came back empty.
+# A lock from an older version is re-validated once.
+QUALIFICATION_VERSION = 3
 SELECTION_FILE = "model_selection.json"
 RUNS_FILE = "model_qualification_runs.jsonl"
 
@@ -302,6 +309,7 @@ async def capture_screen(page: Any, *, wait_seconds: float = 15.0) -> Dict[str, 
 def qualify_models(
     router: Any, screen: Mapping[str, Any], *, source: str, min_accuracy: float = 0.6, max_questions: int = 8,
     models: Optional[Sequence[str]] = None, judge_questions: int = 4, min_judge_accuracy: float = 0.5,
+    retries: int = 1,
 ) -> Dict[str, Any]:
     """Give every available text model the same questions about this page and rank them."""
     questions = qualification_questions(screen, max_questions=max_questions, judge_questions=judge_questions)
@@ -324,15 +332,41 @@ def qualify_models(
         return {**base, "status": "no_models_available", "locked": False}
     system, task = _prompt(screen, questions)
 
+    def ask(model: str) -> Dict[str, Any]:
+        text = router.client.autogen_reply(system, task, model=model)
+        row = score_answers(text, questions)
+        if not row["json_ok"] and callable(getattr(router.client, "chat_rest", None)):
+            # A reasoning model can return its answer only in the reasoning channel
+            # (the final text empty); the REST reader takes it from there.
+            try:
+                rest = score_answers(router.client.chat_rest(
+                    [{"role": "system", "content": system}, {"role": "user", "content": task}], model=model), questions)
+                if rest["json_ok"]:
+                    row = dict(rest, answer_read_from="rest_reasoning_fallback")
+            except Exception:
+                pass
+        return row
+
     def run(model: str) -> Dict[str, Any]:
         started = time.perf_counter()
-        try:
-            text = router.client.autogen_reply(system, task, model=model)
-            row = score_answers(text, questions)
-            row.update(model=model, ok=True)
-        except Exception as exc:
-            row = {"model": model, "ok": False, "json_ok": False, "correct": 0, "total": len(questions), "accuracy": 0.0,
-                   "error": mask_sensitive_string(str(exc))[:400]}
+        failed: List[str] = []
+        row: Dict[str, Any] = {}
+        # A model that fails to answer (error, timeout, unreadable answer) is asked
+        # once more: one transient failure must not decide the champion.
+        for _ in range(1 + max(0, int(retries))):
+            try:
+                row = ask(model)
+                row.update(model=model, ok=True)
+                if row["json_ok"]:
+                    break
+                failed.append("answer was not JSON")
+            except Exception as exc:
+                row = {"model": model, "ok": False, "json_ok": False, "correct": 0, "total": len(questions), "accuracy": 0.0,
+                       "error": mask_sensitive_string(str(exc))[:400]}
+                failed.append(row["error"][:160])
+        row["asked"] = len(failed) + (1 if row.get("json_ok") else 0)
+        if failed:
+            row["failed_answers"] = failed
         row["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 1)
         row["capability"] = float(router.capability(model))
         return row
@@ -341,15 +375,20 @@ def qualify_models(
     with ThreadPoolExecutor(max_workers=max(1, min(len(candidates), 6)), thread_name_prefix="hip-model-qualify") as pool:
         for fut in as_completed([pool.submit(run, m) for m in candidates]):
             ranking.append(fut.result())
+    # Accuracy on the live page decides; on a tie the more capable model wins and
+    # latency decides only between equally capable models.
     ranking.sort(key=lambda r: (-float(r["accuracy"]), -float(r.get("judge_accuracy") or 0.0), -int(bool(r.get("json_ok"))),
-                                float(r["latency_ms"]), -float(r["capability"])))
+                                -float(r["capability"]), float(r["latency_ms"])))
     for row in ranking:
         # A champion must also judge a filled form correctly (it answers the judges).
         judge_ok = row.get("judge_accuracy") is None or float(row.get("judge_accuracy") or 0.0) >= float(min_judge_accuracy)
         row["qualified"] = bool(row.get("ok")) and float(row["accuracy"]) >= float(min_accuracy) and judge_ok
     winner = next((r for r in ranking if r["qualified"]), None)
+    for row in ranking:
+        row["why"] = _why(row, winner, min_accuracy=min_accuracy, min_judge_accuracy=min_judge_accuracy)
     result = {**base, "ranking": ranking, "min_accuracy": float(min_accuracy), "min_judge_accuracy": float(min_judge_accuracy),
-              "candidate_models": list(candidates)}
+              "candidate_models": list(candidates),
+              "tie_rule": "equal accuracy -> the more capable model; equal capability -> the faster model"}
     if not winner:
         return {**result, "status": "no_model_met_threshold", "locked": False,
                 "reason": (f"no model answered at least {min_accuracy:.0%} of the page questions correctly"
@@ -358,7 +397,33 @@ def qualify_models(
             "accuracy": winner["accuracy"], "correct": winner["correct"], "total": winner["total"],
             "judge_accuracy": winner.get("judge_accuracy"), "judge_correct": winner.get("judge_correct"),
             "judge_total": winner.get("judge_total"),
+            "selection_reason": winner["why"],
             "fallback_order": [r["model"] for r in ranking if r["qualified"] and r["model"] != winner["model"]]}
+
+
+def _why(row: Mapping[str, Any], winner: Optional[Mapping[str, Any]], *, min_accuracy: float, min_judge_accuracy: float) -> str:
+    """In plain words, why a model is (or is not) the champion."""
+    score = f"{int(row.get('correct') or 0)}/{int(row.get('total') or 0)}"
+    if not row.get("ok"):
+        return f"did not answer ({str(row.get('error') or 'error')[:120]})"
+    if not row.get("json_ok"):
+        return "its answer could not be read (not JSON), also when asked again"
+    if not row.get("qualified"):
+        if float(row.get("accuracy") or 0.0) < float(min_accuracy):
+            return f"answered {score} correctly, below the {min_accuracy:.0%} needed"
+        return (f"answered {score} correctly but judged only {int(row.get('judge_correct') or 0)}/"
+                f"{int(row.get('judge_total') or 0)} filled records right (at least {min_judge_accuracy:.0%} needed)")
+    if winner is None:
+        return f"answered {score} correctly"
+    best = f"{int(winner.get('correct') or 0)}/{int(winner.get('total') or 0)}"
+    if row.get("model") == winner.get("model"):
+        return f"answered {score} questions about the live page correctly -- the most accurate (a tie goes to the more capable model)"
+    if float(row.get("accuracy") or 0.0) < float(winner.get("accuracy") or 0.0) or \
+            float(row.get("judge_accuracy") or 0.0) < float(winner.get("judge_accuracy") or 0.0):
+        return f"answered {score} correctly; the champion answered {best}"
+    if float(row.get("capability") or 0.0) < float(winner.get("capability") or 0.0):
+        return f"same score ({score}); the champion is the more capable model"
+    return f"same score and capability ({score}); the champion answered faster"
 
 
 def revalidation_reason(selection: Mapping[str, Any], config: Any = None) -> str:
@@ -442,6 +507,7 @@ async def ensure_model_qualification(
         max_questions=int(_qualification_cfg(config, "qualification_max_questions", 8) or 8),
         judge_questions=int(_qualification_cfg(config, "qualification_judge_questions", 4) or 0),
         min_judge_accuracy=float(_qualification_cfg(config, "qualification_min_judge_accuracy", 0.5) or 0.0),
+        retries=int(_qualification_cfg(config, "qualification_retries", 1) or 0),
     )
     result["ran_now"] = True
     if revalidate or force:
@@ -471,9 +537,9 @@ def qualification_summary(selection: Mapping[str, Any]) -> Dict[str, Any]:
         return {"selected_model": "", "locked": False}
     return {k: selection.get(k) for k in (
         "selected_model", "locked", "qualified_at", "source", "accuracy", "correct", "total", "fallback_order",
-        "judge_accuracy", "judge_correct", "judge_total", "revalidation_due")} | {
+        "judge_accuracy", "judge_correct", "judge_total", "revalidation_due", "selection_reason", "tie_rule")} | {
         "qualification_version": int(selection.get("qualification_version") or 1),
         "needs_revalidation": revalidation_reason(selection),
         "live_judge_record": {k: (selection.get("live_judge_record") or {}).get(k) for k in ("correct", "wrong")},
-        "ranking": [{k: r.get(k) for k in ("model", "accuracy", "correct", "total", "judge_accuracy", "latency_ms", "qualified", "error")}
+        "ranking": [{k: r.get(k) for k in ("model", "accuracy", "correct", "total", "judge_accuracy", "latency_ms", "qualified", "error", "capability", "why")}
                     for r in selection.get("ranking") or []]}

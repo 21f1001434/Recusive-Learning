@@ -59,6 +59,7 @@
 .chat-msg.k-failed .chat-icon,.chat-msg.k-blocked .chat-icon,.chat-msg.k-stop .chat-icon{background:#451e28;border-color:#693441;color:#ff9dab}
 .chat-msg.k-heal .chat-icon,.chat-msg.k-warn .chat-icon,.chat-msg.k-retry .chat-icon,.chat-msg.k-paused .chat-icon{background:#3a2a12;border-color:#76562c;color:#ffc878}
 .chat-msg.k-complete .chat-bubble{border-color:#23583f}.chat-msg.k-blocked .chat-bubble,.chat-msg.k-failed .chat-bubble{border-color:#5a2b36}
+.chat-msg.k-question .chat-icon{background:#2b2350;border-color:#5a4ca0;color:#cbbcff}.chat-msg.k-question .chat-bubble{border-color:#5a4ca0;background:#18142c}
 .chat-divider{display:flex;align-items:center;gap:8px;margin:8px 0 2px;color:#8fceff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.chat-divider::before,.chat-divider::after{content:"";flex:1;height:1px;background:#264b6c}
 .chat-jump{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:var(--accent);color:#111;font-size:11px;padding:6px 12px;border-radius:999px;box-shadow:0 6px 18px #0009}
 .chat-chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 0;border-top:1px solid var(--border);flex:none}

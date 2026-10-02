@@ -370,14 +370,17 @@ def test_the_operator_talks_to_the_agent_through_the_control_center(tmp_path: Pa
     assert operator_control.notes() == ["Interface Type is on the Connection tab"]
     assert any(m["text"].startswith("📝 Got your note: “Interface Type is on the Connection tab”") for m in _chat(run))
 
-    assert "Nothing is waiting for your review" in say("accept")["reply"]
+    # V243R36: "accept" with no review waiting confirms the phase the agent is on.
+    confirmed = say("accept")
+    assert confirmed["intent"] == "accept" and "you confirmed Source Transport Profile is filled correctly" in confirmed["reply"]
+    assert operator_control.read_control(run)["confirmations"][TP]["text"] == "accept"
     store = human_phase_review_from_config(load_config(cfg_path))
     review = store.create_or_update(run_id="RUN_R35", phase=TP, phase_display="Source Transport Profile", attempt=1,
                                     automated_judge={"pass": True}, verification={}, exact_checkpoint={"pass": True},
                                     model_consensus={})
     assert client.get("/api/mission/chat", params=q).json()["state"]["review"]["request_id"] == review["request_id"]
     accepted = say("looks correct")
-    assert accepted["intent"] == "accept" and accepted["reply"].startswith("✅ Recorded")
+    assert accepted["intent"] == "accept" and accepted["reply"].startswith("✅ Understood")
     assert store.pending(run_id="RUN_R35") == []
 
     stop = say("stop")

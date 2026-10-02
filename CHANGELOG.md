@@ -1,3 +1,53 @@
+# V243R36 — A filled form finishes, and the agent understands you (2026-10-02)
+
+- `input_json_authority._BUSY_JS`:
+  - only an expanded combobox / popup trigger outside the portal shell (`nav, header, aside, [role=navigation|menubar|banner]`), a list it owns, or a loader outside the shell is busy;
+  - `quiet_completion_probe` reads the map through a busy signal that lasts 20 s (`busy_ignored`).
+- `section_judge`: `_boolean_intent` / `_boolean_control`. A fact with a boolean intent matches a switch or checkbox by `checked` (`evidence: checked_state`).
+- `phase_live_reproof`:
+  - `_cross_check_with_executor_reader`: missing facts are re-resolved with the doc-type or stateful resolver and equality (`executor_reader_matched_fields`);
+  - `live_read_only_phase_reproof` returns `operator_control.confirmed_proof(...)` for a whole phase.
+- `operator_control`:
+  - `confirm_complete` (backend), `confirmed_complete` (this mission only);
+  - `confirmed_proof`: completes a proof of an on-screen form with `operator_confirmed_fields`, never over `invalid_fields` or more than `max_confirmed_unread` unread values (it says why and the confirmation stays valid), and says so once;
+  - `write_control` keeps earlier keys.
+- `phase_progress.run_with_progress_watchdog`: an operator confirmation stops the attempt (`stop_reason: operator_confirmed`). A confirmation that cannot complete the form yet keeps the attempt going and is re-checked after new progress (at most every 10 s) or every 30 s.
+- `dummy_fill_e2e`:
+  - a retry, or a confirmed phase, first proves the form on screen and keeps it when exact (`_kept_form_preflight`, `_kept_form_summary`: no route, no refill);
+  - `_near_complete_question` / `_ask_before_reopening`: a stall (watchdog, wall budget, pre-judge gate) on a form missing at most `ask_before_reopening_max_missing` unreadable values asks the operator before the recovery ladder;
+  - `_hold_incomplete_phase_for_human(question=)`.
+- `human_phase_review.create_recovery_request(question=)`.
+- `operator_chat`:
+  - `interpret(text, review_pending=, paused=)`: confirmations, a negation is never a confirmation, "status" only as a bare word or question, yes/no by context;
+  - `interpret_with_model`: an advisory model fallback for hints (confidence ≥ 0.8, never "stop").
+- Backend:
+  - `POST /api/mission/chat`: accept confirms the current phase (`confirm_complete`) and resolves a waiting review;
+  - `POST /api/human-phase-review/resolve`: a pass confirms the phase for the running mission (`confirmed_phase`);
+  - `GET /api/mission/chat` passes the review's `question`.
+- `mission_trace`: `semantic_action_gate` observations stay out of the chat.
+- `form_interaction_policy._clear_interceptor`: Escape for an open popup, wait for a transient layer, never a dialog. It is used by `universal_locator_preflight` and the stateful executor before "target center intercepted".
+- `browser_session`:
+  - `_probe_cdp_endpoint` follows `DevToolsActivePort`;
+  - `restart()` runs `_release_or_replace_cdp_port` (waits 10 s, then a free port via `_cdp_port_override`);
+  - the executor rebind uses its full timeout.
+- `model_qualification` (version 3):
+  - ties rank by capability, then latency;
+  - `retries` (a failed or unreadable answer is asked again);
+  - the REST fallback reads a reasoning-only answer;
+  - `why` per model, plus `selection_reason` and `tie_rule`.
+  - The CLI table and the Model Champion tooltip show the reasons.
+- Control Center:
+  - the `question` chat kind (❓) and style;
+  - the banner shows the agent's question;
+  - the Model Champion tooltip.
+- Config:
+  - `runtime_self_heal.ask_before_reopening_max_missing` (2);
+  - `model_portfolio.qualification_retries` (1);
+  - `agent_chat.model_intent_fallback` (true), `agent_chat.operator_confirmation_max_unread` (3).
+- Tests:
+  - `tests/test_v243r36_operator_confirmation_and_live_doctype.py`;
+  - updated `test_v243r24…` (tie → capability; a failed model is asked twice) and `test_v243r35…` (accept confirms the phase).
+
 # V243R35 — The live agent chat (2026-10-01)
 
 - New `hip_id_agent/agent_chat.py`:

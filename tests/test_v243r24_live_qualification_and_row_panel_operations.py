@@ -123,7 +123,10 @@ def test_every_model_gets_the_same_task_and_the_most_accurate_one_is_selected(li
     client = _Client({"gpt-oss-120b": 1.0, "llama-3-3-70b-instruct": 0.75, "gpt-oss-20b": 0.4, "mistral-small-3-1-24b-instruct-2503": -1})
     router = _router(tmp_path, client, ["gpt-oss-20b", "gpt-oss-120b", "llama-3-3-70b-instruct", "mistral-small-3-1-24b-instruct-2503"])
     result = qualify_models(router, listing_screen, source="test")
-    assert sorted(client.calls) == sorted(router.available_models("text"))  # one identical task each
+    # One identical task each; V243R36: a model that failed to answer is asked once more.
+    assert sorted(set(client.calls)) == sorted(router.available_models("text"))
+    assert client.calls.count("mistral-small-3-1-24b-instruct-2503") == 2
+    assert all(client.calls.count(m) == 1 for m in ("gpt-oss-120b", "llama-3-3-70b-instruct", "gpt-oss-20b"))
     ranking = {r["model"]: r for r in result["ranking"]}
     assert result["status"] == "selected" and result["selected_model"] == "gpt-oss-120b"
     assert ranking["gpt-oss-120b"]["accuracy"] == 1.0 and ranking["gpt-oss-20b"]["qualified"] is False
@@ -131,11 +134,15 @@ def test_every_model_gets_the_same_task_and_the_most_accurate_one_is_selected(li
     assert result["fallback_order"] == ["llama-3-3-70b-instruct"]
 
 
-def test_a_faster_model_wins_a_tie_on_accuracy(listing_screen, tmp_path):
+def test_a_tie_on_accuracy_goes_to_the_more_capable_model(listing_screen, tmp_path):
+    # V243R36: before, latency broke the tie and the faster gpt-oss-20b won whenever
+    # both answered the same.  Now the more capable model wins a tie.
     _Client.expected = _answers(listing_screen)
     client = _Client({"gpt-oss-120b": 1.0, "gpt-oss-20b": 1.0}, delay={"gpt-oss-120b": 0.4})
     result = qualify_models(_router(tmp_path, client, ["gpt-oss-120b", "gpt-oss-20b"]), listing_screen, source="test")
-    assert result["selected_model"] == "gpt-oss-20b"  # same score, answered faster: chosen by performance
+    assert result["selected_model"] == "gpt-oss-120b"  # same score: the more capable model
+    why = {r["model"]: r["why"] for r in result["ranking"]}
+    assert "the champion is the more capable model" in why["gpt-oss-20b"]
 
 
 def test_qualification_runs_once_and_the_selection_is_used_for_every_call(listing_screen, tmp_path, monkeypatch):

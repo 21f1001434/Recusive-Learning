@@ -337,6 +337,13 @@ class AgentChatConfig(BaseModel):
     live_frame_quality: int = 55
     # How often a paused agent checks for "resume".
     pause_poll_seconds: float = 0.5
+    # V243R36: a message the chat's patterns read as a plain hint may be classified
+    # by the configured model (never "stop"; only a confident answer is used).
+    model_intent_fallback: bool = True
+    # V243R36: "everything is filled correctly" finishes a phase when at most this
+    # many input.json values are ones the agent cannot read back itself; with more
+    # still missing it names them and keeps filling (the confirmation stays valid).
+    operator_confirmation_max_unread: int = 3
 
 
 class RuntimeSelfHealConfig(BaseModel):
@@ -387,6 +394,11 @@ class RuntimeSelfHealConfig(BaseModel):
     # post_complete_fill_seconds is stopped as complete.
     live_map_seconds: float = 5.0
     post_complete_fill_seconds: float = 30.0
+    # V243R36: a stalled attempt whose form already holds every input.json value
+    # but at most this many (that the agent cannot read back) asks the operator
+    # "is the form correct?" instead of refreshing, reopening or restarting the
+    # browser -- each of which throws the filled form away.  0 turns it off.
+    ask_before_reopening_max_missing: int = 2
     # V243R32: a Spring "Whitelabel Error Page" -> close and reopen the browser,
     # open the same phase link and the form again, fill from input.json.
     whitelabel_browser_restarts: int = 3
@@ -1057,6 +1069,8 @@ class ModelPortfolioConfig(BaseModel):
     qualification_min_judge_accuracy: float = 0.5
     qualification_max_age_days: float = 30.0
     qualification_revalidate_after_judge_errors: int = 3
+    # V243R36: a model that fails to answer (error, timeout, unreadable) is asked this many more times.
+    qualification_retries: int = 1
 
 
 class RecursiveSelfImprovementConfig(BaseModel):

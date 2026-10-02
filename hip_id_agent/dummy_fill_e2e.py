@@ -159,6 +159,8 @@ def phase_exact_completion_checkpoint(phase: str, phase_dir: Path) -> Dict[str, 
                 "status": "exact_live_state_reproved_read_only",
                 "authoritative_artifact": str(live_reproof_path),
                 "read_only_live_reproof": True,
+                # V243R36: values the operator confirmed that the agent could not read back.
+                "operator_confirmed_fields": list(live.get("operator_confirmed_fields") or []),
                 "inspected": [{
                     "path": str(live_reproof_path),
                     "exists": True,
@@ -2247,6 +2249,93 @@ def accepted_human_override(request: Any, exact_checkpoint: Any) -> Dict[str, An
     return dict(request)
 
 
+def _kept_form_preflight(phase: str, attempt: int, proof: Dict[str, Any]) -> Dict[str, Any]:
+    """V243R36: the preflight of an attempt that keeps an exact form already on screen.
+
+    The read-only proof of this phase's form is the route proof: the agent is on
+    the phase's form, so nothing is navigated, opened or refreshed.
+    """
+    return {
+        "schema_version": "hip.phase-attempt-preflight.v1", "phase": phase, "attempt": int(attempt),
+        "status": "kept_exact_live_form", "pass": True, "persistent_session": True,
+        "route": {"pass": True, "source": "read_only_proof_of_the_form_on_screen"},
+        "dual_mcp": {"pass": True, "source": "read_only_proof_of_the_form_on_screen"},
+        "kept_exact_live_form": {k: proof.get(k) for k in ("status", "matched_count", "operator_confirmed_fields", "reason")},
+    }
+
+
+async def _kept_form_summary(phase: str, proof: Dict[str, Any]) -> Dict[str, Any]:
+    """V243R36: the "execution" of an attempt that keeps an exact form: nothing to do."""
+    return {
+        "phase": phase, "status": "kept_exact_live_form", "pass": True, "browser_replay_performed": False,
+        "form_reopened": False, "matched_count": proof.get("matched_count"),
+        "operator_confirmed_fields": proof.get("operator_confirmed_fields") or [],
+    }
+
+
+# V243R36: stops where the attempt ran out of progress, not where the page broke.
+_NEAR_COMPLETE_STALL_CODES = (
+    "HIP_PHASE_NO_PROGRESS_WATCHDOG", "HIP_PHASE_WALL_BUDGET", "HIP_PHASE_WALLCLOCK_STALL_GUARD",
+    "HIP_PHASE_STALL_AFTER_RECOVERY", "HIP_PHASE_EXACT_EXECUTION_NOT_COMPLETED",
+)
+_BROKEN_PAGE_CODES = (
+    "HIP_PORTAL_LOADING_STUCK", "HIP_AUTH_SESSION_EXPIRED", "HIP_ROUTE_NOT_COMMITTED", "HIP_MCP_SURFACE_DRIFT",
+    "HIP_DROPDOWN_OPTIONS_EMPTY", "HIP_WHITELABEL",
+)
+
+
+def _near_complete_question(
+    phase: str, phase_dir: Path, message: str, classification: str, *, max_missing: int, reason: str,
+) -> Dict[str, Any]:
+    """V243R36: ask the operator instead of throwing a nearly complete form away.
+
+    The recovery ladder after a stall refreshes the page, reopens the form or
+    restarts the browser -- each one discards everything filled.  When the
+    attempt's own fresh read-only proof (written under ``reason``) shows the form
+    on screen holding every input.json value but at most ``max_missing`` the
+    agent cannot read back, and nothing the portal flags invalid, the agent asks
+    "is the form correct?" first.  A broken page (loader, expired login,
+    Whitelabel error, lost browser, another page) still goes straight to
+    recovery.  Returns ``{}`` when it should not ask.
+    """
+    from .input_json_authority import NOT_ELIGIBLE_CLASSES
+
+    text = str(message or "")
+    if int(max_missing or 0) <= 0 or str(classification or "") in NOT_ELIGIBLE_CLASSES:
+        return {}
+    if not any(code in text for code in _NEAR_COMPLETE_STALL_CODES) or any(code in text for code in _BROKEN_PAGE_CODES):
+        return {}
+    try:
+        proof = json.loads((Path(phase_dir) / "input_json_completion_authority.json").read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(proof, dict) or str(proof.get("reason") or "") != str(reason) or proof.get("pass") is True:
+        return {}
+    if proof.get("read_only") is not True or str(proof.get("source") or "") != "current_live_browser":
+        return {}
+    if proof.get("invalid_fields") or int(proof.get("actual_control_count") or 0) <= 0:
+        return {}
+    unread = [*(proof.get("missing_fields") or []), *(proof.get("row_issue_fields") or [])]
+    upload = proof.get("required_upload_proof") or {}
+    if isinstance(upload, dict) and upload.get("pass") is False:
+        unread.extend(upload.get("missing_fields") or ["upload"])
+    unread = list(dict.fromkeys(str(x) for x in unread if str(x)))
+    matched = len(proof.get("matched_fields") or [])
+    if not unread or len(unread) > int(max_missing) or matched < 3:
+        return {}
+    shown = phase_display(phase)
+    names = ", ".join(unread)
+    question = (
+        f"❓ The {shown} form holds {matched} of {matched + len(unread)} input.json values, but I can't read back "
+        f"{names}. Is the form correct? Accept: I finish the phase as it is (nothing is saved on the portal). "
+        "Needs correction: fix it on screen, then I check it again. Either way I keep this form open "
+        "instead of reopening it blank."
+    )
+    return {"question": question, "unread_fields": unread, "matched_count": matched,
+            "reason": f"HIP_PHASE_NEAR_COMPLETE_OPERATOR_QUESTION: {shown} holds {matched} input.json values; "
+                      f"not read back: {names}\n\nLast error: {text[:2000]}"}
+
+
 async def _hold_incomplete_phase_for_human(
     *,
     store: Any,
@@ -2261,6 +2350,7 @@ async def _hold_incomplete_phase_for_human(
     automated_judge: Optional[Dict[str, Any]] = None,
     verification: Optional[Dict[str, Any]] = None,
     config: Any = None,
+    question: str = "",
 ) -> Dict[str, Any]:
     """Keep the live browser open while an incomplete phase waits for assistance.
 
@@ -2285,7 +2375,7 @@ async def _hold_incomplete_phase_for_human(
         run_id=run_id, phase=phase, phase_display=phase_display,
         recovery_round=recovery_round, reason=reason, screenshot_path=screenshot_path,
         exact_checkpoint=exact_checkpoint or {}, automated_judge=automated_judge or {},
-        verification=verification or {},
+        verification=verification or {}, question=question,
     )
     wait_file = phase_dir / "INCOMPLETE_PHASE_WAITING.json"
     safe_write_json(wait_file, {
@@ -2520,7 +2610,8 @@ class FullDummyFillE2EFlow:
         chat_cfg = getattr(self.config, "agent_chat", None)
         mission_trace.chat.enabled = bool(getattr(chat_cfg, "enabled", True))
         agent_chat.activate(mission_trace.chat)
-        operator_control.bind(root_dir, poll_seconds=float(getattr(chat_cfg, "pause_poll_seconds", 0.5) or 0.5))
+        operator_control.bind(root_dir, poll_seconds=float(getattr(chat_cfg, "pause_poll_seconds", 0.5) or 0.5),
+                              max_confirmed_unread=int(getattr(chat_cfg, "operator_confirmation_max_unread", 3) or 0))
         mission_trace.chat.post(
             f"Starting the mission: {', '.join(phase_display(p) for p in phases)}. "
             "I'll tell you here what I open, click, type and select, and what I verify.", kind="mission")
@@ -3251,6 +3342,43 @@ class FullDummyFillE2EFlow:
                 pass
             return record
 
+        async def _ask_before_reopening(
+            phase_name: str, phase_dir: Path, attempt: int, message: str, classification: str, *,
+            proof_reason: str, judge: Optional[Dict[str, Any]] = None, verify: Optional[Dict[str, Any]] = None,
+        ) -> Dict[str, Any]:
+            """V243R36: a stalled, nearly complete form -> ask the operator, keep the form.
+
+            ``{"asked": False}`` when the agent should recover as before; otherwise the
+            hold's result (``resume`` -> the next attempt re-proves the same form).
+            """
+            if not self.options.hold_browser_on_incomplete_phase or shared_browser.is_executor_transport_disconnect(message):
+                return {"asked": False}
+            ask = _near_complete_question(
+                phase_name, phase_dir, message, classification, reason=proof_reason,
+                max_missing=int(getattr(self.config.runtime_self_heal, "ask_before_reopening_max_missing", 2) or 0))
+            if not ask:
+                return {"asked": False}
+            agent_chat.say(ask["question"], kind="question", phase=phase_name)
+            try:
+                mission_trace.record_warning(
+                    phase_name, f"Asked the operator before reopening a nearly complete form (not read back: "
+                                f"{', '.join(ask['unread_fields'])})")
+            except Exception:
+                pass
+            safe_write_json(phase_dir / f"near_complete_question_attempt_{int(attempt):02d}.json", {
+                "schema_version": "hip.near-complete-question.v1", "phase": phase_name, "attempt": int(attempt),
+                "unread_fields": ask["unread_fields"], "matched_count": ask["matched_count"],
+                "recovery_ladder_skipped": True, "form_kept_open": True, "asked_at": utc_now(),
+            })
+            hold = await _hold_incomplete_phase_for_human(
+                store=human_phase_reviews, browser=shared_browser, run_id=ctx.run_id,
+                phase=phase_name, phase_display=PHASE_DISPLAY.get(phase_name, phase_name),
+                recovery_round=attempt, phase_dir=phase_dir, reason=ask["reason"], question=ask["question"],
+                exact_checkpoint=phase_exact_completion_checkpoint(phase_name, phase_dir),
+                automated_judge=judge or {}, verification=verify or {}, config=self.config,
+            )
+            return {"asked": True, **hold, "unread_fields": ask["unread_fields"]}
+
         # V243R35: a live frame of the browser for the chat panel, every few seconds.
         live_frame_task = None
         if mission_trace.chat.enabled and float(getattr(chat_cfg, "live_frame_seconds", 3.0) or 0.0) > 0:
@@ -3397,17 +3525,36 @@ class FullDummyFillE2EFlow:
                     attempt_index += 1
                     # V243R35: a pause from the live chat takes effect before an attempt.
                     await operator_control.checkpoint(phase=phase, where=f"{phase_display(phase)} attempt {attempt_no}")
+                    # V243R36: a retry -- or a phase the operator confirmed -- first proves
+                    # the form already on screen, read-only.  When it holds every
+                    # input.json value it is kept: no route, no reopened form, no refill
+                    # (a confirmed form used to be reopened blank and filled again).
+                    kept_exact: Dict[str, Any] = {}
+                    if attempt_no > 1 or operator_control.confirmed_complete(phase):
+                        try:
+                            page_now = shared_browser.page
+                            if page_now is not None and not page_now.is_closed():
+                                before_reopen = await _input_json_authority(
+                                    phase, phase_dir, input_path, reason=f"attempt_{attempt_no}_before_reopening_the_form")
+                                if before_reopen.get("pass"):
+                                    kept_exact = before_reopen
+                                    agent_chat.say(
+                                        f"The {phase_display(phase)} form on screen already holds every input.json value — "
+                                        "I keep it instead of reopening and filling it again", kind="complete", phase=phase)
+                        except Exception:
+                            kept_exact = {}
                     # R10: a live read-only reproof is valid only for the stable
                     # browser state in the attempt that created it.  Any new
                     # execution/repair attempt invalidates that proof before the
                     # browser is touched, preventing a stale prior pass from
                     # satisfying a later checkpoint.
-                    try:
-                        stale_live_reproof = phase_dir / "phase_live_read_only_reproof.json"
-                        if stale_live_reproof.exists():
-                            stale_live_reproof.unlink()
-                    except Exception:
-                        pass
+                    if not kept_exact:
+                        try:
+                            stale_live_reproof = phase_dir / "phase_live_read_only_reproof.json"
+                            if stale_live_reproof.exists():
+                                stale_live_reproof.unlink()
+                        except Exception:
+                            pass
                     contract = PHASE_RUNTIME_CONTRACTS[phase]
                     attempt_stage = "agentic_preflight"
                     mission_readiness = mission.phase_readiness(phase)
@@ -3428,7 +3575,7 @@ class FullDummyFillE2EFlow:
                             raise RuntimeError(dependency_message)
                     mission.mark_phase_started(phase, attempt=attempt_no)
                     try:
-                        preflight = await runtime_self_healer.prepare_phase_attempt(
+                        preflight = _kept_form_preflight(phase, attempt_no, kept_exact) if kept_exact else await runtime_self_healer.prepare_phase_attempt(
                             phase=phase,
                             target_url=PHASE_URLS[phase],
                             attempt=attempt_no,
@@ -3479,7 +3626,7 @@ class FullDummyFillE2EFlow:
                         # being cancelled mid-form.
                         summary = await run_with_progress_budget(
                             run_with_progress_watchdog(
-                                _execute_phase_once(phase, phase_ctx, input_path),
+                                (_kept_form_summary(phase, kept_exact) if kept_exact else _execute_phase_once(phase, phase_ctx, input_path)),
                                 phase=phase,
                                 marker_provider=lambda: shared_browser.capture_phase_progress_marker(phase),
                                 checkpoint_provider=_watchdog_checkpoint_provider,
@@ -3607,6 +3754,28 @@ class FullDummyFillE2EFlow:
                                 artifact=str(recovery_artifact),
                             )
                         else:
+                            # V243R36: a stall on a form that holds every input.json value but
+                            # one or two the agent cannot read back asks the operator; the
+                            # recovery ladder below would refresh, reopen or restart -- and
+                            # throw the filled form away.
+                            asked = await _ask_before_reopening(
+                                phase, phase_dir, attempt_no, message, classification,
+                                proof_reason=f"attempt_{attempt_no}_error", judge=judge_result, verify=verification)
+                            if asked.get("asked"):
+                                phase_attempts.append({
+                                    "attempt": attempt_no, "status": "asked_operator_near_complete",
+                                    "failure_stage": attempt_stage, "classification": classification, "error": message,
+                                    "unread_fields": asked.get("unread_fields") or [], "form_kept_open": True,
+                                    "human_resume": bool(asked.get("resume")),
+                                })
+                                safe_write_json(phase_dir / "phase_execution_attempts.json", phase_attempts)
+                                await _learning_finish(phase, attempt_no, success=False, error=message, phase_dir=phase_dir)
+                                if asked.get("resume"):
+                                    phase_loop_started = time.monotonic()
+                                    runtime_self_healer.reset_phase_ladder(phase)
+                                    # A human answer grants the phase a fresh attempt budget.
+                                    max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
+                                    continue
                             if "HIP_PHASE_NO_PROGRESS_WATCHDOG" in message:
                                 try:
                                     mission_trace.record_warning(phase, "No-progress watchdog interrupted a repeated browser state; entering bounded deterministic recovery")
@@ -3758,6 +3927,24 @@ class FullDummyFillE2EFlow:
                             f"independent section judge is forbidden until the exact browser execution checkpoint passes; "
                             f"checkpoint={json.dumps(mask_sensitive_data(pre_judge_checkpoint), ensure_ascii=False, default=str)[:5000]}"
                         )
+                        # V243R36: the executor finished but one or two values cannot be read
+                        # back -- ask the operator before a retry reopens the form blank.
+                        asked = await _ask_before_reopening(
+                            phase, phase_dir, attempt_no, execution_message, "exact_execution_not_completed",
+                            proof_reason=f"attempt_{attempt_no}_pre_judge_gate", judge=judge_result, verify=verification)
+                        if asked.get("asked"):
+                            phase_attempts.append({
+                                "attempt": attempt_no, "status": "asked_operator_near_complete",
+                                "failure_stage": "pre_judge_exact_execution_gate",
+                                "unread_fields": asked.get("unread_fields") or [], "form_kept_open": True,
+                                "human_resume": bool(asked.get("resume")),
+                            })
+                            safe_write_json(phase_dir / "phase_execution_attempts.json", phase_attempts)
+                            if asked.get("resume"):
+                                phase_loop_started = time.monotonic()
+                                runtime_self_healer.reset_phase_ladder(phase)
+                                max_phase_attempts = attempt_index + (runtime_self_healer.max_phase_attempts if runtime_self_healer.enabled else 2)
+                                continue
                         decision = await runtime_self_healer.handle_failure(
                             phase=phase,
                             target_url=PHASE_URLS[phase],

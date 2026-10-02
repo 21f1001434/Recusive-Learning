@@ -691,6 +691,8 @@ async function refreshStatus() {
       $("modelPortfolioDetail").textContent = !mp.enabled ? "model portfolio disabled" : (q.locked
         ? `champion by live task: ${q.correct||0}/${q.total||0} correct${q.judge_total?` • judged ${q.judge_correct||0}/${q.judge_total}`:""} • ${String(q.qualified_at||"").slice(0,10)}${q.in_use&&q.in_use!==q.selected_model?" • fallback "+q.in_use:""}${(jr.correct||jr.wrong)?` • live verdicts ${jr.correct||0}✓ ${jr.wrong||0}✗`:""}${q.needs_revalidation?" • re-validation due":""}`
         : `not qualified yet (runs on Live certification) • ${champ ? "champion "+champ : "champion: earning"} • ${scored} scored decisions`);
+      // V243R36: why this model is the champion, and why each other model is not.
+      $("modelPortfolioDetail").title = q.locked ? [`${q.selected_model}: ${q.selection_reason||""}`, ...(q.ranking||[]).filter(r=>r.model!==q.selected_model).map(r=>`${r.model}: ${r.why||""}`)].join("\n") : "";
     }
     if ($("runHistoryMetric")) {
       // V243R27: what the missions learned from past runs (folders and MLflow).
@@ -1060,7 +1062,7 @@ function wire() {
 
 // V243R35: the live agent chat on the right -- every action the agent takes, as it
 // takes it, and the operator's side of the conversation (status, pause, hints...).
-const CHAT_ICONS = {navigate:"🌐",click:"🖱",type:"⌨",select:"☑",key:"⌨",field:"✎",verified:"✓",failed:"✗",retry:"↻",heal:"♻",warn:"⚠",stop:"🛑",blocked:"⛔",complete:"✅",phase:"▶",progress:"📊",observe:"👁",wait:"⏳",paused:"⏸",resumed:"▶",ack:"📝",mission:"🚀",info:"ℹ"};
+const CHAT_ICONS = {navigate:"🌐",click:"🖱",type:"⌨",select:"☑",key:"⌨",field:"✎",verified:"✓",failed:"✗",retry:"↻",heal:"♻",warn:"⚠",stop:"🛑",blocked:"⛔",complete:"✅",phase:"▶",progress:"📊",observe:"👁",wait:"⏳",paused:"⏸",resumed:"▶",ack:"📝",mission:"🚀",info:"ℹ",question:"❓"};
 const CHAT_PHASES = {data_map:"Data Map",source_document_type:"Source Document Type",target_document_type:"Target Document Type",rule:"Rule",source_transport_profile:"Source Transport Profile",target_transport_profile:"Target Transport Profile",biz_flow:"BizFlow"};
 function chatPhaseName(phase) { return CHAT_PHASES[phase] || String(phase||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()); }
 function chatParams() { return new URLSearchParams({config:$("configPath").value||"config.yaml", runs_dir:$("runsDir").value||"./runs"}); }
@@ -1220,7 +1222,8 @@ function renderChatBanner(st) {
   const b = $("chatBanner"); if (!b) return;
   let html = "", cls = "chat-banner";
   if (st.review) {
-    html = `<b>The agent asks you:</b> is <b>${esc(chatPhaseName(st.review.phase))}</b> correct?${st.review.automated_verdict ? ` <span class="muted">(automated: ${esc(st.review.automated_verdict)})</span>` : ""}<div class="button-row"><button class="small-button" data-chat-send="accept">✅ Accept</button><button class="small-button" data-chat-send="reject">✗ Needs correction</button></div>`;
+    const ask = st.review.question ? esc(chatStrip(st.review.question)) : `is <b>${esc(chatPhaseName(st.review.phase))}</b> correct?${st.review.automated_verdict === "blocked" ? ` <span class="muted">(the automated check could not prove every value)</span>` : ""}`;
+    html = `<b>The agent asks you:</b> ${ask}<div class="button-row"><button class="small-button" data-chat-send="accept">✅ Accept</button><button class="small-button" data-chat-send="reject">✗ Needs correction</button></div>`;
   } else if (st.assistance) {
     html = `<b>The agent needs your help</b> finding ${esc(st.assistance.count)} field(s)${st.assistance.reason ? `: ${esc(st.assistance.reason)}` : ""}<div class="button-row"><button class="small-button" data-chat-teach="1">Open the Teach panel</button></div>`;
   } else if (st.running && (st.paused || st.process_paused)) {

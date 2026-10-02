@@ -35,6 +35,11 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# V243R36: internal per-click evidence ("Semantic target SC-… approved for select")
+# stays in the trace; the chat already says what the click did.
+_CHAT_QUIET_SOURCES = frozenset({"semantic_action_gate"})
+
+
 def phase_display(phase: str) -> str:
     return (STEP_DEFINITIONS.get(str(phase)) or ("", humanize(phase)))[1]
 
@@ -263,7 +268,8 @@ class MissionTraceLedger:
         step["current_activity"] = row["summary"][:500]
         step["updated_at"] = _utc_now()
         self._persist()
-        self.chat.post(row["summary"], kind="progress" if source == "input_json_live_map" else "observe", phase=phase)
+        if source not in _CHAT_QUIET_SOURCES:
+            self.chat.post(row["summary"], kind="progress" if source == "input_json_live_map" else "observe", phase=phase)
 
     def record_transition(self, from_phase: str, to_phase: str, *, status: str, details: Optional[Mapping[str, Any]] = None) -> None:
         """Record an explicit phase-to-phase handoff without planner reasoning."""

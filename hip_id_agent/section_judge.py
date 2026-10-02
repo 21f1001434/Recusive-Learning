@@ -76,6 +76,24 @@ def _values_equal(expected: Any, actual: Any) -> bool:
         return False
 
 
+def _boolean_intent(value: Any) -> Optional[bool]:
+    """"Enabled" / "Yes" / "On" -> True, "Disabled" / "No" / "Off" -> False, else None."""
+    text = _norm(value)
+    if text in _BOOLEAN_TRUE_WORDS:
+        return True
+    if text in _BOOLEAN_FALSE_WORDS or text in {"not enabled", "not enable"}:
+        return False
+    return None
+
+
+def _boolean_control(control: Dict[str, Any]) -> bool:
+    """A switch or checkbox whose state is its ``checked`` flag (never a radio)."""
+    role = str(control.get("role") or "").lower()
+    ctype = str(control.get("type") or "").lower()
+    return isinstance(control.get("checked"), bool) and ctype != "radio" and role != "radio" and (
+        role in {"switch", "checkbox"} or ctype == "checkbox")
+
+
 def _flatten_strings(value: Any) -> List[str]:
     out: List[str] = []
     if isinstance(value, dict):
@@ -413,6 +431,12 @@ class DualModelSectionJudge:
             if ctype in {"checkbox", "radio"} and value_norm in {"", "false", "0", "off", "unchecked"}:
                 continue
             controls.append(c)
+        # V243R36: a switch / checkbox is read by its checked state, as the executor
+        # reads it.  A DDS switch rendered as <button role="switch" aria-checked>
+        # has no value text, so "Status = Enabled" looked missing although the
+        # switch was on -- and the phase was refilled again and again.
+        boolean_controls = [c for c in controls_raw if isinstance(c, dict) and c.get("trusted_for_exact_judge") is not False
+                            and _boolean_control(c)]
         actual_values = [_norm(c.get("value")) for c in controls if _norm(c.get("value"))]
         actual_text = _norm(actual_state.get("visible_text"))
         missing: List[Dict[str, Any]] = []
@@ -452,7 +476,31 @@ class DualModelSectionJudge:
                     candidates.append(c)
             found = False
             actual_seen = []
-            for c in candidates:
+            intent = _boolean_intent(value)
+            if intent is not None:
+                for c in boolean_controls:
+                    lab = _norm(c.get("label"))
+                    c_section = _norm(c.get("section"))
+                    if fact_sections and c_section and not any(fs == c_section or fs in c_section or c_section in fs for fs in fact_sections):
+                        continue
+                    if fact_row_kind and _norm(c.get("row_kind")) != fact_row_kind:
+                        continue
+                    if fact_row_index is not None and c.get("row_index") != fact_row_index:
+                        continue
+                    if aliases and not any(a in lab or lab in a for a in aliases if lab):
+                        continue
+                    shown = value if bool(c.get("checked")) == intent else ("on" if c.get("checked") else "off")
+                    actual_seen.append(shown)
+                    if bool(c.get("checked")) == intent:
+                        found = True
+                        matched.append({
+                            "field": fact.get("field"), "input_path": fact.get("input_path"), "expected": value,
+                            "actual": value, "selector": c.get("selector"), "evidence": "checked_state",
+                            "section": c.get("section"), "row_kind": c.get("row_kind"), "row_index": c.get("row_index"),
+                            "label": c.get("label"),
+                        })
+                        break
+            for c in ([] if found else candidates):
                 actual_value = c.get("selected_values") if fact.get("match_mode") == "set" and c.get("selected_values") is not None else c.get("value")
                 if actual_value in (None, "", []) and (c.get("disabled") or c.get("readonly")) and str(c.get("placeholder") or "").strip():
                     # V243R29: a portal-owned read-only field (the Document Type Version)
