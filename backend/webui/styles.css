@@ -75,3 +75,159 @@
 @media(max-width:760px){.chat-dock{width:100vw}.chat-title small{max-width:200px}}
 /* the row-plan table scrolls inside its panel instead of widening the page on a phone */
 #rowPlan{overflow-x:auto}
+
+/* ===================================================================
+   V243R37 — responsive layout without overflow, and polish
+   - the main area sizes its grids to its own width (container queries),
+     so the docked sidebar and chat never squeeze tiles / panels out of shape
+   - tile values never break inside a word; long details clamp with a tooltip
+   - badges, buttons and tabs never wrap or spill; long ids / paths / JSON wrap
+   - collapsible sidebar (drawer below 1100 px), sticky tabs, resizable chat,
+     keyboard focus rings, dark native controls and scrollbars
+   =================================================================== */
+:root{color-scheme:dark;--side-w:320px;--chat-w:400px;--main-pad:clamp(16px,2.2vw,34px)}
+html{scrollbar-color:#323b4d transparent;scrollbar-width:thin}
+/* any long unbroken value (a path, a run id, a token) wraps where it lands instead of widening the page */
+body{overflow-wrap:break-word}
+*::-webkit-scrollbar{width:10px;height:10px}*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#2c3546;border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:#3d4860;border:2px solid transparent;background-clip:padding-box}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+button{transition:background-color .15s,border-color .15s,color .15s,opacity .15s}
+.secondary:hover,.icon-button:hover,.small-button:hover{border-color:#56637d;background:#283247}
+.primary:hover{background:#ffdc3d}.danger:hover{background:#6e2331}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* shell: sidebar | main | chat, sized by variables */
+.shell{grid-template-columns:var(--side-w) minmax(0,1fr) var(--chat-w)}
+.shell.chat-collapsed{grid-template-columns:var(--side-w) minmax(0,1fr)}
+.shell.side-collapsed{grid-template-columns:minmax(0,1fr) var(--chat-w)}
+.shell.side-collapsed.chat-collapsed{grid-template-columns:minmax(0,1fr)}
+.shell.side-collapsed .sidebar{display:none}
+.sidebar{min-width:0}
+main{container-type:inline-size;container-name:main;padding:26px var(--main-pad) 60px}
+@media(max-width:1699px){:root{--side-w:300px;--chat-w:370px}}
+@media(max-width:1499px){:root{--side-w:280px;--chat-w:350px}.sidebar{padding:20px 16px}}
+
+/* topbar */
+.topbar{flex-wrap:wrap;row-gap:12px}.topbar>div:first-child{display:flex;gap:14px;align-items:flex-start;min-width:0;flex:1 1 360px}
+.topbar-text{min-width:0}
+h1{font-size:clamp(22px,2.3vw,32px);line-height:1.15}
+.subtitle{font-size:13px;line-height:1.45}
+.top-actions{flex-wrap:wrap;justify-content:flex-end}
+.side-toggle{flex:none;display:inline-flex;align-items:center;gap:7px;padding:9px 11px;margin-top:2px}
+.side-toggle .side-toggle-label{display:none;font-size:12px}
+.badge{display:inline-block;vertical-align:middle;white-space:nowrap;line-height:1.3;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+/* flex / grid children that hold text may shrink (then wrap or ellipsize) instead of pushing out */
+.panel-head>*,.mission-step-head>*,.mission-step-title>*,.mission-step-grid>*,.chat-progress-row>*,.top-actions>*,.button-row>*,.toolbar>*,.chat-head>*,.visual-state-banner>*{min-width:0}
+.top-actions{min-width:0;max-width:100%}.top-actions .badge{max-width:260px}
+#chatCount{flex:none;max-width:55%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* metric tiles: as many columns as fit, no word broken inside a value */
+.metrics{grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:10px;margin:22px 0 20px}
+.metrics article{min-width:0;padding:13px 14px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.metrics article::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent}
+.metrics article[data-tone=good]::before{background:var(--good)}.metrics article[data-tone=bad]::before{background:var(--bad)}
+.metrics article[data-tone=warn]::before{background:#f2b84a}.metrics article[data-tone=info]::before{background:var(--info)}
+.metrics span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.metrics strong{font-size:clamp(16px,1.25vw,20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:5px 0 4px}
+.metrics small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;overflow-wrap:anywhere}
+
+/* tabs: one row, sticky, scroll sideways only when really narrow */
+.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;position:sticky;top:0;z-index:20;margin:0 calc(-1 * var(--main-pad)) 18px;padding:0 var(--main-pad);background:#0c0f15ee;backdrop-filter:blur(8px)}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;white-space:nowrap;padding:12px 11px;font-size:13px}
+.tabs button:hover{color:#dfe5ee}
+
+/* panels and their heads */
+.panel{padding:clamp(13px,1.4vw,17px)}
+.panel-head{flex-wrap:wrap;row-gap:8px}
+.panel-head h2,.panel-head h3{min-width:0}
+.panel-head>div{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;min-width:0}
+.panel-head>span:not(.badge){color:var(--muted);font-size:11px}
+.panel-grid.two{grid-template-columns:minmax(0,1fr)}
+@container main (min-width:900px){.panel-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* key/value lists, runs, outputs: long ids, paths and JSON wrap instead of spilling */
+.kv{grid-template-columns:minmax(84px,max-content) minmax(0,1fr)}
+.kv>*{min-width:0;overflow-wrap:anywhere}
+@container main (max-width:460px){.kv{grid-template-columns:minmax(0,1fr);gap:2px 0}.kv>b{margin-top:8px}}
+.run strong,.run span{overflow-wrap:anywhere}
+.json-output,.console-panel pre,#console,.log-tail{overflow-wrap:anywhere}
+.empty{overflow-wrap:anywhere}
+
+/* tables: cells wrap; only a table with many columns scrolls inside its panel */
+.table th{white-space:normal;min-width:64px;vertical-align:bottom}
+.table td{overflow-wrap:anywhere;min-width:64px}
+.table td .badge{white-space:nowrap}
+.table-wrap{scrollbar-width:thin}
+
+/* toolbars, button rows, two-column button pairs */
+.toolbar,.button-row{flex-wrap:wrap}
+.toolbar input{flex:1 1 220px;min-width:0}.toolbar select{flex:0 1 190px;width:auto;min-width:140px}
+.two-col{display:flex;flex-wrap:wrap;gap:10px}.two-col>button{flex:1 1 auto}.two-col>label{flex:1 1 200px;min-width:0}
+button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.sidebar button{font-size:13px}.sidebar .two-col button{padding:9px 10px}
+.panel,.chat-dock{overflow-wrap:break-word}
+
+/* agent live view */
+.agent-live-layout{grid-template-columns:minmax(0,1fr)}
+@container main (min-width:1000px){.agent-live-layout{grid-template-columns:minmax(0,1.45fr) minmax(0,.85fr)}}
+.visual-counter-grid{grid-template-columns:repeat(auto-fill,minmax(86px,1fr))}
+.visual-counter span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-live-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.adaptive-stats{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.visual-state-banner{flex-wrap:wrap}.visual-state-banner span{text-align:left;min-width:0}
+.mission-step-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.mission-trace,.decision-timeline,.agent-live-summary{grid-template-columns:minmax(0,1fr)}
+.mission-step{min-width:0}.decision-row{grid-template-columns:88px 120px minmax(0,1fr) auto}
+.mission-step-head{flex-wrap:wrap}
+@container main (max-width:560px){.decision-row{grid-template-columns:70px minmax(0,1fr)}.decision-row .decision-event{grid-column:2}.decision-row .decision-label{grid-column:1/-1;white-space:normal}.decision-row .decision-state{display:none}}
+
+/* a panel whose 'empty' placeholder was replaced by a table or a key/value list */
+.empty:has(>table,>.kv,>.table-wrap){padding:0}
+.side-close{display:none;margin-left:auto;padding:6px 10px}
+/* sidebar sections fold on their heading */
+.side-section>h3:first-child{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;border-radius:6px}
+.side-section>h3:first-child::after{content:"▾";color:#7d889a;font-size:12px;transition:transform .15s}
+.side-section>h3:first-child:hover{color:#e3e8f0}
+.side-section.collapsed>h3:first-child{margin-bottom:0}.side-section.collapsed>h3:first-child::after{transform:rotate(-90deg)}
+.side-section.collapsed>:not(:first-child){display:none!important}
+.toast{cursor:pointer}
+/* toast */
+.toast{max-width:min(440px,calc(100vw - 32px));overflow-wrap:anywhere}
+
+/* chat dock: resizable when docked */
+.chat-title small{max-width:none}.chat-title>div{min-width:0}
+.chat-resize{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:5;touch-action:none}
+.chat-resize:hover,.chat-resize.dragging{background:linear-gradient(90deg,transparent 3px,var(--accent) 3px,var(--accent) 5px,transparent 5px)}
+.chat-banner{overflow-wrap:anywhere}
+.chat-chips button{flex:0 0 auto}
+
+/* below 1350 px the chat is a drawer (R35); leave room for its floating button */
+@media(max-width:1349px){
+  .shell,.shell.chat-collapsed{grid-template-columns:var(--side-w) minmax(0,1fr)}
+  .shell.side-collapsed,.shell.side-collapsed.chat-collapsed{grid-template-columns:minmax(0,1fr)}
+  .chat-resize{display:none}
+  main{padding-bottom:96px}
+}
+/* below 1100 px the sidebar is a drawer too: the dashboard comes first */
+.side-backdrop{display:none}
+@media(max-width:1099px){
+  .shell,.shell.chat-collapsed,.shell.side-collapsed,.shell.side-collapsed.chat-collapsed{grid-template-columns:minmax(0,1fr);display:grid}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;height:auto;width:min(340px,90vw);z-index:44;transform:translateX(-104%);transition:transform .2s ease;box-shadow:18px 0 40px #0009;display:block}
+  .shell.side-collapsed .sidebar{display:block}
+  .shell.side-open .sidebar{transform:none}
+  .shell.side-open .side-backdrop{display:block;position:fixed;inset:0;background:#0008;z-index:43}
+  .side-toggle .side-toggle-label{display:inline}
+  .side-close{display:inline-flex}
+}
+@media(max-width:760px){
+  .shell{display:block}
+  main{padding:18px 16px 96px}
+  .topbar{display:flex}
+  .top-actions{margin-top:0;justify-content:flex-start}
+  .metrics{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .toast{right:16px;top:16px}
+}

@@ -1,3 +1,30 @@
+# V243R37 — The Control Center fits every screen (2026-10-02)
+
+- `webui/styles.css` (and `backend/webui/styles.css`), a V243R37 layer:
+  - `main` is a size container; tiles `repeat(auto-fill,minmax(172px,1fr))` with one-line values and two-line details;
+  - `@container main` rules for panel pairs (two columns at ≥ 900 px), the live-view layout (≥ 1000 px), key/value lists, decision rows; auto-fill counters, stats, mission-step and live-view grids; `minmax(0,1fr)` tracks;
+  - `body{overflow-wrap:break-word}`; text-holding flex/grid children `min-width:0`; table cells wrap;
+  - badges inline-block with ellipsis; buttons nowrap; flex-wrapping button pairs, toolbars and button rows;
+  - sticky single-row tabs; shell widths by breakpoint (`--side-w` / `--chat-w`); sidebar drawer below 1100 px with a backdrop;
+  - foldable sidebar sections; chat resize handle;
+  - focus-visible rings, `color-scheme: dark`, thin dark scrollbars, reduced motion.
+- `webui/index.html`:
+  - ☰ toggle (`#sideToggleBtn`), drawer close (`#sideCloseBtn`), backdrop (`#sideBackdrop`);
+  - tablist / tab / tabpanel roles;
+  - chat resize separator (`#chatResize`);
+  - announced toast; favicon and theme colour;
+  - tile label "Edit & action sections".
+- `webui/app.js`:
+  - `initLayout` (sidebar collapse remembered, drawer with Escape and backdrop, keyboard tabs, remembered and deep-linked tab, `/` focuses the chat);
+  - `initSideSections`, `revealHumanAssistance` (the Teach section opens when the agent asks; fixes the chat's Teach link);
+  - `initMetricTiles` (tooltips and state tone);
+  - `initChatResize`;
+  - tab-title status;
+  - phase names in tables;
+  - the toast timer is reset per message;
+  - `window.hipControlCenter`.
+- Tests: `tests/test_v243r37_control_center_layout.py` (4, real backend and browser).
+
 # V243R36 — A filled form finishes, and the agent understands you (2026-10-02)
 
 - `input_json_authority._BUSY_JS`:

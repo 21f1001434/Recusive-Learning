@@ -4,15 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>HIP Agent Control Center</title>
+  <meta name="theme-color" content="#0b0d12" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ffd000'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-weight='900' font-size='20' text-anchor='middle' fill='%23111'%3EH%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <div class="shell">
-    <aside class="sidebar">
+    <div class="side-backdrop" id="sideBackdrop"></div>
+    <aside class="sidebar" id="sidebar" aria-label="Mission controls">
       <div class="brand">
         <div class="brand-mark">H</div>
         <div><strong>HIP Agent</strong><span>JavaScript Control Center</span></div>
+        <button id="sideCloseBtn" class="icon-button side-close" type="button" title="Close the controls" aria-label="Close the controls">✕</button>
       </div>
 
       <section class="side-section">
@@ -119,14 +123,17 @@
     <main>
       <header class="topbar">
         <div>
-          <p class="eyebrow">HIP BROWSER INTELLIGENCE</p>
-          <h1>AgentQ UI/API Mission</h1>
-          <p class="subtitle">JavaScript UI · FastAPI · Browser Use · AutoWebGLM · LangChain · MCP · AutoGen · MLflow Async · governed execution</p>
+          <button id="sideToggleBtn" class="icon-button side-toggle" type="button" aria-controls="sidebar" aria-expanded="true" title="Show or hide the mission controls">☰<span class="side-toggle-label">Controls</span></button>
+          <div class="topbar-text">
+            <p class="eyebrow">HIP BROWSER INTELLIGENCE</p>
+            <h1>AgentQ UI/API Mission</h1>
+            <p class="subtitle">JavaScript UI · FastAPI · Browser Use · AutoWebGLM · LangChain · MCP · AutoGen · MLflow Async · governed execution</p>
+          </div>
         </div>
         <div class="top-actions">
           <span id="backendBadge" class="badge neutral">Backend</span>
           <span id="autogenBadge" class="badge neutral">AutoGen</span>
-          <button id="refreshBtn" class="icon-button" title="Refresh">↻</button>
+          <button id="refreshBtn" class="icon-button" title="Refresh" aria-label="Refresh">↻</button>
         </div>
       </header>
 
@@ -142,19 +149,19 @@
         <article><span>Model Champion</span><strong id="modelPortfolioMetric">—</strong><small id="modelPortfolioDetail">On-Prem champion/challenger</small></article>
         <article><span>Recursive Improvement</span><strong id="recursiveMetric">—</strong><small id="recursiveDetail">bounded self-improvement</small></article>
         <article><span>Learned from past runs</span><strong id="runHistoryMetric">—</strong><small id="runHistoryDetail">run folders + MLflow</small></article>
-        <article><span>Edit / action sections known</span><strong id="editSectionsMetric">—</strong><small id="editSectionsDetail">listing › expand › Edit</small></article>
+        <article><span>Edit &amp; action sections</span><strong id="editSectionsMetric">—</strong><small id="editSectionsDetail">listing › expand › Edit</small></article>
       </section>
 
-      <nav class="tabs" id="tabs">
-        <button class="active" data-tab="preflight">Preflight</button>
-        <button data-tab="mission">Mission</button>
-        <button data-tab="capabilities">Capabilities</button>
-        <button data-tab="apis">API Contracts</button>
-        <button data-tab="tasks">Certified Tasks</button>
-        <button data-tab="governance">Governance</button>
+      <nav class="tabs" id="tabs" role="tablist" aria-label="Control Center sections">
+        <button class="active" data-tab="preflight" role="tab" aria-selected="true" aria-controls="preflight" id="tab-preflight">Preflight</button>
+        <button data-tab="mission" role="tab" aria-selected="false" aria-controls="mission" id="tab-mission" tabindex="-1">Mission</button>
+        <button data-tab="capabilities" role="tab" aria-selected="false" aria-controls="capabilities" id="tab-capabilities" tabindex="-1">Capabilities</button>
+        <button data-tab="apis" role="tab" aria-selected="false" aria-controls="apis" id="tab-apis" tabindex="-1">API Contracts</button>
+        <button data-tab="tasks" role="tab" aria-selected="false" aria-controls="tasks" id="tab-tasks" tabindex="-1">Certified Tasks</button>
+        <button data-tab="governance" role="tab" aria-selected="false" aria-controls="governance" id="tab-governance" tabindex="-1">Governance</button>
       </nav>
 
-      <section id="preflight" class="tab-panel active">
+      <section id="preflight" class="tab-panel active" role="tabpanel" aria-labelledby="tab-preflight">
         <div class="panel-grid two">
           <article class="panel">
             <div class="panel-head"><h2>Mission readiness</h2><span id="preflightState" class="badge neutral">Not run</span></div>
@@ -200,7 +207,7 @@
         <article class="panel"><div class="panel-head"><h2>Selected phase coverage</h2></div><div id="phaseCoverage" class="table-wrap"></div></article>
       </section>
 
-      <section id="mission" class="tab-panel">
+      <section id="mission" class="tab-panel" role="tabpanel" aria-labelledby="tab-mission">
         <div class="panel-grid two">
           <article class="panel">
             <div class="panel-head"><h2>Live process</h2><span id="liveState" class="badge neutral">Stopped</span></div>
@@ -269,7 +276,7 @@
         <article class="panel console-panel"><div class="panel-head"><h2>Mission console</h2><span>auto-refresh 3s</span></div><pre id="console">Waiting for mission output…</pre></article>
       </section>
 
-      <section id="capabilities" class="tab-panel">
+      <section id="capabilities" class="tab-panel" role="tabpanel" aria-labelledby="tab-capabilities">
         <article class="panel">
           <div class="toolbar"><input id="capSearch" placeholder="Search learned capabilities" /><select id="capFamily"><option value="">All families</option></select><button id="capLoad" class="secondary">Search</button></div>
           <div id="capabilitySummary" class="muted">Loading canonical + live learning memory…</div>
@@ -277,7 +284,7 @@
         </article>
       </section>
 
-      <section id="apis" class="tab-panel">
+      <section id="apis" class="tab-panel" role="tabpanel" aria-labelledby="tab-apis">
         <article class="panel">
           <div class="toolbar"><input id="apiFamily" placeholder="Page family (optional)" /><select id="apiMethod"><option value="">Any method</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select><button id="apiLoad" class="secondary">Load</button></div>
           <div id="apiSummary" class="muted">Loading canonical + observed API contracts…</div>
@@ -285,7 +292,7 @@
         </article>
       </section>
 
-      <section id="tasks" class="tab-panel">
+      <section id="tasks" class="tab-panel" role="tabpanel" aria-labelledby="tab-tasks">
         <div class="panel-grid two">
           <article class="panel">
             <h2>Certified future task · Universal portal operator</h2>
@@ -334,7 +341,7 @@
         </article>
       </section>
 
-      <section id="governance" class="tab-panel">
+      <section id="governance" class="tab-panel" role="tabpanel" aria-labelledby="tab-governance">
         <div class="panel-grid two">
           <article class="panel">
             <h2>Governed change</h2>
@@ -351,6 +358,7 @@
 
     <!-- V243R35: the live agent chat, docked on the right -->
     <aside class="chat-dock" id="chatDock" aria-label="Live agent chat">
+      <div class="chat-resize" id="chatResize" role="separator" aria-orientation="vertical" aria-label="Resize the chat" title="Drag to resize · double-click to reset"></div>
       <div class="chat-head">
         <div class="chat-title"><span class="chat-dot" id="chatDot"></span><div><strong>Live agent</strong><small id="chatSubtitle">Waiting for a mission</small></div></div>
         <button id="chatCollapseBtn" class="icon-button chat-collapse" title="Hide the chat" aria-label="Hide the chat">⟩</button>
@@ -380,7 +388,7 @@
         <button type="button" data-chat="help">Help</button>
       </div>
       <form class="chat-input" id="chatForm">
-        <textarea id="chatText" rows="2" maxlength="1200" placeholder="Ask the agent, or give it a hint… (Enter to send)"></textarea>
+        <textarea id="chatText" rows="2" maxlength="1200" placeholder="Ask the agent, or give it a hint… (Enter to send)" title="Press / anywhere to jump here"></textarea>
         <button type="submit" class="primary" id="chatSend">Send</button>
       </form>
     </aside>

@@ -1,3 +1,22 @@
+## V243R37 — The Control Center fits every screen (2026-10-02)
+
+- **Nothing overflows any more.** A browser audit at 9 screen sizes × 6 tabs went from 629 layout problems to 0.
+  - Tiles no longer break "gpt-oss-120b" over three lines or cut off "Stopped".
+  - Panels, tables, run IDs and paths stay inside their boxes; very long values wrap instead of widening the page.
+  - Badges, buttons and tabs never wrap or get cut off.
+- **Layout follows the space you have.** Grids size to the dashboard's own width, so the docked sidebar and chat no longer squeeze it. Sidebar and chat widths step down on smaller screens.
+- **Easier to use:**
+  - ☰ collapses the sidebar (a drawer below 1100 px, so the dashboard comes first on a phone or tablet);
+  - sidebar sections fold;
+  - sticky tabs work with the keyboard and are remembered and linkable (`#mission`);
+  - the docked chat can be resized by dragging;
+  - press `/` to talk to the agent;
+  - the browser tab title shows the agent's state ("❓ Needs you", "⏸ Paused", "✅ Complete");
+  - tiles show their state with a colour and their full text on hover.
+- **Fixed:** "Open the Teach panel" in the chat did nothing; a new toast could be hidden early by an older one.
+
+See `V243R37_CONTROL_CENTER_LAYOUT_AND_POLISH_20261002.md`. Apply with `APPLY_V243R37_IN_PLACE.ps1`; it includes R13–R36.
+
 ## V243R36 — A filled form finishes, and the agent understands you (2026-10-02)
 
 - **A filled Source Document Type finishes instead of being refilled.**

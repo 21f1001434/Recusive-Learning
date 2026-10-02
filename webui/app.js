@@ -29,7 +29,10 @@ function toast(message, kind = "good") {
   const el = $("toast");
   el.textContent = message;
   el.className = `toast ${kind}`;
-  setTimeout(() => el.classList.add("hidden"), 3600);
+  el.onclick = () => el.classList.add("hidden");
+  // V243R37: a new message gets its full time (an older timer used to hide it early).
+  clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(() => el.classList.add("hidden"), Math.min(9000, 3600 + String(message || "").length * 25));
 }
 
 function esc(value) {
@@ -38,7 +41,10 @@ function esc(value) {
 
 function table(rows, columns) {
   if (!rows?.length) return '<div class="empty">No rows available.</div>';
-  return `<table class="table"><thead><tr>${columns.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${columns.map(c=>`<td>${c.render ? c.render(row) : esc(row[c.key])}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  // V243R37: a phase is shown by its name ("Source Document Type"), its key in the tooltip.
+  const cell = (c, row) => c.render ? c.render(row)
+    : (c.key === "phase" && CHAT_PHASES[row[c.key]] ? `<span title="${esc(row[c.key])}">${esc(CHAT_PHASES[row[c.key]])}</span>` : esc(row[c.key]));
+  return `<table class="table"><thead><tr>${columns.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${columns.map(c=>`<td>${cell(c, row)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
 }
 
 
@@ -928,6 +934,7 @@ async function loadHumanAssistance(){
       return;
     }
     if(badge){badge.textContent='Needs assistance';badge.className='badge info';}
+    revealHumanAssistance(false);
     if(reason) reason.textContent=req.reason||req.instruction||'Choose the correct live control.';
     if(select){select.innerHTML=(req.unresolved_input_paths||[]).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); select.dataset.requestId=req.request_id||'';}
   }catch(e){ if($('humanAssistState')){$('humanAssistState').textContent='Unavailable';$('humanAssistState').className='badge bad';} }
@@ -946,6 +953,7 @@ async function loadHumanPhaseReview(){
       return;
     }
     state.humanPhaseReviewRequest=req;
+    revealHumanAssistance(false);
     const verdict=(req.automated_verdict||'').toUpperCase();
     if(badge){badge.textContent=`Review ${req.phase_display||req.phase||''}`;badge.className='badge info';}
     if(reason) reason.textContent=req.reason||req.instruction||'Review the newly learned phase once.';
@@ -1038,7 +1046,141 @@ async function changeAction(kind) {
 }
 async function loadAudit(){try{$("governanceOutput").textContent=JSON.stringify(await api(`/api/governed-change/audit?config=${encodeURIComponent($("configPath").value||"config.yaml")}&limit=50`),null,2)}catch(e){toast(e.message,"bad")}}
 
-function showTab(name) { document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name)); document.querySelectorAll(".tab-panel").forEach(p=>p.classList.toggle("active",p.id===name)); }
+function showTab(name, {remember = true, focus = false} = {}) {
+  if (!document.getElementById(name)?.classList.contains("tab-panel")) return;
+  document.querySelectorAll(".tabs button").forEach(b => {
+    const on = b.dataset.tab === name;
+    b.classList.toggle("active", on); b.setAttribute("aria-selected", on ? "true" : "false"); b.tabIndex = on ? 0 : -1;
+    if (on && focus) b.focus({preventScroll: true});
+    // Bring the tab into view inside the tab strip only (never scroll the page).
+    const bar = b.parentElement;
+    if (on && bar && bar.scrollWidth > bar.clientWidth) {
+      const left = b.getBoundingClientRect().left - bar.getBoundingClientRect().left + bar.scrollLeft, right = left + b.offsetWidth;
+      if (left < bar.scrollLeft) bar.scrollLeft = Math.max(0, left - 12);
+      else if (right > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = right - bar.clientWidth + 12;
+    }
+  });
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.toggle("active",p.id===name));
+  // V243R37: the open tab is remembered (and linkable: #mission).
+  if (remember) { try { localStorage.setItem("hipTab", name); history.replaceState(null, "", `#${name}`); } catch {} }
+}
+
+// V243R37: layout -- the sidebar collapses (a drawer below 1100 px), tabs work with the
+// keyboard, tiles show their full text on hover and a colour for their state, and the
+// docked chat can be resized.
+const DRAWER_QUERY = "(max-width: 1099px)";
+function initLayout() {
+  const shell = document.querySelector(".shell"), btn = $("sideToggleBtn");
+  const drawer = () => window.matchMedia(DRAWER_QUERY).matches;
+  let collapsed = false; try { collapsed = localStorage.getItem("hipSideCollapsed") === "1"; } catch {}
+  const apply = () => {
+    shell?.classList.toggle("side-collapsed", !drawer() && collapsed);
+    if (!drawer()) shell?.classList.remove("side-open");
+    btn?.setAttribute("aria-expanded", String(drawer() ? !!shell?.classList.contains("side-open") : !collapsed));
+  };
+  const closeDrawer = () => { shell?.classList.remove("side-open"); apply(); };
+  $("sideCloseBtn")?.addEventListener("click", closeDrawer);
+  btn?.addEventListener("click", () => {
+    if (drawer()) shell?.classList.toggle("side-open");
+    else { collapsed = !collapsed; try { localStorage.setItem("hipSideCollapsed", collapsed ? "1" : "0"); } catch {} }
+    apply();
+  });
+  $("sideBackdrop")?.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shell?.classList.contains("side-open")) closeDrawer(); });
+  window.matchMedia(DRAWER_QUERY).addEventListener?.("change", closeDrawer);
+  // Starting, pausing or stopping from the drawer closes it, so the dashboard is in view.
+  ["startBtn", "pauseBtn", "resumeBtn", "stopBtn"].forEach(id => $(id)?.addEventListener("click", () => { if (drawer()) closeDrawer(); }));
+  apply();
+
+  const tabs = [...document.querySelectorAll(".tabs button[data-tab]")];
+  $("tabs")?.addEventListener("keydown", (e) => {
+    const i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const next = {ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1}[e.key];
+    if (next === undefined) return;
+    e.preventDefault(); showTab(tabs[(next + tabs.length) % tabs.length].dataset.tab, {focus: true});
+  });
+  let initial = (location.hash || "").slice(1);
+  if (!initial) { try { initial = localStorage.getItem("hipTab") || ""; } catch { initial = ""; } }
+  if (initial) showTab(initial, {remember: false});
+  window.addEventListener("hashchange", () => showTab((location.hash || "").slice(1), {remember: false}));
+
+  initSideSections();
+  initMetricTiles();
+  initChatResize();
+  document.addEventListener("keydown", (e) => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "") || document.activeElement?.isContentEditable;
+    if (e.key !== "/" || typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    if (chatCollapsed()) setChatCollapsed(false);
+    $("chatText")?.focus();
+  });
+}
+
+const TILE_TONES = [
+  [/^(running|ready|pass|async ready)\b/i, "good"],
+  [/^(blocked|failed|fail|error|unavailable|off|disabled|missing)\b/i, "bad"],
+  [/^(paused|stale|not run)\b/i, "warn"],
+];
+// V243R37: sidebar sections fold on their heading (remembered); a section the agent
+// needs you in opens by itself.
+function initSideSections() {
+  document.querySelectorAll(".sidebar .side-section").forEach(sec => {
+    const h = sec.firstElementChild; if (!h || h.tagName !== "H3") return;
+    const key = `hipSideSection:${h.textContent.trim()}`;
+    h.tabIndex = 0; h.setAttribute("role", "button");
+    const set = (collapsed, remember = true) => {
+      sec.classList.toggle("collapsed", collapsed); h.setAttribute("aria-expanded", String(!collapsed));
+      if (remember) { try { localStorage.setItem(key, collapsed ? "1" : "0"); } catch {} }
+    };
+    let stored = false; try { stored = localStorage.getItem(key) === "1"; } catch {}
+    set(stored, false);
+    sec._hipSetCollapsed = set;
+    h.addEventListener("click", () => set(!sec.classList.contains("collapsed")));
+    h.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); set(!sec.classList.contains("collapsed")); } });
+  });
+}
+
+function revealHumanAssistance(scroll) {
+  const sec = $("humanAssistancePanel"); if (!sec) return;
+  if (sec.classList.contains("collapsed")) sec._hipSetCollapsed?.(false, false);
+  if (!scroll) return;
+  const shell = document.querySelector(".shell");
+  if (window.matchMedia(DRAWER_QUERY).matches) shell?.classList.add("side-open");
+  else if (shell?.classList.contains("side-collapsed")) $("sideToggleBtn")?.click();
+  $("sideToggleBtn")?.setAttribute("aria-expanded", "true");
+  sec.scrollIntoView({behavior: "smooth", block: "start"});
+  setTimeout(() => $("humanInputPath")?.focus({preventScroll: true}), 350);
+}
+
+function initMetricTiles() {
+  const tiles = [...document.querySelectorAll(".metrics article")];
+  const update = () => tiles.forEach(t => {
+    const [label, value, detail] = ["span", "strong", "small"].map(sel => (t.querySelector(sel)?.textContent || "").trim());
+    const title = `${label}: ${value}${detail ? ` — ${detail}` : ""}`;
+    if (t.title !== title) t.title = title;
+    const tone = (TILE_TONES.find(([re]) => re.test(value)) || [null, ""])[1];
+    if ((t.dataset.tone || "") !== tone) { if (tone) t.dataset.tone = tone; else delete t.dataset.tone; }
+  });
+  const box = document.querySelector(".metrics");
+  if (box && window.MutationObserver) new MutationObserver(update).observe(box, {subtree: true, childList: true, characterData: true});
+  update();
+}
+
+function initChatResize() {
+  const handle = $("chatResize"); if (!handle) return;
+  const root = document.documentElement;
+  const clamp = (w) => Math.round(Math.max(320, Math.min(w, Math.max(320, window.innerWidth * 0.42))));
+  try { const w = Number(localStorage.getItem("hipChatWidth") || 0); if (w) root.style.setProperty("--chat-w", `${clamp(w)}px`); } catch {}
+  let dragging = false;
+  handle.addEventListener("pointerdown", (e) => { dragging = true; handle.classList.add("dragging"); handle.setPointerCapture(e.pointerId); e.preventDefault(); });
+  handle.addEventListener("pointermove", (e) => { if (dragging) root.style.setProperty("--chat-w", `${clamp(window.innerWidth - e.clientX)}px`); });
+  const stop = () => {
+    if (!dragging) return; dragging = false; handle.classList.remove("dragging");
+    try { localStorage.setItem("hipChatWidth", String(parseInt(getComputedStyle(root).getPropertyValue("--chat-w"), 10) || "")); } catch {}
+  };
+  handle.addEventListener("pointerup", stop); handle.addEventListener("pointercancel", stop);
+  handle.addEventListener("dblclick", () => { root.style.removeProperty("--chat-w"); try { localStorage.removeItem("hipChatWidth"); } catch {} });
+}
 
 function wire() {
   $("sectionSelect").addEventListener("change",()=>{ if(!$("useDescriptionTrigger").checked){state.descriptionPlan=null;} invalidateLiveReadiness("Execution scope changed"); renderScope();runPreflight(true)});
@@ -1200,6 +1342,11 @@ function renderChatState(st, frameUrl) {
   else { text = `Idle — last run ${st.run_id || ""}`; }
   dot.className = `chat-dot ${cls}`; sub.textContent = text; sub.title = st.activity || text;
   const lm = st.live_map || {}, total = Number(lm.total || 0), exact = Number(lm.exact || 0);
+  // V243R37: the browser tab says what the agent is doing -- and when it needs you.
+  const mark = st.review || st.assistance ? "❓ Needs you" : paused ? "⏸ Paused" : st.running ? `▶ ${total ? `${exact}/${total}` : "Running"}`
+    : st.mission_status === "blocked" ? "⛔ Blocked" : st.mission_status === "complete" ? "✅ Complete" : "";
+  const title = mark ? `${mark} · HIP Agent Control Center` : "HIP Agent Control Center";
+  if (document.title !== title) document.title = title;
   $("chatPhase").textContent = lm.phase_display || st.phase_display || "No phase yet";
   $("chatCount").textContent = total ? (lm.complete ? `${exact}/${total} ✓ complete` : `${exact}/${total} on the form`) : "";
   $("chatBar").style.width = total ? `${Math.round(100 * exact / total)}%` : "0%";
@@ -1234,10 +1381,7 @@ function renderChatBanner(st) {
   if (state.chat.banner === html) return;
   state.chat.banner = html; b.className = cls; b.innerHTML = html;
   b.querySelectorAll("[data-chat-send]").forEach(x => x.onclick = () => sendChat(x.dataset.chatSend));
-  b.querySelectorAll("[data-chat-teach]").forEach(x => x.onclick = () => {
-    const panel = $("humanAssistState")?.closest(".panel"), tab = panel?.closest(".tab-panel");
-    if (tab) showTab(tab.id); panel?.scrollIntoView({behavior: "smooth", block: "start"});
-  });
+  b.querySelectorAll("[data-chat-teach]").forEach(x => x.onclick = () => revealHumanAssistance(true));
 }
 
 async function sendChat(text) {
@@ -1255,8 +1399,12 @@ async function sendChat(text) {
   finally { if (btn) btn.disabled = false; }
 }
 
+// V243R37: a small handle for automation and support (the module keeps everything else private).
+window.hipControlCenter = { showTab: (name) => showTab(name), toast: (msg, kind) => toast(msg, kind), revealHumanAssistance: () => revealHumanAssistance(true) };
+
 async function boot() {
   wire();
+  initLayout();
   initAgentChat();
   syncWitnessMode();
   try { await loadSections(); } catch(e){ toast(`Could not load sections: ${e.message}`,"bad"); }
