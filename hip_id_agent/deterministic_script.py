@@ -112,6 +112,29 @@ def _pick_skill(data: Mapping[str, Any], operation: str = "create") -> Dict[str,
     return merged
 
 
+def _list_name(list_path: str) -> str:
+    """V243R39: "configure_routing.conditions.rows" -> "Configure routing · Conditions"."""
+    parts = [p for p in str(list_path or "").split(".") if p]
+    if parts and parts[-1].lower() in {"rows", "items", "list", "entries"}:
+        parts = parts[:-1]
+    if len(parts) >= 2:
+        return f"{_humanize(parts[0])} · {_humanize(parts[-1])}"
+    return _humanize(parts[-1]) if parts else "Rows"
+
+
+def _add_label_for(list_path: str, rows: Mapping[str, Any]) -> str:
+    """The "+" learned for this list's row kind (e.g. "flow identifier" -> flow_identifiers.conditions)."""
+    tokens = {t for t in re.split(r"[^a-z]+", str(list_path or "").lower()) if t}
+    tokens |= {t.rstrip("s") for t in tokens}
+    for key, value in (rows or {}).items():
+        if not isinstance(value, Mapping) or not value.get("add_label"):
+            continue
+        words = [w.rstrip("s") for w in re.split(r"[^a-z]+", str(key).split(":", 1)[-1].lower()) if w]
+        if words and all(w in tokens for w in words):
+            return str(value.get("add_label"))
+    return "+"
+
+
 def _norm_section(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
 
@@ -175,8 +198,8 @@ def build_script(
     for list_path, count in row_counts.items():
         if count <= 1:
             continue
-        add_label = next((str(v.get("add_label")) for v in rows.values() if isinstance(v, dict) and v.get("add_label")), "+")
-        section = _humanize(list_path.split(".")[-1])
+        add_label = _add_label_for(list_path, rows)
+        section = _list_name(list_path)
         steps.append({"do": "add_rows", "text": f"Add rows in “{section}” until there is one per input.json item "
                                                 f"({count} in this run) with “{add_label}”",
                       "section": section, "rows_from": f"input.json → {list_path}", "add_label": add_label})
