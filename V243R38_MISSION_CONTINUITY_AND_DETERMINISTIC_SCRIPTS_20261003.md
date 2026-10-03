@@ -156,6 +156,7 @@ The final verdict still needs every phase complete.
 
 - The chat attributed the next phase's clicks to the previous phase's last field ("Clicked “Condition Type” for Validation Type"). The field context is now cleared per phase and after each field.
 - The "learning / replaying the script" line is said once per phase, not once per BizFlow tab.
+- After a phase completed, the chat header could still show its last mid-fill count ("Rule 16/19"). The live map now takes one last reading at completion.
 - R27's route loop already waits for a slow module and reloads it once. Inside that loop, the new ladder stays out of the way.
 - If the route loop ends with "module not rendered", self-heal now treats it as a stuck loader (refresh, then restart) instead of routing again.
 
@@ -255,7 +256,7 @@ Real browser and real `BrowserSession` against the simulator, plus one full miss
 | Final message | When all phases finished but the final check failed, the message says that. |
 | Exact proof | An exact live form is not blocked by a disagreeing coverage report, and each attempt starts without an earlier proof. |
 | Deterministic script | Readable and value-free; the listing follows certification; the API and both Control Center copies show it. |
-| Full mission | A Data Map mission completes, the final gate passes with the judges off, and the chat reports the script. |
+| Full mission | A Data Map mission completes, the final gate passes with the judges off, the chat reports the script, and the live map ends on the completed form. |
 
 ## Settings (all have defaults; a kept `config.yaml` needs no change)
 

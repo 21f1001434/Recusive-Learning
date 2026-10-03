@@ -397,6 +397,9 @@ def test_a_data_map_mission_completes_and_reports_its_deterministic_script(tmp_p
     assert any(t.startswith("📜 Deterministic script for Data Map saved (candidate)") for t in texts)
     assert any("🏁 Mission complete" in t for t in texts)
     assert (run_dir / "data_map" / "deterministic_script.md").is_file()
+    # The live map ends on the completed form, not on a mid-fill count.
+    live = json.loads((run_dir / "data_map" / "input_json_live_map.json").read_text())
+    assert live["complete"] is True and live["exact"] == live["total"]
     assert (tmp_path / "memory" / "deterministic_scripts" / "index.json").is_file()
 
 

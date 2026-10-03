@@ -4961,6 +4961,12 @@ class FullDummyFillE2EFlow:
                             "values_stored": False,
                         }
                     safe_write_json(phase_dir / "phase_learning_memory_receipt.json", learning_memory_receipt)
+                    # V243R38: one last live-map reading, so the Control Center does not
+                    # keep showing a mid-fill count (16/19) after the phase completed.
+                    try:
+                        await _quiet_completion_probe(phase, Path(input_path))
+                    except Exception:
+                        pass
                     # V243R38: the deterministic script this phase learned (or replayed),
                     # as a person can read it -- in the run folder and in memory -- and
                     # one chat line saying where it is and whether it is certified.

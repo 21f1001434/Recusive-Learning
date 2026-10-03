@@ -24,7 +24,8 @@
   - `_HOLD_POLICY`: a bounded hold when more phases remain, then the phase is deferred to the end of the mission (`phase_queue`, a fresh browser, one retry);
   - `section_judge_gate.json` is written from the exact proof when the judges are off;
   - with the exact input.json proof passing, the maximum-observability coverage gate becomes a warning, and a failed verification record is marked as completed on the exact proof (the final consolidation no longer fails a completed mission); `input_authority` is reset at each attempt;
-  - the deterministic script is written after each completed phase (`kind="script"` chat line).
+  - the deterministic script is written after each completed phase (`kind="script"` chat line);
+  - one last live-map reading when a phase completes, so the Control Center no longer shows a mid-fill count afterwards.
 - `deterministic_script.py` (new): `build_script` / `render_markdown` / `write_phase_script` / `list_scripts` / `chat_line`.
 - `autonomous_form_runtime.py`: a "replaying the deterministic script" or "learning it now" chat line.
 - `agent_chat.py`:
