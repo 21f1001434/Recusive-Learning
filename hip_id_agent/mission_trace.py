@@ -550,10 +550,16 @@ class MissionTraceLedger:
             self.state["current_step_id"] = ""
         self._persist()
         done = len(self.state.get("completed_step_ids") or [])
-        self.chat.post(
-            f"🏁 Mission complete — {done}/{len(self.phases)} phases done" if complete
-            else f"Mission ended — {done}/{len(self.phases)} phases done; see the blocked phase above",
-            kind="complete" if complete else "blocked")
+        if complete:
+            text = f"🏁 Mission complete — {done}/{len(self.phases)} phases done"
+        elif done >= len(self.phases):
+            # V243R38: every phase finished, but the final completion check did not
+            # pass -- say so instead of pointing at a "blocked phase" that is not there.
+            text = (f"Mission ended — {done}/{len(self.phases)} phases done, but the final completion check "
+                    "did not pass (see mission_terminal_completion_gate.json)")
+        else:
+            text = f"Mission ended — {done}/{len(self.phases)} phases done; see the blocked phase above"
+        self.chat.post(text, kind="complete" if complete else "blocked")
 
 
 def read_mission_trace(run_dir: str | Path) -> Dict[str, Any]:

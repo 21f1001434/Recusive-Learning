@@ -375,6 +375,14 @@ class RuntimeSelfHealConfig(BaseModel):
     # V243R28: a phase whose dropdowns list no values ("No data found") closes and
     # reopens the browser, returns to the same page and fills the form again, at most this often.
     empty_options_browser_restarts: int = 2
+    # V243R38: a HIP module that never finishes loading after a navigation (an
+    # endless spinner, or the portal bouncing to another page) is recovered in
+    # place -- wait, reload, open it from the portal menu, load a fresh document --
+    # each step given route_recovery_step_seconds; the order is learned per module.
+    # A phase handoff then restarts the browser (same profile, SSO kept) once.
+    route_recovery_enabled: bool = True
+    route_recovery_step_seconds: float = 25.0
+    handoff_restart_browser_on_stuck_route: bool = True
     finalize_grace_seconds: float = 600.0
     max_finalize_extensions: int = 2
     # Active structural watchdog. Unlike failure-signature counting, this runs
@@ -1164,6 +1172,12 @@ class HumanInTheLoopConfig(BaseModel):
     # or explicitly stops the controller process.
     hold_browser_on_incomplete_phase: bool = True
     incomplete_phase_wait_seconds: int = 0
+    # V243R38: in a mission with more phases still to run, an incomplete phase
+    # waits this long for the operator, then the mission continues with the
+    # remaining phases and comes back to it once at the end (fresh browser).
+    # 0 keeps the indefinite hold.
+    incomplete_phase_wait_seconds_when_more_phases: int = 900
+    deferred_phase_retries: int = 1
     incomplete_phase_poll_seconds: float = 2.0
     keepalive_seconds: float = 20.0
     never_finalize_incomplete_run: bool = True

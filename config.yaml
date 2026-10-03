@@ -557,6 +557,13 @@ runtime_self_heal:
   # above hold theirs: close and reopen the browser, return to the same page, open
   # the form and fill it again -- at most this many times per phase.
   empty_options_browser_restarts: 2
+  # V243R38: a module that never finishes loading after navigation (endless
+  # spinner, or the portal bouncing elsewhere): wait, reload, open it from the
+  # portal menu, load a fresh document (25 s each, learned order); a phase
+  # handoff then restarts the browser once (same profile, SSO kept).
+  route_recovery_enabled: true
+  route_recovery_step_seconds: 25
+  handoff_restart_browser_on_stuck_route: true
   finalize_grace_seconds: 600
   max_finalize_extensions: 2
   no_progress_watchdog_seconds: 90
@@ -977,6 +984,10 @@ human_in_the_loop:
   phase_review_poll_seconds: 2.0
   hold_browser_on_incomplete_phase: true
   incomplete_phase_wait_seconds: 0
+  # V243R38: with more phases still to run, wait this long for you, then carry on
+  # with the remaining phases and come back to this one at the end (fresh browser).
+  incomplete_phase_wait_seconds_when_more_phases: 900
+  deferred_phase_retries: 1
   incomplete_phase_poll_seconds: 2.0
   keepalive_seconds: 20.0
   never_finalize_incomplete_run: true

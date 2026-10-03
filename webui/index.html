@@ -218,6 +218,12 @@
             <div id="runsList" class="run-list"></div>
           </article>
         </div>
+        <article class="panel" id="deterministicScriptsPanel">
+          <div class="panel-head"><h2>Deterministic scripts</h2><div><span id="deterministicScriptsState" class="badge neutral">None yet</span> <button id="deterministicScriptsLoad" class="small-button">Refresh</button></div></div>
+          <p class="muted">After a phase completes, what the agent learned is saved as a value-free script: open the page, + Add, then each field and the input.json path its value comes from. The next run replays it without models; it is <b>certified</b> when that replay reproduces every value.</p>
+          <div id="deterministicScriptsTable" class="table-wrap"><div class="empty">No script yet — complete a phase to generate one.</div></div>
+          <pre id="deterministicScriptView" class="json-output hidden"></pre>
+        </article>
         <article class="panel" id="liveInputMapPanel">
           <div class="panel-head"><h2>Live input.json ↔ HIP form</h2><div><span id="liveInputMapState" class="badge neutral">Waiting</span></div></div>
           <p class="help">Every input.json value of the phase being filled, the form field it maps to and what the form holds right now (refreshed every few seconds, read without touching the page). When every value is exact the phase is complete and filling stops.</p>

@@ -2228,6 +2228,19 @@ def interactive_teaching_finish(req: InteractiveTeachingFinishRequest) -> Dict[s
     return {"status": "capture_requested", "session": row, "manifest": store.manifest()}
 
 
+@app.get("/api/deterministic-scripts")
+def deterministic_scripts(config: str = "config.yaml") -> Dict[str, Any]:
+    """V243R38: each phase's deterministic script -- status (candidate / certified /
+    stale), steps and a readable script -- learned from completed phases."""
+    from hip_id_agent.deterministic_script import list_scripts
+
+    cfg = _cfg(config)
+    memory = Path(cfg.reporting.memory_dir)
+    if not memory.is_absolute():
+        memory = (ROOT / memory).resolve()
+    return list_scripts(memory)
+
+
 @app.get("/api/deterministic-recipes")
 def deterministic_recipes(config: str = "config.yaml") -> Dict[str, Any]:
     cfg = _cfg(config)

@@ -1060,6 +1060,30 @@ async def execute_autonomous_phase_goal(
         skills.reason = f"skill_layer_error: {mask_sensitive_string(str(exc))[:300]}"
     fast = skills.plan == "replay" and skills.skill is not None
     replay_skill: Dict[str, Any] = dict(skills.skill or {}) if fast else {}
+    # V243R38: say which way this form is filled -- replaying a learned
+    # deterministic script, or learning (the script is written when it completes).
+    try:
+        from . import agent_chat
+
+        # Once per phase and mode: a wizard (BizFlow) runs the engine per tab.
+        said = getattr(page, "_hip_skill_mode_said", None)
+        if not isinstance(said, set):
+            said = set()
+            setattr(page, "_hip_skill_mode_said", said)
+        mode_key = (str(phase), "replay" if fast else "learn")
+        already_said = mode_key in said
+        said.add(mode_key)
+        if already_said:
+            pass
+        elif fast:
+            state = "certified" if replay_skill.get("status") == "certified" else "learned last run (being certified now)"
+            agent_chat.say(f"📜 Replaying the deterministic script for this form ({state}) — no models; "
+                           "every value is still read back", kind="script", phase=str(phase), group="skill_mode")
+        elif skill_mode != "replay" and getattr(skills, "enabled", False) and not skill_override:
+            agent_chat.say("📜 No certified deterministic script for this form yet — learning it now; "
+                           "it is saved when the form is complete", kind="script", phase=str(phase), group="skill_mode")
+    except Exception:
+        pass
     if fast:
         # Replay only what the skill learned: its fields, sections and rows.
         from .form_structure_memory import seed_fields

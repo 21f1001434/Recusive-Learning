@@ -945,6 +945,48 @@ async def _ensure_doctype_create_surface(
     return result
 
 
+def _defer_row_deficit_to_goal_engine(row_audit: Dict[str, Any], warnings: List[str], *, stage: str) -> None:
+    """Hand a row-count shortfall to the goal engine instead of failing the attempt (V243R38).
+
+    The listing-era row adder only knows text "+ Add" buttons.  The live portal's
+    rows are added with a DDS "+" icon in the section legend, which the goal
+    engine's structure healer (R20) finds and clicks while it fills.  Failing
+    here sent every attempt back to "reopen the form", for ever.  The exact
+    input.json proof still decides whether the phase is complete.
+    """
+    summary = row_audit.get("summary") if isinstance(row_audit.get("summary"), dict) else {}
+    if summary.get("exact_row_count_pass"):
+        return
+    row_audit["deferred_to_goal_engine"] = True
+    warnings.append(
+        f"Document Type {stage}: the listing row adder created {summary.get('clicked', 0)} of "
+        f"{summary.get('planned_add_clicks', 0)} rows; the goal engine adds the remaining rows while it fills."
+    )
+
+
+async def _locator_present(locator: Locator) -> bool:
+    """True when the locator still matches an element (never waits for one)."""
+    try:
+        return bool(await locator.count())
+    except Exception:
+        return False
+
+
+async def _await_doctype_add_form(page: Page, *, timeout_ms: int = 6000, poll_ms: int = 400) -> bool:
+    """Poll for the Create Document Type form; portal drawers and SPA views render after the click."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(0, timeout_ms) / 1000.0
+    while True:
+        try:
+            if await _looks_like_doctype_add_form(page):
+                return True
+        except Exception:
+            pass
+        if loop.time() >= deadline:
+            return False
+        await page.wait_for_timeout(poll_ms)
+
+
 async def _click_add_doctype_with_overlay_recovery(
     page: Page,
     browser: BrowserSession,
@@ -957,14 +999,25 @@ async def _click_add_doctype_with_overlay_recovery(
     attempts: List[str] = []
     for label in ["normal", "after_overlay_wait"]:
         try:
+            if label != "normal":
+                # V243R38: the first click may have opened the form after the first
+                # check, or replaced the listing (its + Add is gone).  Never retry a
+                # vanished button -- Playwright would wait the full page timeout for it.
+                if await _await_doctype_add_form(page, timeout_ms=4000):
+                    return True
+                if not await _locator_present(add):
+                    fresh = await _find_add_button(page)
+                    if fresh is None:
+                        attempts.append(f"{label}: + Add is no longer on the page and the Add form was not detected")
+                        break
+                    add = fresh
             await browser.wait_for_blocking_overlays_gone(timeout_ms=30000 if label == "normal" else 60000)
             await browser.click_and_wait(
                 action=f"structural_opener click_add_doctype_do_not_save_{label}",
                 locator=add,
                 selector="Add Document Type",
             )
-            await page.wait_for_timeout(1000)
-            if await _looks_like_doctype_add_form(page):
+            if await _await_doctype_add_form(page, timeout_ms=6000):
                 return True
             attempts.append(f"{label}: click returned but Add form was not detected")
         except Exception as exc:
@@ -976,18 +1029,24 @@ async def _click_add_doctype_with_overlay_recovery(
                 pass
             await page.wait_for_timeout(1500)
 
+    if await _await_doctype_add_form(page, timeout_ms=3000):
+        return True
     disabled = await _disable_stale_loading_overlays(page)
     if disabled:
         warnings.append(f"Stale Document Type loading overlay detected before + Add; disabled pointer-events on {disabled} overlay node(s) for read-only KB form capture.")
     try:
+        if not await _locator_present(add):
+            fresh = await _find_add_button(page)
+            if fresh is None:
+                raise RuntimeError("+ Add is no longer on the page")
+            add = fresh
         # Final recovery remains governed: semantic proof -> AutoWebGLM ->
         # Playwright MCP -> effect verification. No HTMLElement.click fallback.
         await browser.click_and_wait(
             action="structural_opener click_add_doctype_do_not_save_semantic_overlay_recovery",
             locator=add, selector="Add Document Type", mutation_risk=False,
         )
-        await page.wait_for_timeout(1500)
-        if await _looks_like_doctype_add_form(page):
+        if await _await_doctype_add_form(page, timeout_ms=6000):
             return True
         attempts.append("semantic_overlay_recovery: Add form was not detected")
     except Exception as exc:
@@ -3278,8 +3337,7 @@ class DocumentTypeKBFlow:
                     safe_write_json(kb_dir / "doctype_structure_first_audit.json", structure_audit)
                     row_audit = await apply_repeatable_row_adds(page, input_data, phase_name)
                     repeatable_row_audit.append(dict(row_audit, execution_stage="validated_memory_exact_target_form"))
-                    if not row_audit.get("summary", {}).get("exact_row_count_pass"):
-                        raise RuntimeError("Document Type deterministic-first path could not create the required repeatable rows")
+                    _defer_row_deficit_to_goal_engine(row_audit, warnings, stage="deterministic-first")
                 else:
                     try:
                         # Expose the complete repeatable-row schema without entering any
@@ -3356,8 +3414,7 @@ class DocumentTypeKBFlow:
                         raise RuntimeError("Create Document Type form could not be rebuilt after structure learning")
                     row_audit = await apply_repeatable_row_adds(page, input_data, phase_name)
                     repeatable_row_audit.append(dict(row_audit, execution_stage="exact_target_form"))
-                    if not row_audit.get("summary", {}).get("exact_row_count_pass"):
-                        raise RuntimeError("Document Type exact target form could not create the required repeatable rows")
+                    _defer_row_deficit_to_goal_engine(row_audit, warnings, stage="exact target form")
 
             if add_form_opened:
                 gate = await _ensure_doctype_create_surface(
@@ -3401,22 +3458,22 @@ class DocumentTypeKBFlow:
                     if repair.get("pass"):
                         row_repair = await apply_repeatable_row_adds(page, input_data, phase_name)
                         repeatable_row_audit.append(dict(row_repair, execution_stage="exact_fill_retry"))
-                        if row_repair.get("summary", {}).get("exact_row_count_pass"):
-                            if autonomous_phase_enabled(self.config, phase_name):
-                                autonomous_cfg = getattr(self.config, "autonomous_form", None)
-                                autonomous_execution = await execute_autonomous_phase_goal(
-                                    page=page, graph=state_graph, phase=phase_name, input_data=input_data,
-                                    config=self.config, output_dir=kb_dir / "autonomous_form_runtime_retry",
-                                    max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
-                                    repair=True, strict_live_execution=True,
-                                    executor=execute_document_type_state_graph,
-                                )
-                                target_branch_execution = autonomous_target_execution(autonomous_execution)
-                                _write_json(kb_dir / "doctype_autonomous_form_execution_retry.json", autonomous_execution)
-                            else:
-                                target_branch_execution = await execute_document_type_state_graph(
-                                    page, state_graph, phase=phase_name, max_retries=2
-                                )
+                        _defer_row_deficit_to_goal_engine(row_repair, warnings, stage="clean retry")
+                        if autonomous_phase_enabled(self.config, phase_name):
+                            autonomous_cfg = getattr(self.config, "autonomous_form", None)
+                            autonomous_execution = await execute_autonomous_phase_goal(
+                                page=page, graph=state_graph, phase=phase_name, input_data=input_data,
+                                config=self.config, output_dir=kb_dir / "autonomous_form_runtime_retry",
+                                max_cycles=int(getattr(autonomous_cfg, "max_adaptive_cycles", 5) or 5),
+                                repair=True, strict_live_execution=True,
+                                executor=execute_document_type_state_graph,
+                            )
+                            target_branch_execution = autonomous_target_execution(autonomous_execution)
+                            _write_json(kb_dir / "doctype_autonomous_form_execution_retry.json", autonomous_execution)
+                        else:
+                            target_branch_execution = await execute_document_type_state_graph(
+                                page, state_graph, phase=phase_name, max_retries=2
+                            )
                 _write_json(kb_dir / "doctype_target_branch_execution.json", target_branch_execution)
                 form_state_model = {
                     "schema_version": "hip.doctype-form-state-model-bundle.v2",

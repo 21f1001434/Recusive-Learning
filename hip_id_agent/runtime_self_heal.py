@@ -266,6 +266,16 @@ class RuntimeSelfHealController:
             and any(x in joined for x in ("expired", "redirected", "unauthenticated", "session"))
         ):
             return "authentication_expired"
+        if "hip_route_stuck_loading" in joined:
+            # V243R38: the module never loaded although navigation already waited,
+            # reloaded, used the portal menu and a fresh document -- a stuck portal
+            # loader: refresh, then close and reopen the browser (learned order).
+            return "portal_loading_stuck"
+        if "hip_route_not_committed" in joined and any(
+                reason in joined for reason in ("module_loading", "module_not_rendered", "page_not_rendered")):
+            # V243R38: the route is the requested one but the module never rendered
+            # even after the route loop's wait and reload -- a stuck portal loader.
+            return "portal_loading_stuck"
         if "hip_route_not_committed" in joined or "requested module is not the requested module" in joined:
             return "route_not_committed"
         if "hip_mcp_surface_drift" in joined or (

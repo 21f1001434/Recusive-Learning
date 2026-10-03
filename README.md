@@ -1,3 +1,25 @@
+## V243R38 — Whole missions keep going, and say what they learned (2026-10-03)
+
+- **Target Document Type no longer loops on the listing.** Three causes, found by running the real mission against a local copy of the portal:
+  - Every structural click ("+ Add", a row "+") waited 45 s after it had worked, so the no-progress watchdog kept reopening the form ("Live form not yet exact: document_type_name, …", attempt 15).
+  - The old row adder could not click the live "+" and failed the attempt instead of letting the goal engine add the rows.
+  - After Source, the handoff left Source's form open on the same URL, and Target typed over it.
+- **All sections no longer stall after a phase or two:**
+  - A module stuck on its spinner is detected (the portal menu no longer fools the check).
+  - It is recovered in place: wait, reload, open it from the portal menu, load a fresh document. The order is learned per module.
+  - A handoff then restarts the browser once (same profile, sign-in kept).
+  - A phase that needs you waits up to 15 minutes, then the mission carries on and comes back to it at the end.
+- **The deterministic script is visible.** After every completed phase, the agent writes the script it learned: open the page, + Add, each field and the input.json path its value comes from. It goes in `runs/<run>/<phase>/deterministic_script.md` and in `data/hip_memory/deterministic_scripts/`.
+  - The chat says whether it is new (certified when the next run replays it exactly) or already certified.
+  - The Mission tab lists every phase's script.
+- **Also fixed:**
+  - With the section judges off, a completed mission was reported blocked.
+  - A Rule form proven exact (19/19) was reopened because a coverage report disagreed, and a completed mission ended "failed".
+  - The Rule form was not recognised.
+  - The chat attributed the next phase's clicks to the previous phase's last field.
+
+See `V243R38_MISSION_CONTINUITY_AND_DETERMINISTIC_SCRIPTS_20261003.md`. Apply with `APPLY_V243R38_IN_PLACE.ps1`; it includes R13–R37.
+
 ## V243R37 — The Control Center fits every screen (2026-10-02)
 
 - **Nothing overflows any more.** A browser audit at 9 screen sizes × 6 tabs went from 629 layout problems to 0.

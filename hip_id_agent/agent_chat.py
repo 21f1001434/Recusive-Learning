@@ -195,6 +195,9 @@ def executor_step(page: Any, *, phase: str, node: Mapping[str, Any], stage: str,
             last = getattr(page, "_hip_last_broker_error", None)
             why = _clean((last or {}).get("error"), 160) if isinstance(last, Mapping) else ""
             say(f"✗ {label} did not take {value}" + (f" ({why})" if why else ""), kind="failed", phase=phase)
+        if stage in {"done", "failed"}:
+            # V243R38: later clicks (an opener, the next phase) are not this field's.
+            setattr(page, "_hip_chat_field", None)
     except Exception:
         pass
 
@@ -245,7 +248,9 @@ def broker_action(page: Any, *, action: str, label: str, success: bool, value: A
     try:
         ctx = _field_context(page)
         field = ctx.get("label") or "the form"
-        phase = str(ctx.get("phase") or "")
+        # V243R38: without a field context (a listing-era helper clicked) the phase
+        # is still the session's current one.
+        phase = str(ctx.get("phase") or getattr(getattr(page, "_hip_browser_session", None), "_active_phase_name", "") or "")
         lab = _clean(label, 200)
         low = lab.lower()
         shown = display_value(ctx.get("field_key") or field, value) if value not in (None, "") else ""
@@ -271,7 +276,7 @@ def broker_action(page: Any, *, action: str, label: str, success: bool, value: A
             text = f"Typed {shown} to search {field}"
             kind = "type"
         elif low in {"hip portal dds combobox", "hip portal native dropdown", "hip portal dds multi-select"}:
-            text = f"Opened the {field} dropdown"
+            text = f"Opened the {field} dropdown" if field != "the form" else "Opened a dropdown on the form"
         elif low.startswith("hip portal text field") or (action in {"fill", "type"} and not lab):
             text = f"Typed {shown} into {field}"
             kind = "type"

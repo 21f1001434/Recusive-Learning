@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import copy
+import contextvars
 import csv
 import hashlib
 import json
@@ -2336,6 +2337,12 @@ def _near_complete_question(
                       f"not read back: {names}\n\nLast error: {text[:2000]}"}
 
 
+# V243R38: the hold policy of the phase being run (set by the mission loop).  With
+# more phases still to run, an incomplete phase is held for a bounded time and then
+# deferred to the end of the mission instead of holding every later phase forever.
+_HOLD_POLICY: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = contextvars.ContextVar("hip_hold_policy", default=None)
+
+
 async def _hold_incomplete_phase_for_human(
     *,
     store: Any,
@@ -2398,6 +2405,19 @@ async def _hold_incomplete_phase_for_human(
         pass
 
     timeout = max(0, int(getattr(hitl, "incomplete_phase_wait_seconds", 0) or 0))
+    policy = _HOLD_POLICY.get()
+    defer_after = int((policy or {}).get("defer_after_seconds") or 0) if isinstance(policy, dict) else 0
+    deferring = bool(defer_after and (timeout == 0 or defer_after < timeout))
+    if deferring:
+        timeout = defer_after
+        try:
+            agent_chat.say(
+                f"⏸ {phase_display} needs you (see the request above). I'll wait up to {max(1, round(defer_after / 60))} min; "
+                f"without an answer I continue with {PHASE_DISPLAY.get(str(policy.get('next') or ''), 'the next phase')} "
+                f"and come back to {phase_display} at the end with a fresh browser.",
+                kind="question", phase=phase)
+        except Exception:
+            pass
     poll = max(0.25, float(getattr(hitl, "incomplete_phase_poll_seconds", 2.0) or 2.0))
     keepalive_every = max(2.0, float(getattr(hitl, "keepalive_seconds", 20.0) or 20.0))
     started = time.monotonic()
@@ -2423,7 +2443,21 @@ async def _hold_incomplete_phase_for_human(
         if timeout > 0 and now - started >= timeout:
             # A finite timeout is an explicit operator configuration. Do not claim
             # completion; caller may stop/raise, but the default is indefinite.
-            return {"held": True, "resume": False, "timed_out": True, "request": row}
+            if deferring:
+                policy["deferred"] = True
+                safe_write_json(wait_file, {
+                    "schema_version": "hip.incomplete-phase-wait.v1", "status": "deferred_to_end_of_mission",
+                    "phase": phase, "request_id": request.get("request_id"), "waited_seconds": int(now - started),
+                    "next_phase": policy.get("next"), "deferred_at": utc_now(),
+                    "policy": "continue with the remaining phases; retry this phase once at the end with a fresh browser",
+                })
+                try:
+                    agent_chat.say(f"⏭ No answer for {phase_display} — continuing with "
+                                   f"{PHASE_DISPLAY.get(str(policy.get('next') or ''), 'the next phase')}; "
+                                   f"I'll come back to {phase_display} at the end.", kind="phase", phase=phase)
+                except Exception:
+                    pass
+            return {"held": True, "resume": False, "timed_out": True, "deferred": deferring, "request": row}
 
         if now - last_keepalive >= keepalive_every:
             last_keepalive = now
@@ -3387,9 +3421,44 @@ class FullDummyFillE2EFlow:
                 seconds=float(getattr(chat_cfg, "live_frame_seconds", 3.0) or 3.0),
                 quality=int(getattr(chat_cfg, "live_frame_quality", 55) or 55)))
         try:
-            for phase_index, phase in enumerate(phases):
+            hitl_cfg = getattr(self.config, "human_in_the_loop", None)
+            defer_wait = int(getattr(hitl_cfg, "incomplete_phase_wait_seconds_when_more_phases", 0) or 0)
+            deferred_retries = max(0, int(getattr(hitl_cfg, "deferred_phase_retries", 1) or 0))
+            phase_queue: List[str] = list(phases)
+            deferred_phases: Dict[str, int] = {}
+            for phase_index, phase in enumerate(phase_queue):
                 phase_dir = root_dir / phase
                 phase_dir.mkdir(parents=True, exist_ok=True)
+                retry_pass = phase_queue.index(phase) != phase_index
+                # V243R38: bounded hold while more phases remain; the phase is
+                # then deferred to the end of the mission (once).
+                more_after = [p for p in phase_queue[phase_index + 1:] if p != phase]
+                hold_policy: Dict[str, Any] = {}
+                if (defer_wait > 0 and more_after and self.options.continue_after_phase_block
+                        and deferred_phases.get(phase, 0) < deferred_retries):
+                    hold_policy = {"defer_after_seconds": defer_wait, "next": more_after[0], "phase": phase}
+                _HOLD_POLICY.set(hold_policy or None)
+                if retry_pass:
+                    # Back to a phase deferred earlier: a fresh browser (same profile,
+                    # SSO kept) and a fresh attempt budget; its earlier block is lifted
+                    # until this attempt decides again.
+                    try:
+                        mission_trace.chat.post(f"↩ Back to {PHASE_DISPLAY.get(phase, phase)} (deferred earlier): "
+                                                "fresh browser, new attempt", kind="phase", phase=phase)
+                    except Exception:
+                        pass
+                    if phase in blocked_phases:
+                        blocked_phases.remove(phase)
+                    blocked_phase = ""
+                    try:
+                        runtime_self_healer.reset_phase_ladder(phase)
+                    except Exception:
+                        pass
+                    try:
+                        safe_write_json(phase_dir / "deferred_retry_restart.json",
+                                        mask_sensitive_data(await shared_browser.restart(reason=f"deferred retry of {phase}")))
+                    except Exception as exc:
+                        safe_write_json(phase_dir / "deferred_retry_restart.json", {"status": "error", "error": mask_sensitive_string(str(exc))[:500]})
                 # R12: every click/fill/navigation is learning experience. Capture
                 # the action cursor now so this phase can promote only its own
                 # browser interactions after exact+judge(+human) completion.
@@ -3523,6 +3592,7 @@ class FullDummyFillE2EFlow:
                         break
                     attempt_no = attempt_index + 1
                     attempt_index += 1
+                    input_authority = {}  # V243R38: this attempt's own exact proof only
                     # V243R35: a pause from the live chat takes effect before an attempt.
                     await operator_control.checkpoint(phase=phase, where=f"{phase_display(phase)} attempt {attempt_no}")
                     # V243R36: a retry -- or a phase the operator confirmed -- first proves
@@ -4044,6 +4114,16 @@ class FullDummyFillE2EFlow:
                         phase, phase_dir, input_path, reason="after_section_judge", judge_result=judge_result)
                     judge_result, diagnosis, authority_overruled = accept_exact_phase(judge_result, diagnosis, input_authority)
                     if authority_overruled:
+                        safe_write_json(phase_dir / "section_judge_gate.json", judge_result)
+                    elif phase_judge is None and isinstance(input_authority, dict) and input_authority.get("pass") and not diagnosis:
+                        # V243R38: with the section judges switched off the exact live
+                        # form is the only proof; record it so the mission's terminal
+                        # gate (which requires a judge gate file) does not report a
+                        # completed run as blocked.
+                        judge_result = {
+                            "pass": True, "status": "pass_input_json_exact_judges_off", "section_judge_enabled": False,
+                            "input_json_authority": {k: input_authority.get(k) for k in ("matched_count", "rule")},
+                        }
                         safe_write_json(phase_dir / "section_judge_gate.json", judge_result)
 
                     # Any phase whose exact state graph completed must never
@@ -4573,6 +4653,15 @@ class FullDummyFillE2EFlow:
                         completed_phase_checkpoint.get("pass")
                         and bool(judge_result.get("pass", True))
                     )
+                    # V243R38 (R29 rule): the live form is the answer.  When every
+                    # input.json value is proven exact and committed on the form, a
+                    # coverage report that disagrees (an earlier listing-era pass that
+                    # recorded a failed step) is a learning warning, not a block -- the
+                    # Rule form was "filled and committed" yet reopened three times.
+                    exact_authority = input_authority
+                    if (evidence_incomplete and isinstance(exact_authority, dict) and exact_authority.get("pass")
+                            and bool(judge_result.get("pass", True))):
+                        phase_acceptance_committed = True
                     if evidence_incomplete and phase_acceptance_committed:
                         safe_write_json(phase_dir / "maximum_observability_learning_warning.json", {
                             "schema_version": "hip.maximum-observability-learning-warning.v1",
@@ -4872,6 +4961,24 @@ class FullDummyFillE2EFlow:
                             "values_stored": False,
                         }
                     safe_write_json(phase_dir / "phase_learning_memory_receipt.json", learning_memory_receipt)
+                    # V243R38: the deterministic script this phase learned (or replayed),
+                    # as a person can read it -- in the run folder and in memory -- and
+                    # one chat line saying where it is and whether it is certified.
+                    try:
+                        from .deterministic_script import chat_line as _script_chat_line, write_phase_script
+
+                        script_summary = write_phase_script(
+                            phase=phase, phase_dir=phase_dir, memory_dir=Path(self.config.reporting.memory_dir),
+                            graph=compile_phase_state_graph(
+                                phase_payload_for_memory if isinstance(phase_payload_for_memory, dict) else {}, phase),
+                            url=PHASE_URLS.get(phase, ""), run_id=ctx.run_id,
+                            save_after_fill=bool(self.options.save_after_fill),
+                        )
+                        mission_trace.chat.post(_script_chat_line(script_summary, PHASE_DISPLAY.get(phase, phase)),
+                                                kind="script", phase=phase)
+                    except Exception as exc:
+                        script_summary = {"status": "error", "error": mask_sensitive_string(str(exc))[:300]}
+                    safe_write_json(phase_dir / "deterministic_script_summary.json", script_summary)
                     # R12 continuous portal learning: filling/navigation is the
                     # training experience. Promote semantic action/effect sequences
                     # only after the live phase has exact proof and judge/human PASS.
@@ -5040,13 +5147,23 @@ class FullDummyFillE2EFlow:
                         phase,
                         attempt=attempt_index,
                         reason=phase_save_block_reason or (
-                            f"blocked by section judge in phase {blocked_phase}"
+                            # V243R38: say why it stopped -- a deferred phase is not a judge block.
+                            "no answer from the operator in time; retried at the end of the mission"
+                            if hold_policy.get("deferred") and deferred_phases.get(phase, 0) < deferred_retries
+                            else f"blocked by section judge in phase {blocked_phase}"
                             if blocked_phase
                             else "self-heal stopped before a judged pass"
                         ),
                     )
                     if phase not in blocked_phases:
                         blocked_phases.append(phase)
+                    if hold_policy.get("deferred") and deferred_phases.get(phase, 0) < deferred_retries:
+                        deferred_phases[phase] = deferred_phases.get(phase, 0) + 1
+                        phase_queue.append(phase)
+                        safe_write_json(phase_dir / "deferred_to_end_of_mission.json", {
+                            "phase": phase, "deferred_count": deferred_phases[phase], "queue": list(phase_queue[phase_index + 1:]),
+                            "policy": "retried once at the end of the mission with a fresh browser; the final verdict still needs every phase complete",
+                        })
                     if summary:
                         phase_summaries[phase] = mask_sensitive_data(summary)
                     if verification:
@@ -5094,6 +5211,15 @@ class FullDummyFillE2EFlow:
                     )
 
                 phase_summaries[phase] = mask_sensitive_data(summary)
+                if (isinstance(verification, dict) and verification.get("status") == "failed"
+                        and isinstance(input_authority, dict) and input_authority.get("pass")):
+                    # V243R38: the phase completed on the exact live form (R29); the
+                    # listing-era verification report that disagreed must not turn the
+                    # whole mission into "failed" at the final consolidation.
+                    verification = {**verification, "status": "pass",
+                                    "status_before_input_json_authority": "failed",
+                                    "input_json_authority": "every input.json value exact and committed on the live form"}
+                    safe_write_json(phase_dir / PHASE_VERIFICATION_FILENAME, verification)
                 phase_verifications.append(verification)
                 if judge_result:
                     phase_judge_results.append(judge_result)

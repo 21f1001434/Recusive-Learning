@@ -850,6 +850,41 @@ async function loadSkillLibrary() {
   } catch(e){ if($('skillLibraryTable')) $('skillLibraryTable').innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
 }
 
+// V243R38: the deterministic script of every completed phase (status, steps, the script).
+async function loadDeterministicScripts() {
+  const host = $("deterministicScriptsTable"); if (!host) return;
+  try {
+    const data = await api(`/api/deterministic-scripts?${new URLSearchParams({config:$("configPath").value||"config.yaml"})}`);
+    const rows = data.scripts || [];
+    state.deterministicScripts = rows;
+    const badge = $("deterministicScriptsState");
+    if (badge) {
+      badge.textContent = rows.length ? `${data.certified||0} certified • ${data.candidates||0} learning` : "None yet";
+      badge.className = `badge ${data.certified ? "good" : rows.length ? "info" : "neutral"}`;
+    }
+    const tone = {certified:"good", candidate:"info", stale:"bad"};
+    host.innerHTML = rows.length ? table(rows, [
+      {key:"phase", label:"Phase"},
+      {key:"status", label:"Status", render:r=>`<span class="badge ${tone[r.status]||"neutral"}" title="${esc(r.status_text||"")}">${esc(r.status)}</span>`},
+      {key:"steps", label:"Steps", render:r=>`${esc(r.steps)} <small class="muted">(${esc(r.fields)} fields)</small>`},
+      {key:"replays", label:"Replays"},
+      {key:"updated_at", label:"Updated", render:r=>esc(String(r.updated_at||"").replace("T"," ").replace("Z",""))},
+      {key:"view", label:"Script", render:r=>`<button class="small-button" data-script-phase="${esc(r.phase)}">View</button>`},
+    ]) : '<div class="empty">No script yet — complete a phase to generate one.</div>';
+    host.querySelectorAll("[data-script-phase]").forEach(b => b.onclick = () => {
+      const row = (state.deterministicScripts||[]).find(x => x.phase === b.dataset.scriptPhase) || {};
+      const view = $("deterministicScriptView"); if (!view) return;
+      const same = !view.classList.contains("hidden") && view.dataset.phase === row.phase;
+      view.dataset.phase = row.phase || "";
+      view.textContent = `${row.markdown || "(empty)"}\nRun copy: ${row.run_file || "—"}\nMemory copy: ${row.file || "—"}`;
+      view.classList.toggle("hidden", same);
+    });
+    if ($("skillsDetail") && rows.length && !String($("skillsDetail").textContent).includes("script")) {
+      $("skillsDetail").textContent += ` • ${rows.length} script${rows.length===1?"":"s"}`;
+    }
+  } catch (e) { host.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
 async function loadReplayPolicy() {
   try {
     const qs=new URLSearchParams({config:$('configPath').value||'config.yaml',limit:'100'});
@@ -1198,13 +1233,13 @@ function wire() {
   $("testTextModelBtn").onclick=()=>testModelAvailability("text"); $("testVisionModelBtn").onclick=()=>testModelAvailability("vision");
   $("preflightBtn").onclick=()=>runPreflight(); $("liveRuntimeCertBtn").onclick=()=>runLiveRuntimeCertification(); $("liveReadinessBtn").onclick=()=>runLiveReadiness(); $("startBtn").onclick=startMission; $("pauseBtn").onclick=()=>processAction("pause"); $("resumeBtn").onclick=()=>processAction("resume"); $("stopBtn").onclick=()=>processAction("stop");
   $("refreshBtn").onclick=refreshStatus; $("runsRefresh").onclick=refreshStatus; $("capLoad").onclick=loadCapabilities; $("apiLoad").onclick=loadApis; if($("humanAssistRefresh")) $("humanAssistRefresh").onclick=loadHumanAssistance; if($("humanTeachSubmit")) $("humanTeachSubmit").onclick=submitHumanTeaching; if($("interactiveTeachStart")) $("interactiveTeachStart").onclick=startInteractiveTeaching; if($("interactiveTeachFinish")) $("interactiveTeachFinish").onclick=finishInteractiveTeaching; if($("humanPhaseRefresh")) $("humanPhaseRefresh").onclick=loadHumanPhaseReview; if($("humanPhaseApprove")) $("humanPhaseApprove").onclick=()=>submitHumanPhaseReview('pass'); if($("humanPhaseReject")) $("humanPhaseReject").onclick=()=>submitHumanPhaseReview('needs_correction');
-  $("taskPlan").onclick=()=>taskAction("plan"); $("taskRun").onclick=()=>taskAction("run"); if($("productionDoctor")) $("productionDoctor").onclick=()=>productionAction("doctor"); if($("productionRun")) $("productionRun").onclick=()=>productionAction("start"); if($("skillLibraryLoad")) $("skillLibraryLoad").onclick=loadSkillLibrary; if($("skillLibrarySearch")) $("skillLibrarySearch").addEventListener("input",()=>loadSkillLibrary()); if($("skillLibraryStatus")) $("skillLibraryStatus").addEventListener("change",()=>loadSkillLibrary()); if($("replayPolicyLoad")) $("replayPolicyLoad").onclick=loadReplayPolicy; if($("modelPortfolioLoad")) $("modelPortfolioLoad").onclick=loadModelPortfolio; if($("recursiveImprovementLoad")) $("recursiveImprovementLoad").onclick=loadRecursiveImprovement; if($("runHistoryLoad")) { $("runHistoryLoad").onclick=()=>loadRunHistory(true); loadRunHistory(false); } $("changePreview").onclick=()=>changeAction("preview"); $("changeRun").onclick=()=>changeAction("run"); $("auditLoad").onclick=loadAudit;
+  $("taskPlan").onclick=()=>taskAction("plan"); $("taskRun").onclick=()=>taskAction("run"); if($("productionDoctor")) $("productionDoctor").onclick=()=>productionAction("doctor"); if($("productionRun")) $("productionRun").onclick=()=>productionAction("start"); if($("skillLibraryLoad")) $("skillLibraryLoad").onclick=loadSkillLibrary; if($("skillLibrarySearch")) $("skillLibrarySearch").addEventListener("input",()=>loadSkillLibrary()); if($("skillLibraryStatus")) $("skillLibraryStatus").addEventListener("change",()=>loadSkillLibrary()); if($("replayPolicyLoad")) $("replayPolicyLoad").onclick=loadReplayPolicy; if($("modelPortfolioLoad")) $("modelPortfolioLoad").onclick=loadModelPortfolio; if($("recursiveImprovementLoad")) $("recursiveImprovementLoad").onclick=loadRecursiveImprovement; if($("runHistoryLoad")) { $("runHistoryLoad").onclick=()=>loadRunHistory(true); loadRunHistory(false); } if($("deterministicScriptsLoad")) { $("deterministicScriptsLoad").onclick=loadDeterministicScripts; loadDeterministicScripts(); setInterval(loadDeterministicScripts, 30000); } $("changePreview").onclick=()=>changeAction("preview"); $("changeRun").onclick=()=>changeAction("run"); $("auditLoad").onclick=loadAudit;
   document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 }
 
 // V243R35: the live agent chat on the right -- every action the agent takes, as it
 // takes it, and the operator's side of the conversation (status, pause, hints...).
-const CHAT_ICONS = {navigate:"🌐",click:"🖱",type:"⌨",select:"☑",key:"⌨",field:"✎",verified:"✓",failed:"✗",retry:"↻",heal:"♻",warn:"⚠",stop:"🛑",blocked:"⛔",complete:"✅",phase:"▶",progress:"📊",observe:"👁",wait:"⏳",paused:"⏸",resumed:"▶",ack:"📝",mission:"🚀",info:"ℹ",question:"❓"};
+const CHAT_ICONS = {navigate:"🌐",click:"🖱",type:"⌨",select:"☑",key:"⌨",field:"✎",verified:"✓",failed:"✗",retry:"↻",heal:"♻",warn:"⚠",stop:"🛑",blocked:"⛔",complete:"✅",phase:"▶",progress:"📊",observe:"👁",wait:"⏳",paused:"⏸",resumed:"▶",ack:"📝",mission:"🚀",info:"ℹ",question:"❓",script:"📜"};
 const CHAT_PHASES = {data_map:"Data Map",source_document_type:"Source Document Type",target_document_type:"Target Document Type",rule:"Rule",source_transport_profile:"Source Transport Profile",target_transport_profile:"Target Transport Profile",biz_flow:"BizFlow"};
 function chatPhaseName(phase) { return CHAT_PHASES[phase] || String(phase||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()); }
 function chatParams() { return new URLSearchParams({config:$("configPath").value||"config.yaml", runs_dir:$("runsDir").value||"./runs"}); }

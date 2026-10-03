@@ -756,7 +756,12 @@ async def _looks_like_rule_add_form(page: Page) -> bool:
   const hasRuleName = /Rule\\s*Type\\s*Name/i.test(text) || /ruleName/i.test(html);
   const hasDocIdentifier = /Rule\\s*Identifier/i.test(text) || /Root\\s*Element/i.test(text);
   const hasFormControl = !!document.querySelector('input:not([type=hidden]), textarea, select, [role=combobox]');
-  return hasFormControl && (hasRuleName || hasDocIdentifier);
+  // V243R38: the Create Rule form as in the approved golden screenshots --
+  // "Create Rule" with its own sections and fields -- is a rule form too.
+  const createRule = /Create\\s+Rule\\b/i.test(text);
+  const ruleMarkers = [/Document\\s*Type\\s*Name\\s*\\(Version\\)/i, /Rule\\s*Type/i, /Rule\\s*Scope/i,
+    /Execute\\s*Action\\(s\\)\\s*When/i, /Conditions\\s*:/i, /Actions\\s*:/i].filter((rx) => rx.test(text)).length;
+  return hasFormControl && (hasRuleName || hasDocIdentifier || (createRule && ruleMarkers >= 3));
 }
             """
         ))
@@ -5359,7 +5364,19 @@ class RuleKBFlow:
                 # 1 for row 2.
                 condition_row_audit = await _apply_rule_condition_row_adds(page, input_data, warnings=warnings)
                 repeatable_row_audit = [condition_row_audit]
-                if not bool((condition_row_audit.get("summary") or {}).get("exact_input_pass")):
+                if not bool((condition_row_audit.get("summary") or {}).get("exact_input_pass")) and autonomous_phase_enabled(self.config, "rule"):
+                    # V243R38: the goal engine owns completion.  It creates missing
+                    # condition rows with the live legend "+" (R20 structure healer),
+                    # binds every row by its own index (no row is reused) and the
+                    # exact input.json proof still decides.  Failing here instead sent
+                    # every attempt back to "reopen the form" until the phase blocked.
+                    condition_row_audit["deferred_to_goal_engine"] = True
+                    warnings.append(
+                        "Rule Conditions: the listing-era condition transaction did not finish "
+                        f"({(condition_row_audit.get('summary') or {}).get('filled_rows', 0)} of "
+                        f"{condition_row_audit.get('row_count_from_input', 0)} rows); the goal engine creates and fills the rest."
+                    )
+                elif not bool((condition_row_audit.get("summary") or {}).get("exact_input_pass")):
                     raise RuntimeError(
                         "Rule Conditions mandatory +Add/fill transaction failed; refusing row reuse: "
                         + mask_sensitive_string(json.dumps({
@@ -5472,6 +5489,12 @@ class RuleKBFlow:
                         continue
                     value = c.get("recommended_value") or dummy_values.get(key or "")
                     if value in (None, ""):
+                        continue
+                    # V243R38: switches, checkboxes, radios and read-only fields are the goal
+                    # engine's (typing into them only failed and alarmed the chat).
+                    if (str(c.get("type") or "").lower() in {"checkbox", "radio"}
+                            or str(c.get("role") or "").lower() in {"switch", "checkbox", "radio"}
+                            or c.get("disabled") or c.get("readonly") or c.get("readOnly")):
                         continue
                     if str(c.get("type") or "").lower() == "file" or key == "schema_file":
                         fill_attempts.append(await attempt_upload_for_control(page, c, input_data, phase="rule", field_key=str(key or ""), desired_value=value))

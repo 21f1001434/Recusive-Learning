@@ -124,4 +124,6 @@ def test_live_controller_uses_transition_coordinator_and_destination_ack():
     assert "transition_coordinator.plan_after(phase, mission.phase_status)" in source
     assert "transition_coordinator.acknowledge(" in source
     assert "phase_transition_ack_attempt_" in source
-    assert "phases.index(phase)" not in source[source.index("for phase_index, phase in enumerate(phases):"):]
+    # V243R38: the loop runs over a queue (a deferred phase is retried at the end).
+    loop = "for phase_index, phase in enumerate(phase_queue):"
+    assert "phases.index(phase)" not in source[source.index(loop):]

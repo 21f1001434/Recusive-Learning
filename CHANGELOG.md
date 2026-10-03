@@ -1,3 +1,46 @@
+# V243R38 — Whole missions keep going, and say what they learned (2026-10-03)
+
+- `tests/hip_portal_sim.py` (new):
+  - an HTTPS copy of the portal at the real developer.dell.com paths (Chromium `--host-resolver-rules`);
+  - per module: header, menu, listing, + Add, the replica Create form (a modal drawer for Data Map / Document Type / Transport Profile, a page for Rule / BizFlow) and a working Cancel;
+  - faults: endless spinner, bounce to the portal home, blank page.
+- `browser_session.py`:
+  - `_observe_form_memory_action` never waits for the clicked element (was the 45 s page timeout);
+  - `_module_still_loading` and a `module_loading` usability reason;
+  - route recovery ladder in `navigate` (`wait`, `reload`, `portal_menu`, `fresh_document`): learned order in `route_recovery_ladder.json`, chat narration, watchdog heartbeat; `HIP_ROUTE_STUCK_LOADING`;
+  - the handoff restarts the browser once on a stuck route;
+  - `_dismiss_transient_ui` reloads when the previous Create form is still open at a phase boundary;
+  - the chat field context is cleared per phase.
+- `runtime_self_heal.py`: `HIP_ROUTE_STUCK_LOADING`, and `HIP_ROUTE_NOT_COMMITTED` with a module that never rendered, → `portal_loading_stuck` (refresh, then browser restart).
+- `browser_session.py` also: the R27 route loop (`_react_ensure_target_surface`) keeps its own wait and reload, so the ladder does not run inside it; the ladder's reload opens the target when the browser bounced elsewhere, and "wait" is skipped there.
+- `doctype_kb.py`:
+  - `_await_doctype_add_form`, `_locator_present`; the Add retry re-finds + Add instead of retrying a vanished button;
+  - `_defer_row_deficit_to_goal_engine` replaces the row-count `raise`.
+- `rules_kb.py`:
+  - the conditions transaction defers to the goal engine;
+  - `_looks_like_rule_add_form` accepts "Create Rule" plus at least 3 rule sections or fields;
+  - the generic pass skips switches, checkboxes, radios and read-only fields.
+- `dummy_fill_e2e.py`:
+  - `_HOLD_POLICY`: a bounded hold when more phases remain, then the phase is deferred to the end of the mission (`phase_queue`, a fresh browser, one retry);
+  - `section_judge_gate.json` is written from the exact proof when the judges are off;
+  - with the exact input.json proof passing, the maximum-observability coverage gate becomes a warning, and a failed verification record is marked as completed on the exact proof (the final consolidation no longer fails a completed mission); `input_authority` is reset at each attempt;
+  - the deterministic script is written after each completed phase (`kind="script"` chat line).
+- `deterministic_script.py` (new): `build_script` / `render_markdown` / `write_phase_script` / `list_scripts` / `chat_line`.
+- `autonomous_form_runtime.py`: a "replaying the deterministic script" or "learning it now" chat line.
+- `agent_chat.py`:
+  - the field context is cleared after a field is done;
+  - a click without a field context keeps the session's phase;
+  - "Opened a dropdown on the form".
+- `mission_trace.py`: a clear message when every phase finished but the final check failed.
+- `backend/app.py`: `GET /api/deterministic-scripts`.
+- `webui` (both copies): the Mission tab's **Deterministic scripts** panel; the 📜 chat icon.
+- Config:
+  - `runtime_self_heal.route_recovery_enabled`, `route_recovery_step_seconds`, `handoff_restart_browser_on_stuck_route`;
+  - `human_in_the_loop.incomplete_phase_wait_seconds_when_more_phases`, `deferred_phase_retries`.
+- Tests:
+  - `tests/test_v243r38_mission_continuity.py` (16; real browser, simulator and one full mission);
+  - `test_v211_layer8_all_phase_transition_coordinator` follows the loop's new name (`phase_queue`).
+
 # V243R37 — The Control Center fits every screen (2026-10-02)
 
 - `webui/styles.css` (and `backend/webui/styles.css`), a V243R37 layer:

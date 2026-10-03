@@ -6,10 +6,11 @@ import json
 import os
 import re
 import uuid
+import time
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Mapping
+from typing import Any, Dict, List, Optional, Mapping, Tuple
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
@@ -347,6 +348,12 @@ def _hash_value(value: str | None) -> str | None:
 
 # V243R30: paths of the HIP portal itself -- never a Dell sign-in page.
 HIP_SURFACE_PATH_MARKERS = ("/hybrid-integrations/", "/securelink/")
+
+_ROUTE_MODULE_LABELS: Dict[str, str] = {
+    "datamaps": "The Data Maps page", "doctypes": "The Document Types page", "rules": "The Rules page",
+    "transportprofiles": "The Transport Profiles page", "bizflows": "The Biz Flows page",
+}
+
 
 class BrowserSession:
     """HIP browser session with dual MCP execution and evidence.
@@ -1482,6 +1489,30 @@ class BrowserSession:
             except Exception as exc:
                 audit["warnings"].append(mask_sensitive_string(f"discard confirmation cleanup failed: {exc}"))
 
+            # V243R38: prove the form really closed.  Source and Target Document
+            # Type (and Transport Profile) share one URL, so a form left open here
+            # would be "already on the right page" for the next phase, which then
+            # overwrote the previous phase's form instead of opening its own.  A
+            # reload discards the unsaved form (nothing is ever saved here).
+            try:
+                await page.wait_for_timeout(300)
+                after = (await page.locator("body").inner_text(timeout=2000)).lower()
+            except Exception:
+                after = ""
+            still_open = any(token in after for token in [
+                "create map", "create document type", "create rule", "create transport profile", "create biz flow",
+            ])
+            # Only at a real phase boundary ("target_document_type"); a self-heal
+            # reopen ("rule:self_heal") navigates to the phase link right after.
+            if still_open and ":" not in str(next_phase):
+                audit["create_surface_still_open"] = True
+                try:
+                    await page.reload(wait_until="domcontentloaded", timeout=30000)
+                    audit["reloaded_to_discard_form"] = True
+                    await page.wait_for_timeout(500)
+                except Exception as exc:
+                    audit["warnings"].append(mask_sensitive_string(f"reload to discard the previous form failed: {exc}"))
+
         try:
             safe_write_json(self.run_dir / "phase_boundary_cleanup.json", audit)
         except Exception:
@@ -1504,6 +1535,12 @@ class BrowserSession:
         self._active_phase_name = next_phase
         self._phase_transition_count += 1
         await self._ensure_active_page()
+        # V243R38: the chat's "current field" belongs to the previous phase; a
+        # Rule click was narrated as "… for Validation Type" (Target's last field).
+        try:
+            setattr(self.page, "_hip_chat_field", None)
+        except Exception:
+            pass
         await self._ensure_page_observers()
         self.register_borrowed_phase(Path(phase_run_dir), next_phase, already_bound=True)
         cfg = getattr(self.config, "browser_use", None)
@@ -2517,6 +2554,13 @@ class BrowserSession:
         if seen_login and not any(p.lower() in body for p in self.config.portal.sso_positive_texts):
             return {**details, "usable": False, "reason": "login_surface", "login_words": seen_login}
 
+        # V243R38: the portal's header and menu name every module, so their text
+        # alone proves nothing.  A visible spinner with no module content outside
+        # the app chrome is a module that is still (or forever) loading.
+        busy = await self._module_still_loading()
+        if busy.get("loading"):
+            return {**details, "usable": False, "reason": "module_loading", "loading": busy}
+
         contract = self._phase_surface_contract(target_url)
         terms = list(contract.get("expected_terms") or [])
         seen_terms = [term for term in terms if term in body]
@@ -2542,6 +2586,204 @@ class BrowserSession:
         usable = bool(ready_ok and surface_ok)
         reason = "usable" if usable else ("document_loading" if not ready_ok else "module_not_rendered")
         return {**details, "usable": usable, "reason": reason}
+
+    async def _module_still_loading(self) -> Dict[str, Any]:
+        """A visible portal spinner and no module content outside the header/menu (V243R38)."""
+        if not self.page:
+            return {"loading": False}
+        try:
+            row = await self.page.evaluate(r"""() => {
+              const visible = (el) => { if (!el || !el.getBoundingClientRect) return false; const r = el.getBoundingClientRect();
+                const s = getComputedStyle(el); return !!(r.width && r.height && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity || '1') !== 0); };
+              const chrome = (el) => !!(el.closest && el.closest('header,nav,footer,[role=navigation],[role=banner],[role=contentinfo]'));
+              const busyHost = '[aria-busy="true"],[role=progressbar],app-loadingindicator,.dds__loading-indicator,.dds__loading-indicator__overlay';
+              const loaders = Array.from(document.querySelectorAll(busyHost + ',.spinner,.loading-spinner,mat-spinner,mat-progress-spinner'))
+                .filter((el) => visible(el) && !chrome(el));
+              const content = Array.from(document.querySelectorAll(
+                'input:not([type=hidden]),select,textarea,button,[role=combobox],[role=button],[role=row],[role=table],table,dds-table,dds-dropdown'))
+                .filter((el) => visible(el) && !chrome(el) && !el.closest(busyHost));
+              return {loading: loaders.length > 0 && content.length < 2, loaders: loaders.length, content: content.length};
+            }""")
+        except Exception:
+            return {"loading": False}
+        return row if isinstance(row, dict) else {"loading": False}
+
+    # ---- V243R38 route recovery ladder ---------------------------------------------
+    ROUTE_RECOVERY_STEPS: Tuple[str, ...] = ("wait", "reload", "portal_menu", "fresh_document")
+    ROUTE_RECOVERY_TEXT: Dict[str, str] = {
+        "wait": "waiting a little longer for it",
+        "reload": "reloading the page",
+        "portal_menu": "opening it from the portal menu",
+        "fresh_document": "loading it in a fresh document (session storage cleared)",
+    }
+
+    def _route_recovery_path(self) -> Path:
+        return Path(getattr(self.config.reporting, "memory_dir", "./data/hip_memory")) / "route_recovery_ladder.json"
+
+    def _route_recovery_memory(self) -> Dict[str, Any]:
+        try:
+            data = json.loads(self._route_recovery_path().read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("modules"), dict):
+                return data
+        except Exception:
+            pass
+        return {"schema_version": "hip.route-recovery-ladder.v1", "modules": {}}
+
+    def _route_recovery_order(self, module: str, memory: Dict[str, Any]) -> List[str]:
+        """Learned order: the step that resolved this module most often goes first."""
+        rows = ((memory.get("modules") or {}).get(module) or {}) if isinstance(memory, dict) else {}
+        default = list(self.ROUTE_RECOVERY_STEPS)
+
+        def score(step: str) -> Tuple[float, int]:
+            row = rows.get(step) if isinstance(rows.get(step), dict) else {}
+            tried, resolved = int(row.get("tried") or 0), int(row.get("resolved") or 0)
+            # Unknown steps keep their place; a step that never helped (tried >= 2) goes last.
+            rate = (resolved / tried) if tried else 0.5
+            if tried >= 2 and not resolved:
+                rate = -1.0
+            return (-rate, default.index(step))
+
+        return sorted(default, key=score)
+
+    def _record_route_recovery(self, memory: Dict[str, Any], module: str, step: str, resolved: bool) -> None:
+        row = memory.setdefault("modules", {}).setdefault(module, {}).setdefault(step, {"tried": 0, "resolved": 0})
+        row["tried"] = int(row.get("tried") or 0) + 1
+        row["resolved"] = int(row.get("resolved") or 0) + (1 if resolved else 0)
+        row["last"] = "resolved" if resolved else "not_resolved"
+        row["at"] = utc_now()
+        memory["updated_at"] = utc_now()
+        try:
+            safe_write_json(self._route_recovery_path(), memory, mask=False)
+        except Exception:
+            pass
+
+    def _route_recovery_heartbeat(self, step: str, n: int) -> None:
+        """Tell the phase watchdog the agent is recovering, not stuck (each step is new work)."""
+        try:
+            setattr(self.page, "_hip_executor_progress", {"token": f"route_recovery:{step}:{n}:{time.monotonic():.0f}"})
+        except Exception:
+            pass
+
+    async def _route_recovery_step(self, step: str, url: str) -> None:
+        page = self.page
+        if page is None:
+            raise RuntimeError("no page")
+        if step == "wait":
+            return
+        if step == "reload":
+            if self._same_target_path(url, str(page.url or "")):
+                await page.reload(wait_until="domcontentloaded", timeout=30000)
+            else:
+                # Bounced elsewhere (the portal home): reloading that page helps nothing.
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            return
+        if step == "portal_menu":
+            # In-app navigation: the module link in the portal's own menu routes
+            # inside the single-page app instead of reloading every bundle.
+            target_path = (urlparse(url).path or "").rstrip("/").lower()
+            clicked = await page.evaluate(r"""(path) => {
+              const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+              const links = Array.from(document.querySelectorAll('a[href]')).filter(visible);
+              const hit = links.find((a) => { try { return new URL(a.href, location.href).pathname.replace(/\/+$/, '').toLowerCase() === path; }
+                catch (e) { return false; } });
+              if (!hit) return false;
+              hit.click();
+              return true;
+            }""", target_path)
+            if not clicked:
+                # No menu link on this page: go through the portal home, then the menu.
+                parsed = urlparse(url)
+                await page.goto(f"{parsed.scheme}://{parsed.netloc}/hybrid-integrations", wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(1500)
+                if not await page.evaluate(r"""(path) => {
+                  const hit = Array.from(document.querySelectorAll('a[href]')).find((a) => {
+                    try { return new URL(a.href, location.href).pathname.replace(/\/+$/, '').toLowerCase() === path; } catch (e) { return false; } });
+                  if (!hit) return false; hit.click(); return true; }""", target_path):
+                    raise RuntimeError("the portal menu has no link to this module")
+            return
+        if step == "fresh_document":
+            try:
+                await page.evaluate("() => { try { sessionStorage.clear(); } catch (e) {} }")
+            except Exception:
+                pass
+            await page.goto("about:blank", wait_until="commit", timeout=15000)
+            await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            return
+        raise ValueError(step)
+
+    async def _route_recovery_ladder(self, url: str, errors: List[str]) -> bool:
+        """Bring a module that does not load back in place; learned per module (V243R38).
+
+        Every step keeps the same tab, browser and SSO session (the caller's page
+        object stays valid).  Returns True when the module (or the Dell SSO page)
+        became usable.  Browser restarts are left to the handoff and the mission
+        self-heal ladder, which own the page lifecycle.
+        """
+        cfg = getattr(self.config, "runtime_self_heal", None)
+        if not bool(getattr(cfg, "route_recovery_enabled", True)) or self.page is None:
+            return False
+        if int(getattr(self, "_react_route_depth", 0) or 0) > 0:
+            return False  # the R27 route loop waits and reloads itself
+        step_seconds = float(getattr(cfg, "route_recovery_step_seconds", 25.0) or 25.0)
+        contract = self._phase_surface_contract(url)
+        module = str(contract.get("module_key") or "generic")
+        label = _ROUTE_MODULE_LABELS.get(module, "The requested page")
+        memory = self._route_recovery_memory()
+        order = self._route_recovery_order(module, memory)
+        try:
+            why = (await self._navigation_usability(url)).get("reason") or "not usable"
+        except Exception:
+            why = "not usable"
+        audit: Dict[str, Any] = {"schema_version": "hip.route-recovery.v1", "url": self._evidence_url(url), "module": module,
+                                 "reason": why, "order": order, "steps": [], "errors_before": [mask_sensitive_string(e)[:300] for e in errors[-5:]]}
+        from . import agent_chat
+
+        phase = self._trace_phase_override or self._active_phase_name or ""
+        agent_chat.say(f"⏳ {label} did not load ({why.replace('_', ' ')}); recovering it step by step: "
+                       + ", ".join(self.ROUTE_RECOVERY_TEXT[x].split(" (")[0] for x in order),
+                       kind="heal", phase=phase)
+        resolved_by = ""
+        for n, step in enumerate(order, 1):
+            if step == "wait" and not self._same_target_path(url, str(self.page.url if self.page else "")):
+                # Bounced to another page: waiting there cannot bring the module.
+                audit["steps"].append({"step": step, "state": "skipped_not_on_target"})
+                continue
+            self._route_recovery_heartbeat(step, n)
+            if n > 1:
+                agent_chat.say(f"↻ {label} still not usable — {self.ROUTE_RECOVERY_TEXT[step]}", kind="heal", phase=phase)
+            row: Dict[str, Any] = {"step": step, "started_at": utc_now()}
+            try:
+                await self._route_recovery_step(step, url)
+            except Exception as exc:
+                row["error"] = mask_sensitive_string(str(exc))[:300]
+            self._route_recovery_heartbeat(step, n)
+            state = await self._wait_for_navigation_acceptance(url, timeout_seconds=step_seconds)
+            row["state"] = state or "not_usable"
+            if not state:
+                try:
+                    row["usability"] = mask_sensitive_data(await self._navigation_usability(url))
+                except Exception:
+                    pass
+            ok = bool(state)
+            self._record_route_recovery(memory, module, step, ok)
+            audit["steps"].append(row)
+            if ok:
+                resolved_by = step
+                break
+        audit["resolved_by"] = resolved_by
+        audit["pass"] = bool(resolved_by)
+        try:
+            safe_write_json(self.run_dir / "mcp_runtime" / "route_recovery.json", audit)
+        except Exception:
+            pass
+        if resolved_by:
+            agent_chat.say(f"✓ {label} loaded after {self.ROUTE_RECOVERY_TEXT[resolved_by].split(' (')[0]}; continuing",
+                           kind="heal", phase=phase)
+        else:
+            agent_chat.say(f"⛔ {label} still does not load after waiting, reloading, the portal menu and a fresh document; "
+                           "next: closing and reopening the browser (same profile, so the sign-in is kept)",
+                           kind="heal", phase=phase)
+        return bool(resolved_by)
 
     @staticmethod
     def is_executor_transport_disconnect(message: str) -> bool:
@@ -3020,6 +3262,15 @@ class BrowserSession:
 
     async def _react_ensure_target_surface(self, target_url: str, *, max_steps: int = 4) -> Dict[str, Any]:
         """Plan → Act → Observe → Judge until the requested HIP route is ready."""
+        # V243R38: this loop owns its render wait and its one reload, so navigate()
+        # called from inside it gives up quickly instead of running its own ladder.
+        self._react_route_depth = int(getattr(self, "_react_route_depth", 0) or 0) + 1
+        try:
+            return await self._react_ensure_target_surface_inner(target_url, max_steps=max_steps)
+        finally:
+            self._react_route_depth = max(0, int(getattr(self, "_react_route_depth", 1) or 1) - 1)
+
+    async def _react_ensure_target_surface_inner(self, target_url: str, *, max_steps: int = 4) -> Dict[str, Any]:
         trace: Dict[str, Any] = {
             "schema_version": "hip.navigation-react.v1",
             "phase": self._active_phase_name,
@@ -3427,7 +3678,24 @@ class BrowserSession:
             # destination phase even though the borrowed evidence directory is
             # not rebound until prepare_borrowed_phase().
             self._trace_phase_override = str(to_phase or "")
-            await self.navigate(to_url)
+            try:
+                await self.navigate(to_url)
+            except Exception as nav_exc:
+                # V243R38: between phases no form flow holds the page, so a module
+                # that stays stuck after the in-place ladder gets a fresh browser
+                # (same profile: the Dell sign-in is kept) before the handoff fails.
+                cfg = getattr(self.config, "runtime_self_heal", None)
+                if "HIP_ROUTE_STUCK_LOADING" not in str(nav_exc) or not bool(
+                        getattr(cfg, "handoff_restart_browser_on_stuck_route", True)):
+                    raise
+                from . import agent_chat
+
+                agent_chat.say("↻ Closing and reopening the browser (same profile, sign-in kept), then opening "
+                               f"{_ROUTE_MODULE_LABELS.get(str(self._phase_surface_contract(to_url).get('module_key')), 'the next page').lower()}",
+                               kind="heal", phase=str(to_phase or ""))
+                result["browser_restart"] = mask_sensitive_data(await self.restart(reason=f"handoff {from_phase} -> {to_phase}: route stuck loading"))
+                result["browser_switched"] = False
+                await self.goto_base_and_complete_sso(to_url)
             if not await self._navigation_page_is_usable(to_url):
                 # navigate() may legitimately stop on Dell SSO. Handoff is stricter:
                 # it returns only after the requested authenticated module is usable.
@@ -3547,7 +3815,9 @@ class BrowserSession:
                 if state and await self._finish_accepted_navigation(ev, url, note="target URL committed; duplicate fallback navigation suppressed"):
                     return
                 errors.append("target URL committed but Angular target surface did not become usable")
-                raise TimeoutError("Navigation reached the requested URL but the target Angular surface did not become usable; duplicate goto suppressed")
+                if await self._route_recovery_ladder(url, errors) and await self._finish_accepted_navigation(ev, url, note="route recovery ladder"):
+                    return
+                raise TimeoutError("HIP_ROUTE_STUCK_LOADING: Navigation reached the requested URL but the target Angular surface did not become usable after the recovery ladder; duplicate goto suppressed")
 
             # Direct Playwright is the bounded fallback for corporate SSO/network
             # edge cases. ERR_ABORTED is common when Dell replaces the document with
@@ -3589,7 +3859,9 @@ class BrowserSession:
                 if await self._finish_accepted_navigation(ev, url, note="location.assign exception tolerated because target page is usable after redirect"):
                     return
 
-            raise TimeoutError("Navigation failed after retries: " + " | ".join(errors[-5:]))
+            if await self._route_recovery_ladder(url, errors) and await self._finish_accepted_navigation(ev, url, note="route recovery ladder"):
+                return
+            raise TimeoutError("HIP_ROUTE_STUCK_LOADING: Navigation failed after retries and the recovery ladder: " + " | ".join(errors[-5:]))
         except Exception as exc:
             await self._finish_action(ev, False, str(exc), screenshot_after=True)
             raise
@@ -4520,9 +4792,17 @@ class BrowserSession:
         semantic_target = ""
         try:
             if self.page and selector:
-                semantic_target = await self.page.locator(selector).first.evaluate(
-                    r"""el => [el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')||el.getAttribute('name')||'', el.getAttribute('role')||'', el.getAttribute('aria-label')||'', (el.tagName||'').toLowerCase()].join('|')"""
-                )
+                # V243R38: never wait for the element.  A click that opens a form
+                # (+ Add) or a selector hint that is a label ("Add Document Type")
+                # leaves nothing to match; waiting for it held every such click for
+                # the 45 s page timeout, and the no-progress watchdog then cancelled
+                # the attempt and reopened the form -- over and over.
+                target = self.page.locator(selector).first
+                if await target.count():
+                    semantic_target = await target.evaluate(
+                        r"""el => [el.getAttribute('formcontrolname')||el.getAttribute('ng-reflect-name')||el.getAttribute('name')||'', el.getAttribute('role')||'', el.getAttribute('aria-label')||'', (el.tagName||'').toLowerCase()].join('|')""",
+                        timeout=1500,
+                    )
         except Exception:
             semantic_target = selector
         try:
