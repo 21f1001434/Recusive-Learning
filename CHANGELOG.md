@@ -64,7 +64,7 @@
     - BizFlow template picker;
     - live wizard;
     - every module's listing from `phase_listing_support` / `doctypes_listing_support`, with records, edit / clone pages and the deploy / migrate / save APIs.
-  - `tests/test_v243r39_bizflow_wizard_and_operations.py` (17).
+  - `tests/test_v243r39_bizflow_wizard_and_operations.py` (16).
 
 # V243R38 — Whole missions keep going, and say what they learned (2026-10-03)
 

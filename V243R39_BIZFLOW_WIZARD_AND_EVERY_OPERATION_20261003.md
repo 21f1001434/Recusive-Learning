@@ -123,7 +123,7 @@ operation_learning:
 
 ## 7. Tests
 
-`tests/test_v243r39_bizflow_wizard_and_operations.py` (17), real Chromium:
+`tests/test_v243r39_bizflow_wizard_and_operations.py` (16), real Chromium:
 
 * the copy's + Add shows the template card, its link opens the wizard, tabs ahead are locked;
 * the agent follows the template **link** and remembers it;
