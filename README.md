@@ -35,6 +35,7 @@
   - Create is the phase's deterministic script.
 
   Each learned operation gets its own script (`deterministic_scripts/<phase>__<operation>.md`). The Mission tab's new **Operations each phase knows** panel (and `GET /api/operation-matrix`) shows the phase × operation table.
+- **The whole mission:** one mission over all seven phases on the local portal copy completed every phase in 42 minutes, BizFlow included. It then learned 25 operation sections with zero write requests, giving 32/35 known (the 3 open cells are guarded Deploy buttons that need the mutation gate). The last blocker was the final check treating a Transport Profile verified "pass with warnings" as failed; it is now a pass.
 - **The local portal copy** (`tests/hip_portal_sim.py`):
   - now serves every module's listing with expandable rows and Edit / Clone / Migrate / Deploy;
   - BizFlow has the template picker and the locked-tab wizard (Next checks required fields; Reset and Submit are traps).

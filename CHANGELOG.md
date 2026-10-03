@@ -19,6 +19,10 @@
     - a refused Next is repaired once from input.json, then raises;
     - `legacy_fill`: with the goal engine on, the legacy dummy pass, the row helpers and dropdown opening are skipped, and repairs go to the goal engine;
     - stateful controls are filtered too ("Items per page").
+- `final_mission.py`: the consolidation accepts a phase verified `pass_with_warnings` (as the section judge and the mission trace do); `failed` still blocks.
+- `deterministic_script.py`: `_pick_skill` joins a wizard phase's per-tab skills (certified only when every tab's is); `_list_name` / `_add_label_for` name each list and its own "+".
+- `phase_navigation.is_commit`: a row's own "Create Condition" / "Remove" is not a commit.
+- `operation_learning`: a fresh listing document before each phase (the unsaved Create form is discarded); `_FIRST_ROW_JS` skips "No data to display".
 - `phase_navigation.py` (new): `record`, `load`, `summaries`, `script_steps`, `is_commit` → `<memory>/phase_navigation/<phase>.json`.
 - `deterministic_script.py`: `build_script(navigation=...)` adds:
   - the entry clicks;
@@ -60,7 +64,7 @@
     - BizFlow template picker;
     - live wizard;
     - every module's listing from `phase_listing_support` / `doctypes_listing_support`, with records, edit / clone pages and the deploy / migrate / save APIs.
-  - `tests/test_v243r39_bizflow_wizard_and_operations.py` (14).
+  - `tests/test_v243r39_bizflow_wizard_and_operations.py` (17).
 
 # V243R38 — Whole missions keep going, and say what they learned (2026-10-03)
 

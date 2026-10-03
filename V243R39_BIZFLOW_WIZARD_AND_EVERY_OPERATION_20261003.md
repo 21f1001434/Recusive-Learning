@@ -90,7 +90,25 @@ Measured on the copy (read-only; the server received **no** write request in any
 
 Without the gate, a guarded Deploy is reported as "⏸ … a guarded action that may act at once … learned by the first authorized deploy" — never clicked.
 
-## 5. Configuration
+## 5. The whole mission: all seven sections, then every operation
+
+One real mission over all seven phases on the portal copy (judges off, no models here), followed by the end-of-mission operation learning:
+
+| Phase | Done at (min) |
+|---|---|
+| Data Map | 0.7 |
+| Source Document Type | 6 |
+| Target Document Type | 12.7 |
+| Rule | 16.8 |
+| Source Transport Profile | 20 |
+| Target Transport Profile | 23.3 |
+| BizFlow (+ Add → template link → 4 wizard tabs with Next → routing drawer) | 42.5 |
+
+Terminal gate: every phase PASS. Operation learning (13 min): 25 sections learned, **0 write requests**; operations known **32/35** — the 3 open cells are the guarded Deploy buttons of Data Map and the two Transport Profiles, which are opened only with the mutation gate (with the gate, a separate run learned them: the Data Map confirmation and the Transport Profile dialog, never confirmed, still 0 write requests).
+
+That run also showed the last blocker of a whole mission: the final consolidation counted a phase verified `pass_with_warnings` as failed. The Transport Profiles' only warning is about learning evidence ("Many dropdown controls have no captured/enriched options") on forms proven exact; the section judge and the mission trace already treat it as a pass, and now the consolidation does too (a `failed` verification still blocks). Re-evaluated on that run's own artifacts: **application complete**.
+
+## 6. Configuration
 
 ```yaml
 operation_learning:
@@ -103,9 +121,9 @@ operation_learning:
 
 `FullDummyFillOptions.learn_operations` (None = the config decides). No other setting changed.
 
-## 6. Tests
+## 7. Tests
 
-`tests/test_v243r39_bizflow_wizard_and_operations.py` (14), real Chromium:
+`tests/test_v243r39_bizflow_wizard_and_operations.py` (17), real Chromium:
 
 * the copy's + Add shows the template card, its link opens the wizard, tabs ahead are locked;
 * the agent follows the template **link** and remembers it;
@@ -118,5 +136,7 @@ operation_learning:
 * `GET /api/operation-matrix`; the Control Center panel; config and mission wiring; the chat field context;
 * a real BrowserSession learns BizFlow and Source Document Type Edit / Clone / Migrate / Deploy on the copy with **zero** write requests (Document Type on an existing row).
 * the wizard memory counts only values read on their own tab (the routing Target / Target Transport Profile case).
+* a wizard phase's script joins every tab's skill; a row's own "Create Condition" / "Remove" is not a commit;
+* the final consolidation accepts `pass_with_warnings` and still blocks `failed`.
 
 The R38 mission test keeps `learn_operations=False` (it covers the Data Map mission only).

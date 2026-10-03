@@ -106,7 +106,10 @@ class FinalMissionConsolidator:
             runtime_status = "not_supplied"
             if isinstance(runtime_verification, Mapping):
                 runtime_status = str(runtime_verification.get("status") or "").lower()
-                runtime_ok = runtime_status in {"pass", "passed", "complete", "completed", "resumed"}
+                # V243R39: "pass_with_warnings" is a pass (as for the section judge and the
+                # mission trace): its warnings are about learning evidence, e.g. "Many dropdown
+                # controls have no captured/enriched options" on a form proven exact.
+                runtime_ok = runtime_status in {"pass", "passed", "pass_with_warnings", "complete", "completed", "resumed"}
                 if "pass" in runtime_verification:
                     runtime_ok = runtime_ok and bool(runtime_verification.get("pass"))
             assurance_pass = bool(isinstance(assurance, Mapping) and assurance.get("pass") is True)

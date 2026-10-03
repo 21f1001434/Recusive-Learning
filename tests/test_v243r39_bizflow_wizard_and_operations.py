@@ -411,3 +411,34 @@ def test_a_wizard_phase_script_joins_every_tab_skill_and_row_tools_are_not_commi
     assert _pick_skill(data)["status"] == "certified" and _pick_skill(data)["stats"]["replays"] == 1
     assert is_commit("Submit") and is_commit("Save") and is_commit("Delete") and is_commit("Create")
     assert not is_commit("Create Condition") and not is_commit("Remove") and not is_commit("+ Add")
+
+
+def test_final_consolidation_accepts_a_phase_verified_with_learning_warnings(tmp_path: Path):
+    """All seven phases complete and exact, Transport Profiles verified "pass_with_warnings"
+    ("Many dropdown controls have no captured/enriched options"): the mission is complete."""
+    from hip_id_agent.final_mission import FinalMissionConsolidator
+    from hip_id_agent.final_mission_uat import PHASES
+    from hip_id_agent.mission_controller import MissionController
+    from hip_id_agent.safe_io import safe_write_json
+
+    mission = MissionController(tmp_path, run_id="T", phases=PHASES, mode="bounded_self_heal")
+    rows = []
+    for phase in PHASES:
+        d = tmp_path / phase
+        d.mkdir(parents=True, exist_ok=True)
+        status = "pass_with_warnings" if phase.endswith("transport_profile") else "pass"
+        v = {"phase": phase, "status": status, "warnings": ["Many dropdown controls have no captured/enriched options."]}
+        safe_write_json(d / "phase_verification.json", v, mask=False)
+        safe_write_json(d / "phase_exact_state_lock.json", {"exact_completion_checkpoint": {"pass": True}}, mask=False)
+        safe_write_json(d / "section_judge_gate.json", {"pass": True}, mask=False)
+        mission.mark_phase_complete(phase, attempt=1, judge_pass=True)
+        rows.append(v)
+    result = FinalMissionConsolidator(tmp_path, run_id="T", phases=PHASES, mode="bounded_self_heal").evaluate(
+        mission=mission, terminal_gate={"pass": True}, phase_verifications=rows,
+        witness_report={"status": "disabled", "pass": True}, transition_state={"pending": None})
+    assert result["pass"] is True and result["application_complete"] is True
+    failed = [dict(rows[0], status="failed")] + rows[1:]
+    result = FinalMissionConsolidator(tmp_path, run_id="T", phases=PHASES, mode="bounded_self_heal").evaluate(
+        mission=mission, terminal_gate={"pass": True}, phase_verifications=failed,
+        witness_report={"status": "disabled", "pass": True}, transition_state={"pending": None})
+    assert result["pass"] is False                                             # a failed verification still blocks
