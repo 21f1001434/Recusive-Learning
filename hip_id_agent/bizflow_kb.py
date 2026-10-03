@@ -8,7 +8,7 @@ import re
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse, quote
 
 from playwright.async_api import Locator, Page
@@ -1608,20 +1608,26 @@ async def _click_bizflow_template_link_after_add(page: Page) -> Dict[str, Any]:
       if(/^(inbound|outbound)$/i.test(label)) continue;
       if(/overflow|more actions|ellipsis|kebab/i.test(low)) continue;
       if(/delete|remove|deploy|save|submit/i.test(low)) continue;
+      if(/^(‹\s*|<\s*)?back$|view template|learn more/i.test(label)) continue;
       let score=0;
       if(/^create\s+biz\s+flow$/i.test(label)) score+=30;
       if(/use template|select template|start|open|continue|create biz flow/i.test(label)) score+=20;
       if(/B2B-Flow-PubSub-Template/i.test(label)) score+=18;
       const href=el.getAttribute('href')||'';
-      if(href){
+      // V243R39: an in-page link (javascript:void(0), #..., no href) is the SPA's
+      // own link; a real href must stay on this module (same path or below it).
+      const inPage = !href || /^\s*(javascript:|#)/i.test(href);
+      if(href && !inPage){
         try {
           const target=new URL(href, window.location.href);
-          const norm=p=>(p||'/').replace(/\/+$/,'')||'/';
-          if(target.origin!==window.location.origin || norm(target.pathname).toLowerCase()!==norm(window.location.pathname).toLowerCase()) continue;
+          const norm=p=>((p||'/').replace(/\/+$/,'')||'/').toLowerCase();
+          const here=norm(window.location.pathname), there=norm(target.pathname);
+          if(target.origin!==window.location.origin || !(there===here || there.startsWith(here+'/'))) continue;
         } catch(_) { continue; }
       }
       if(el.tagName.toLowerCase()==='a' || el.getAttribute('role')==='link') score+=8;
-      if(href) score+=5;
+      if(href && !inPage) score+=5;
+      if(el.closest('[role=menu]') && !visible(el.closest('[role=menu]'))) continue;
       if(score>0) scored.push({selector:path(el),label,score,tag:el.tagName.toLowerCase(),href});
     }
     scored.sort((a,b)=>b.score-a.score);
@@ -1645,6 +1651,10 @@ async def _click_bizflow_template_link_after_add(page: Page) -> Dict[str, Any]:
                 await page.wait_for_timeout(3200)
                 if await _is_bizflow_form_surface(page):
                     audit["direct_link_form_verified"] = True
+                    try:
+                        page._hip_bizflow_template_entry = dict(audit)
+                    except Exception:
+                        pass
                     return audit
                 audit["direct_link_form_verified"] = False
                 # If the direct link changed the template surface but did not yet
@@ -1750,6 +1760,10 @@ async def _click_bizflow_template_link_after_add(page: Page) -> Dict[str, Any]:
             audit.update({"clicked": True, "label": menu_cand.get("label", "Create Biz Flow"), "menu_selector": menu_cand.get("selector", ""), "method": menu_cand.get("method", "visible_action_menu_item")})
             await page.wait_for_timeout(3500)
             if await _is_bizflow_form_surface(page):
+                try:
+                    page._hip_bizflow_template_entry = dict(audit)
+                except Exception:
+                    pass
                 return audit
             audit["clicked_but_form_not_visible"] = True
             return audit
@@ -1851,12 +1865,129 @@ def _bizflow_tab_matches(requested: str, actual: str) -> bool:
     return any(re.sub(r"\s+", " ", str(a).lower()).strip() in low or low in re.sub(r"\s+", " ", str(a).lower()).strip() for a in aliases if str(a).strip())
 
 
-async def _ensure_bizflow_tab_open(page: Page, tab_label: str, *, max_steps: int = 3) -> Dict[str, Any]:
-    """Bounded ReAct tab transition: observe -> click -> prove -> reobserve.
+_WIZARD_STATE_JS = r"""
+() => {
+  function visible(el){const r=el&&el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0}; const s=el?getComputedStyle(el):null; return !!(r.width&&r.height&&s&&s.display!=='none'&&s.visibility!=='hidden');}
+  function clean(s){return String(s||'').replace(/\s+/g,' ').trim();}
+  const list = Array.from(document.querySelectorAll('[role=tablist]')).find(l => visible(l) && /flow details|configure source|configure target|configure routing|basic details/i.test(clean(l.innerText||'')));
+  if(!list) return {found:false, tabs:[]};
+  const tabs = Array.from(list.querySelectorAll('[role=tab],.dds__tabs__tab')).filter(visible).map((t, i) => ({
+    index:i, text:clean(t.innerText||t.textContent||t.getAttribute('aria-label')||''),
+    selected: t.getAttribute('aria-selected')==='true' || /--active|\bactive\b/.test(String(t.className||'')),
+    locked: t.getAttribute('aria-disabled')==='true' || t.disabled===true || t.hasAttribute('disabled'),
+  }));
+  const form = list.closest('form,main,[role=main],.dds__container') || document.body;
+  const alerts = Array.from(form.querySelectorAll('[role=alert],.dds__notification--error,.dds__error-text,.dds__invalid-feedback'))
+    .filter(visible).map(a => clean(a.innerText||a.textContent||'')).filter(Boolean).slice(0, 6);
+  const invalid = Array.from(form.querySelectorAll('[aria-invalid=true]')).filter(visible).map(c => {
+    const id = c.id; const l = id ? document.querySelector(`label[for="${CSS.escape(id)}"]`) : null;
+    return clean((l && l.textContent) || c.getAttribute('aria-label') || c.getAttribute('placeholder') || c.getAttribute('formcontrolname') || '');
+  }).filter(Boolean).slice(0, 20);
+  return {found:true, tabs, current:(tabs.find(t => t.selected)||{}).text||'', alerts, invalid};
+}
+"""
 
-    A failed tab click must never be followed by filling controls from the prior
-    tab.  The semantic click path already uses AutoWebGLM + Playwright MCP and
-    evidence fusion; this wrapper adds effect proof and bounded autonomous retry.
+# The wizard's own bottom bar button -- never a pager's Next/Previous, a tab
+# header, a drawer's buttons or anything outside the Create Biz Flow form.
+_WIZARD_BUTTON_JS = r"""
+({want, token}) => {
+  function visible(el){const r=el&&el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0}; const s=el?getComputedStyle(el):null; return !!(r.width&&r.height&&s&&s.display!=='none'&&s.visibility!=='hidden');}
+  function clean(s){return String(s||'').replace(/\s+/g,' ').trim();}
+  document.querySelectorAll('[data-hip-wizard]').forEach(e => e.removeAttribute('data-hip-wizard'));
+  const list = Array.from(document.querySelectorAll('[role=tablist]')).find(l => visible(l) && /flow details|configure source|configure target|configure routing|basic details/i.test(clean(l.innerText||'')));
+  const root = (list && list.closest('form,main,[role=main],.dds__container')) || document.body;
+  const rx = want === 'previous' ? /^(‹\s*|<\s*)?(previous|back to previous)\s*(›)?$/i : /^(next|continue|proceed)\s*(›|>|→)?$/i;
+  const panel = Array.from(root.querySelectorAll('[role=tabpanel]')).find(visible);
+  const panelTop = panel ? panel.getBoundingClientRect().top : 0;
+  const cands = [];
+  for (const el of Array.from(root.querySelectorAll('button,[role=button],a,dds-button'))) {
+    if (!visible(el)) continue;
+    if (el.closest('.dds__pagination,dds-pagination,[class*=pagination],[role=tablist],.dds__drawer,dds-drawer,[role=dialog],.dds__dropdown,dds-dropdown,table,[role=table]')) continue;
+    const label = clean(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')||'');
+    if (!rx.test(label)) continue;
+    const r = el.getBoundingClientRect();
+    const disabled = el.disabled === true || el.getAttribute('aria-disabled') === 'true';
+    let score = 10 + (r.top >= panelTop ? 5 : 0) + (el.closest('.wizard-actions,.actions,.dds__button-group,footer') ? 5 : 0) - (disabled ? 20 : 0);
+    cands.push({el, label, disabled, score, top: r.top});
+  }
+  cands.sort((a, b) => (b.score - a.score) || (b.top - a.top));
+  const hit = cands[0];
+  if (!hit) return {found:false};
+  hit.el.setAttribute('data-hip-wizard', token);
+  return {found:true, label:hit.label, disabled:hit.disabled, selector:`[data-hip-wizard="${token}"]`, candidates:cands.length};
+}
+"""
+
+
+async def _bizflow_wizard_state(page: Page) -> Dict[str, Any]:
+    try:
+        state = await page.evaluate(_WIZARD_STATE_JS)
+        return state if isinstance(state, dict) else {"found": False, "tabs": []}
+    except Exception as exc:
+        return {"found": False, "tabs": [], "error": mask_sensitive_string(str(exc))[:300]}
+
+
+def _bizflow_tab_index(state: Mapping[str, Any], tab_label: str) -> int:
+    for tab in state.get("tabs") or []:
+        if _bizflow_tab_matches(tab_label, str(tab.get("text") or "")):
+            return int(tab.get("index") or 0)
+    return -1
+
+
+async def _click_bizflow_wizard_button(page: Page, want: str) -> Dict[str, Any]:
+    """Click the wizard's own Next / Previous and report where the wizard went (V243R39).
+
+    The live Create Biz Flow is a wizard: a tab ahead of the one reached is locked
+    and only Next -- once the tab's required fields are filled -- moves forward.
+    A Next the portal refused leaves the tab where it was and names the missing
+    fields; that is reported, never retried blindly.
+    """
+    import uuid as _uuid
+
+    before = await _bizflow_wizard_state(page)
+    token = _uuid.uuid4().hex[:10]
+    audit: Dict[str, Any] = {"attempted": True, "want": want, "clicked": False, "from": before.get("current", "")}
+    try:
+        hit = await page.evaluate(_WIZARD_BUTTON_JS, {"want": want, "token": token})
+    except Exception as exc:
+        hit = {"found": False, "error": mask_sensitive_string(str(exc))[:300]}
+    audit["button"] = {k: hit.get(k) for k in ("found", "label", "disabled", "candidates")}
+    if not hit.get("found"):
+        audit["reason"] = f"the wizard shows no {want.title()} button here"
+        return audit
+    if hit.get("disabled"):
+        audit["reason"] = f"{hit.get('label')} is disabled"
+        return audit
+    label = str(hit.get("label") or want.title())
+    try:
+        clicked = await _governed_bizflow_click(page, selector=str(hit["selector"]), action_label=f"BizFlow wizard {label}",
+                                                timeout=1500, mutation_risk=False, structural_opener=True)
+    except Exception as exc:
+        # The governed click proves an effect; a refused Next shows its effect as
+        # a message, which the state read below reports either way.
+        clicked = True
+        audit["click_note"] = mask_sensitive_string(str(exc))[:300]
+    audit["clicked"] = bool(clicked)
+    after = before
+    for _ in range(12):
+        await page.wait_for_timeout(250)
+        after = await _bizflow_wizard_state(page)
+        if after.get("current") != before.get("current") or after.get("alerts"):
+            break
+    audit.update({"label": label, "to": after.get("current", ""), "advanced": bool(after.get("current")) and after.get("current") != before.get("current"),
+                  "alerts": after.get("alerts") or [], "missing_fields": after.get("invalid") or []})
+    audit["blocked"] = bool(not audit["advanced"] and (audit["alerts"] or audit["missing_fields"]))
+    return audit
+
+
+async def _ensure_bizflow_tab_open(page: Page, tab_label: str, *, max_steps: int = 3) -> Dict[str, Any]:
+    """Bounded ReAct tab transition: observe -> act -> prove -> reobserve.
+
+    V243R39: the live Create Biz Flow is a wizard -- tabs ahead of the one
+    reached are locked, so the wizard is moved with its own Next / Previous
+    (as a person does); a reachable tab may still be opened from its header.
+    A failed tab move must never be followed by filling controls from the
+    prior tab.
     """
     audit: Dict[str, Any] = {"tab": tab_label, "pass": False, "steps": []}
     current = await _current_bizflow_tab(page)
@@ -1865,8 +1996,39 @@ async def _ensure_bizflow_tab_open(page: Page, tab_label: str, *, max_steps: int
         return audit
     backend = getattr(page, "_hip_playwright_mcp_backend", None)
     for step_no in range(1, max(1, int(max_steps)) + 1):
-        before = await _current_bizflow_tab(page)
-        step: Dict[str, Any] = {"step": step_no, "observe": {"active_tab": before}, "plan": "open_requested_tab"}
+        state = await _bizflow_wizard_state(page)
+        before = str(state.get("current") or await _current_bizflow_tab(page))
+        want_index = _bizflow_tab_index(state, tab_label)
+        cur_index = _bizflow_tab_index(state, before) if before else -1
+        locked = bool(want_index >= 0 and (state.get("tabs") or [])[want_index].get("locked"))
+        step: Dict[str, Any] = {"step": step_no, "observe": {"active_tab": before, "requested_index": want_index,
+                                                             "active_index": cur_index, "requested_locked": locked}}
+        if locked and want_index > cur_index >= 0:
+            # Wizard: walk forward with Next, one tab at a time, proving each move.
+            step["plan"] = "wizard_next"
+            moves: List[Dict[str, Any]] = []
+            for _ in range(want_index - cur_index):
+                move = await _click_bizflow_wizard_button(page, "next")
+                moves.append(move)
+                if not move.get("advanced"):
+                    break
+            step["action"] = mask_sensitive_data({"wizard_moves": moves})
+            after = await _current_bizflow_tab(page)
+            step["effect"] = {"active_tab": after, "verified": _bizflow_tab_matches(tab_label, after)}
+            audit["steps"].append(step)
+            if step["effect"]["verified"]:
+                audit.update({"pass": True, "status": "verified", "method": "wizard_next", "active_tab": after, "attempts": step_no})
+                return audit
+            last = moves[-1] if moves else {}
+            if last.get("blocked"):
+                audit.update({"status": "blocked", "error_code": "HIP_BIZFLOW_NEXT_BLOCKED", "active_tab": after,
+                              "missing_fields": last.get("missing_fields"), "alerts": last.get("alerts")})
+                raise RuntimeError(
+                    f"HIP_BIZFLOW_NEXT_BLOCKED: the wizard stayed on '{after}' -- "
+                    f"{'; '.join(last.get('alerts') or []) or 'required fields are not filled'}"
+                    + (f" (missing: {', '.join(last.get('missing_fields') or [])})" if last.get("missing_fields") else ""))
+            continue
+        step["plan"] = "open_requested_tab"
         if backend is not None:
             try:
                 found = await backend.find(text=tab_label)
@@ -1878,6 +2040,18 @@ async def _ensure_bizflow_tab_open(page: Page, tab_label: str, *, max_steps: int
         await page.wait_for_timeout(650 + step_no * 150)
         after = await _current_bizflow_tab(page)
         step["effect"] = {"active_tab": after, "verified": _bizflow_tab_matches(tab_label, after)}
+        if not step["effect"]["verified"] and want_index >= 0 and cur_index >= 0 and want_index != cur_index:
+            # The header did not open the tab: move the wizard instead.
+            want = "next" if want_index > cur_index else "previous"
+            moves = []
+            for _ in range(abs(want_index - cur_index)):
+                move = await _click_bizflow_wizard_button(page, want)
+                moves.append(move)
+                if not move.get("advanced"):
+                    break
+            step["wizard_moves"] = mask_sensitive_data(moves)
+            after = await _current_bizflow_tab(page)
+            step["effect"] = {"active_tab": after, "verified": _bizflow_tab_matches(tab_label, after), "method": f"wizard_{want}"}
         audit["steps"].append(step)
         if step["effect"]["verified"]:
             audit.update({"pass": True, "status": "verified", "active_tab": after, "attempts": step_no})
@@ -1887,59 +2061,179 @@ async def _ensure_bizflow_tab_open(page: Page, tab_label: str, *, max_steps: int
     audit.update({"status": "blocked", "error_code": "HIP_BIZFLOW_TAB_NOT_OPENED", "active_tab": await _current_bizflow_tab(page)})
     raise RuntimeError(f"HIP_BIZFLOW_TAB_NOT_OPENED: could not prove active BizFlow tab '{tab_label}' after bounded ReAct retries")
 
+
+# Every button and menu trigger on the open wizard tab (and its bottom bar),
+# read-only.  Menu triggers are tagged so each can be opened, read and closed.
+_TAB_OPTIONS_JS = r"""
+({token}) => {
+  function visible(el){const r=el&&el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0}; const s=el?getComputedStyle(el):null; return !!(r.width&&r.height&&s&&s.display!=='none'&&s.visibility!=='hidden');}
+  function clean(s){return String(s||'').replace(/\s+/g,' ').trim();}
+  document.querySelectorAll('[data-hip-opt]').forEach(e => e.removeAttribute('data-hip-opt'));
+  const panel = Array.from(document.querySelectorAll('[role=tabpanel]')).find(visible);
+  if (!panel) return {found:false};
+  const form = panel.closest('form,main') || document.body;
+  const bar = Array.from(form.querySelectorAll('.wizard-actions,.actions,.dds__button-group,footer')).filter(b => visible(b) && !panel.contains(b));
+  const scopes = [panel, ...bar];
+  const buttons = []; const triggers = []; const seen = new Set();
+  let n = 0;
+  for (const scope of scopes) {
+    for (const el of Array.from(scope.querySelectorAll('button,[role=button],a'))) {
+      if (!visible(el) || seen.has(el)) continue;
+      seen.add(el);
+      if (el.closest('dds-dropdown,.dds__dropdown,[role=listbox],[role=menu]')) continue;
+      const label = clean(el.getAttribute('aria-label') || el.innerText || el.textContent || el.getAttribute('title') || '');
+      if (!label) continue;
+      const cell = el.closest('th,[role=columnheader]');
+      const row = el.closest('tr,[role=row]');
+      const where = cell ? 'column:' + clean(cell.innerText||'').replace(/[⋮\s]+$/,'') : (row && !el.closest('thead') ? 'row:' + clean((row.querySelector('td,[role=cell]')||{}).innerText||'') : (panel.contains(el) ? 'tab' : 'bottom bar'));
+      const disabled = el.disabled === true || el.getAttribute('aria-disabled') === 'true';
+      const item = {label, where, disabled, pager: !!el.closest('.dds__pagination,dds-pagination,[class*=pagination]'), in_drawer: !!el.closest('.dds__drawer,[role=dialog]')};
+      buttons.push(item);
+      if (!disabled && (el.getAttribute('aria-haspopup') === 'true' || el.getAttribute('aria-haspopup') === 'menu' || /^[⋮⁝︙…]$/.test(clean(el.innerText||'')))) {
+        const t = token + '-' + (++n);
+        el.setAttribute('data-hip-opt', t);
+        triggers.push({label, where, selector: `[data-hip-opt="${t}"]`, controls: el.getAttribute('aria-controls') || ''});
+      }
+    }
+  }
+  const columns = Array.from(panel.querySelectorAll('th,[role=columnheader]')).filter(visible).map(c => clean(c.innerText||'').replace(/[⋮\s]+$/,'')).filter(Boolean);
+  return {found:true, buttons, triggers, columns};
+}
+"""
+
+_OPEN_MENU_ITEMS_JS = r"""
+({controls}) => {
+  function visible(el){const r=el&&el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0}; const s=el?getComputedStyle(el):null; return !!(r.width&&r.height&&s&&s.display!=='none'&&s.visibility!=='hidden');}
+  function clean(s){return String(s||'').replace(/\s+/g,' ').trim();}
+  const owned = controls ? document.getElementById(controls) : null;
+  const menus = owned && visible(owned) ? [owned] : Array.from(document.querySelectorAll('[role=menu],.dds__action-menu__menu,.dds__action-menu')).filter(visible);
+  const items = [];
+  for (const m of menus) for (const i of Array.from(m.querySelectorAll('[role=menuitem],button,a')).filter(visible)) {
+    const t = clean(i.innerText||i.textContent||''); if (t && !items.includes(t)) items.push(t);
+  }
+  return items;
+}
+"""
+
+
+async def learn_bizflow_tab_options(page: Page, tab_label: str, *, max_menus: int = 12) -> Dict[str, Any]:
+    """Learn everything a wizard tab offers, without acting (V243R39).
+
+    Every button of the tab and of the wizard's bottom bar is recorded with where
+    it is (tab, column, row, bottom bar, drawer); every menu trigger (column ⋮,
+    row Action ⋮) is opened, its items read, and closed again.  No menu item is
+    ever chosen; commit buttons (Submit, Save, ...) are recorded and never clicked.
+    """
+    import uuid as _uuid
+    from .phase_navigation import is_commit
+
+    token = _uuid.uuid4().hex[:8]
+    out: Dict[str, Any] = {"tab": tab_label, "buttons": [], "menus": {}, "columns": [], "commit_buttons": [], "read_only": True}
+    try:
+        scan = await page.evaluate(_TAB_OPTIONS_JS, {"token": token})
+    except Exception as exc:
+        out["error"] = mask_sensitive_string(str(exc))[:300]
+        return out
+    if not scan.get("found"):
+        out["error"] = "no open wizard tab"
+        return out
+    out["columns"] = list(scan.get("columns") or [])
+    seen = set()
+    for b in scan.get("buttons") or []:
+        key = (b.get("label"), b.get("where"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out["buttons"].append(b)
+        if is_commit(str(b.get("label") or "")):
+            out["commit_buttons"].append(str(b.get("label")))
+    for trig in (scan.get("triggers") or [])[:max(0, int(max_menus))]:
+        where = str(trig.get("where") or "")
+        label = str(trig.get("label") or "menu")
+        # "Rule Name column menu" names itself; a row's "More actions" needs its row.
+        name = label if where.startswith("column:") or where in {"tab", "bottom bar"} else f"{label} — {where}"
+        try:
+            clicked = await _governed_bizflow_click(page, selector=str(trig["selector"]),
+                                                    action_label=f"structural_opener open {trig.get('label') or name} (read only)",
+                                                    timeout=1200, mutation_risk=False, structural_opener=True)
+        except Exception as exc:
+            out["menus"][name] = {"error": mask_sensitive_string(str(exc))[:200]}
+            continue
+        if not clicked:
+            continue
+        await page.wait_for_timeout(300)
+        try:
+            items = await page.evaluate(_OPEN_MENU_ITEMS_JS, {"controls": str(trig.get("controls") or "")})
+        except Exception:
+            items = []
+        out["menus"][name] = {"items": list(items or []), "where": trig.get("where"),
+                              "commit_items": [i for i in items or [] if is_commit(i)]}
+        try:
+            await page.keyboard.press("Escape")
+            await page.wait_for_timeout(150)
+            still = await page.evaluate(
+                """({sel, controls}) => {
+                  const vis = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+                                        return !!(r.width && r.height && s.display !== 'none' && s.visibility !== 'hidden'); };
+                  const owned = controls ? document.getElementById(controls) : null;
+                  if (owned) return vis(owned);
+                  return Array.from(document.querySelectorAll('[role=menu],.dds__action-menu')).some(vis);
+                }""", {"sel": str(trig["selector"]), "controls": str(trig.get("controls") or "")})
+            if still:
+                await _governed_bizflow_click(page, selector=str(trig["selector"]), action_label=f"structural_opener close {trig.get('label') or name}",
+                                              timeout=1000, mutation_risk=False, structural_opener=True)
+        except Exception:
+            pass
+    out["commit_buttons"] = sorted(set(out["commit_buttons"]))
+    return mask_sensitive_data(out)
+
+
+async def _wizard_bar_buttons(page: Page) -> List[str]:
+    try:
+        return list(await page.evaluate(r"""
+() => {
+  function visible(el){const r=el&&el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0}; const s=el?getComputedStyle(el):null; return !!(r.width&&r.height&&s&&s.display!=='none'&&s.visibility!=='hidden');}
+  const panel = Array.from(document.querySelectorAll('[role=tabpanel]')).find(visible);
+  const form = panel ? (panel.closest('form,main') || document.body) : document.body;
+  const bars = Array.from(form.querySelectorAll('.wizard-actions,.actions,.dds__button-group,footer')).filter(b => visible(b) && !(panel && panel.contains(b)));
+  const out = [];
+  for (const b of bars) for (const el of Array.from(b.querySelectorAll('button,[role=button]')).filter(visible)) {
+    const t = String(el.innerText||el.textContent||'').replace(/[‹›<>]/g,'').replace(/\s+/g,' ').trim(); if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+""") or [])
+    except Exception:
+        return []
+
+
 async def _click_bizflow_continue(page: Page) -> Dict[str, Any]:
-    audit = {"attempted": True, "clicked": False, "label": ""}
-    selectors = [
-        "button:has-text('Next')", "button:has-text('Continue')", "button:has-text('Proceed')",
-        "[role=button]:has-text('Next')", "[role=button]:has-text('Continue')", "[role=button]:has-text('Proceed')",
-    ]
+    """Move the wizard to its next tab with its own Next (never a pager, Save or Submit)."""
+    audit = await _click_bizflow_wizard_button(page, "next")
+    if audit.get("button", {}).get("found"):
+        return audit
+    # No wizard Next: a legacy single-surface form may label it Continue / Proceed.
+    selectors = ["button:has-text('Continue')", "button:has-text('Proceed')",
+                 "[role=button]:has-text('Continue')", "[role=button]:has-text('Proceed')"]
     bad = re.compile(r"save|submit|create|delete|remove|deploy|cancel|close", re.I)
     for sel in selectors:
         try:
-            locs = page.locator(sel)
-            n = min(await locs.count(), 10)
-            for i in range(n):
-                loc = locs.nth(i)
-                txt = ""
-                try: txt = (await loc.inner_text(timeout=500)).strip()
-                except Exception: pass
-                if bad.search(txt):
-                    continue
-                if await _governed_bizflow_click(page, selector=sel, action_label=txt or "Continue BizFlow wizard", timeout=1000):
-                    audit.update({"clicked": True, "label": txt, "selector": sel})
-                    await page.wait_for_timeout(1000)
-                    return audit
-        except Exception:
-            continue
-    js = r"""
-() => {
-  function clean(s){return (s||'').trim().replace(/\s+/g,' ')}
-  function path(el){const parts=[]; while(el&&el.nodeType===1&&parts.length<8){let p=el.tagName.toLowerCase(); if(el.id){p+='#'+CSS.escape(el.id); parts.unshift(p); break;} const cls=(el.className||'').toString().trim().split(/\s+/).filter(Boolean).slice(0,3).map(c=>CSS.escape(c)).join('.'); if(cls)p+='.'+cls; const parent=el.parentElement; if(parent){const sib=Array.from(parent.children).filter(x=>x.tagName===el.tagName); if(sib.length>1)p+=':nth-of-type('+(sib.indexOf(el)+1)+')';} parts.unshift(p); el=parent;} return parts.join(' > ');}
-  const roots = Array.from(document.querySelectorAll('.dds__drawer, form, main, body')).filter(r=>/create biz flow|flow details|configure source|configure target|configure routing|businessFlowName/i.test(clean(r.innerText||'')));
-  const root = roots[0] || document.body;
-  const bad=/save|submit|create\s*$|delete|remove|deploy|cancel|close|pagination|next page|previous page|cookie|preference/i;
-  const good=/^(next|continue|proceed|done|add source|add target)$/i;
-  const cands=[];
-  for(const el of Array.from(root.querySelectorAll('button,[role=button],a,dds-button,.dds__button'))){
-    const r=el.getBoundingClientRect(); if(r.width<8||r.height<8) continue;
-    const label=clean(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')||'');
-    const cls=(el.className||'').toString();
-    if(!label || bad.test(label+' '+cls)) continue;
-    if(good.test(label)) cands.push({selector:path(el), label, score:(/next|continue|proceed/i.test(label)?10:1)+(r.top>window.innerHeight*0.5?2:0)});
-  }
-  cands.sort((a,b)=>b.score-a.score);
-  return cands[0]||null;
-}
-"""
-    try:
-        cand = await page.evaluate(js)
-        if cand and cand.get("selector"):
-            if await _governed_bizflow_click(page, selector=cand["selector"], action_label=cand.get("label", "") or "Continue BizFlow wizard", timeout=1200):
-                audit.update({"clicked": True, "label": cand.get("label", ""), "selector": cand.get("selector", ""), "method": "scoped_js_fallback_semantic_dispatch"})
+            loc = page.locator(sel).first
+            if not await loc.count():
+                continue
+            txt = ""
+            try:
+                txt = (await loc.inner_text(timeout=500)).strip()
+            except Exception:
+                pass
+            if bad.search(txt):
+                continue
+            if await _governed_bizflow_click(page, selector=sel, action_label=txt or "Continue BizFlow wizard", timeout=1000):
+                audit.update({"clicked": True, "label": txt, "selector": sel, "method": "legacy_continue"})
                 await page.wait_for_timeout(1000)
                 return audit
-    except Exception as exc:
-        audit["js_error"] = str(exc)
+        except Exception:
+            continue
     return audit
 
 
@@ -2156,10 +2450,15 @@ async def _click_bizflow_section_add(page: Page, aliases: List[str], *, tab_labe
   }).filter(x=>x.t && x.t.length<160);
   const raw=Array.from(root.querySelectorAll('button,a,[role="button"],dds-button,dds-link'));
   const cands=[];
+  // V243R39: a wizard tab header, the wizard's Previous / Reset / Next bar, a
+  // pager or a Back link is never a row "+" (the Flow Details tab was clicked
+  // as the Attributes "+" and the wizard jumped back a tab).
+  const notRowAdder = (el) => !!(el.closest('[role=tablist],[role=tab],.dds__tabs__tab,.wizard-actions,.dds__pagination,dds-pagination,[class*=pagination]')
+    || /^(‹\s*)?(back|previous|next|reset|submit)\b/i.test(clean(el.innerText||el.textContent||'')));
   for(const holder of raw){
     if(!visible(holder)) continue;
     const click = holder.matches('button,a,[role="button"]') ? holder : (holder.querySelector('button,a,[role="button"]') || holder);
-    if(!visible(click)) continue;
+    if(!visible(click) || notRowAdder(click)) continue;
     const r=click.getBoundingClientRect();
     if(r.width>260 || r.height>80) continue;
     const cls=String(click.className||'')+' '+String(holder.className||'');
@@ -2209,7 +2508,7 @@ async def _click_bizflow_section_add(page: Page, aliases: List[str], *, tab_labe
   for(const holder of geomRaw){
     if(!visible(holder)) continue;
     const click = holder.matches('button,a,[role="button"]') ? holder : (holder.querySelector('button,a,[role="button"]') || holder);
-    if(!visible(click)) continue;
+    if(!visible(click) || notRowAdder(click)) continue;
     const r=click.getBoundingClientRect();
     if(r.width>180 || r.height>70 || r.width<8 || r.height<8) continue;
     const cls=String(click.className||'')+' '+String(holder.className||'');
@@ -3137,6 +3436,29 @@ async def _fill_bizflow_routing_action_rows(page: Page, input_data: Dict[str, An
         await _clear_bizflow_sticky_locks(page, reason=f"after routing action row {i+1}")
 
 
+async def _record_bizflow_navigation(page: Page, config: AppConfig | None, nav_tabs: List[Dict[str, Any]],
+                                     tab_options: Dict[str, Any]) -> Dict[str, Any]:
+    """Remember how the Create Biz Flow wizard is reached and moved through (V243R39)."""
+    from .phase_navigation import record
+
+    entry = ["+ Add"]
+    template = getattr(page, "_hip_bizflow_template_entry", None) or {}
+    if template.get("method") == "direct_template_card_link":
+        entry.append(f"template link “{template.get('label') or 'B2B-Flow-PubSub-Template'}”")
+    elif template.get("clicked"):
+        entry.append("template ⋮ menu > “Create Biz Flow”")
+    commits = sorted({b for o in tab_options.values() if isinstance(o, dict) for b in o.get("commit_buttons") or []})
+    navigation = {
+        "entry": entry, "tabs": nav_tabs, "options": tab_options, "commit_buttons_never_clicked": commits,
+        "wizard": any(t.get("advance") for t in nav_tabs) or any("wizard" in str(t.get("opened_by")) for t in nav_tabs),
+        "run_id": str(getattr(page, "_hip_run_id", "") or ""),
+    }
+    memory_dir = getattr(getattr(config, "reporting", None), "memory_dir", None) if config is not None else None
+    if memory_dir:
+        record(Path(memory_dir), "biz_flow", navigation)
+    return navigation
+
+
 async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[str, Any] | None = None, *, fill_dummy: bool = True, judge_output_dir: Path | None = None, config: AppConfig | None = None) -> Dict[str, Any]:
     dummy_values = build_dummy_fill_values(input_data or {})
     audit: Dict[str, Any] = {"template_link": {}, "tabs": [], "routing_nested_add": {}, "warnings": [], "section_judges": [], "blocked_at_section": "", "form_state_learning": {"snapshots": [], "purpose": "learn visible controls, dependency-created children and value regressions after each tab/add/fill"}}
@@ -3252,10 +3574,26 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
             "dummy_values": dummy_values,
         }
     # Capture initial page even if the link was not necessary/available.
+    # V243R39: how the wizard was reached and moved through, and what each tab
+    # offers -- recorded as the phase's navigation knowledge after the last tab.
+    nav_tabs: List[Dict[str, Any]] = []
+    tab_options: Dict[str, Any] = {}
+    # V243R39: with the goal engine owning BizFlow (the default), each tab is
+    # filled by it alone -- rows through the live "+", values from input.json,
+    # read back.  The legacy dummy pass first typed guessed values (a rule name
+    # into the routing drawer, which has no rule field) and opened every
+    # dropdown, which only cost minutes and had to be undone.
+    legacy_fill = bool(fill_dummy and not autonomous_phase_enabled(config, "biz_flow"))
     for step in bizflow_multitab_plan():
         tab = step["tab"]
         tab_audit = await _ensure_bizflow_tab_open(page, tab, max_steps=3)
-        if fill_dummy and not step.get("nested_add"):
+        nav_entry: Dict[str, Any] = {
+            "tab": bizflow_graph_section_for_tab(tab), "portal_tab": await _current_bizflow_tab(page),
+            "opened_by": str(tab_audit.get("method") or tab_audit.get("status") or ""),
+            "bar": await _wizard_bar_buttons(page),
+        }
+        nav_tabs.append(nav_entry)
+        if legacy_fill and not step.get("nested_add"):
             try:
                 # BizFlow row creation is not a generic repeatable table action.
                 # The golden UHAUL screens require section-specific row buttons:
@@ -3274,9 +3612,12 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
         stateful_controls = await capture_stateful_controls(page, "biz_flow")
         if stateful_controls:
             seen_selectors = {str(c.get("selector") or "") for c in controls if isinstance(c, dict)}
-            controls.extend(dict(c) for c in stateful_controls if str(c.get("selector") or "") not in seen_selectors)
+            controls.extend(dict(c) for c in _filter_bizflow_controls(stateful_controls) if str(c.get("selector") or "") not in seen_selectors)
         buttons = _filter_bizflow_buttons(await _evaluate_buttons(page))
-        dropdowns = await _collect_bizflow_dropdowns_with_options(page, controls, tab_label=tab)
+        # Option lists: read from the DOM without opening anything when the goal
+        # engine fills (it reads each list as it chooses); opened only by the legacy pass.
+        dropdowns = (await _collect_bizflow_dropdowns_with_options(page, controls, tab_label=tab) if legacy_fill
+                     else recorded_dropdowns(controls))
         required = _required_fields(controls)
         # Explore only after the current tab's input.json path has been filled and
         # judged. Empty-tab crawling misses children revealed by Source/Target Type,
@@ -3288,7 +3629,7 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
         for r in required:
             r.setdefault("bizflow_tab", tab)
         attempts: List[Dict[str, Any]] = []
-        if fill_dummy and controls:
+        if legacy_fill and controls:
             attempts = await fill_dummy_no_save(page, controls, dummy_values, input_data)
             for a in attempts:
                 a.setdefault("bizflow_tab", tab)
@@ -3300,6 +3641,10 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
                 await restore_filled_values(page, "biz_flow", reason="after Configure Target process rows", attempts=attempts)
 
         async def _repair_current_tab(_repair_no: int, _judge_report: Dict[str, Any]) -> None:
+            if not legacy_fill:
+                # The goal engine repairs from the live form and input.json.
+                await _execute_state_graph_section(tab, attempts, f"judge_repair_{_repair_no}")
+                return
             live_controls = _filter_bizflow_controls(await _evaluate_controls(page))
             live_stateful = await capture_stateful_controls(page, "biz_flow")
             if live_stateful:
@@ -3374,9 +3719,16 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
 
         # Configure Routing has its own + Add that opens/creates the route row/form.
         if step.get("nested_add"):
+            # V243R39: learn everything the routing tab offers first (its table's
+            # column menus, row actions, + Add, Previous, Submit) -- read-only,
+            # while no drawer covers the table.
+            try:
+                tab_options["Configure Routing"] = await learn_bizflow_tab_options(page, "Configure Routing")
+            except Exception as exc:
+                tab_options["Configure Routing"] = {"error": mask_sensitive_string(str(exc))[:300]}
             nested = await _click_configure_routing_add(page)
             await restore_filled_values(page, "biz_flow", reason="after Configure Routing top-level Add")
-            if fill_dummy:
+            if legacy_fill:
                 try:
                     repeatable_row_audits.append(await _apply_bizflow_nested_row_adds(page, input_data or {}, "Configure Routing + Add"))
                 except Exception as exc:
@@ -3386,14 +3738,15 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
             nested_stateful_controls = await capture_stateful_controls(page, "biz_flow")
             if nested_stateful_controls:
                 seen_selectors = {str(c.get("selector") or "") for c in nested_controls if isinstance(c, dict)}
-                nested_controls.extend(dict(c) for c in nested_stateful_controls if str(c.get("selector") or "") not in seen_selectors)
+                nested_controls.extend(dict(c) for c in _filter_bizflow_controls(nested_stateful_controls) if str(c.get("selector") or "") not in seen_selectors)
             nested_buttons = _filter_bizflow_buttons(await _evaluate_buttons(page))
-            nested_dropdowns = await _collect_bizflow_dropdowns_with_options(page, nested_controls, tab_label="Configure Routing + Add")
+            nested_dropdowns = (await _collect_bizflow_dropdowns_with_options(page, nested_controls, tab_label="Configure Routing + Add")
+                                if legacy_fill else recorded_dropdowns(nested_controls))
             nested_required = _required_fields(nested_controls)
             for c in nested_controls:
                 c.setdefault("bizflow_tab", "Configure Routing + Add")
             nested_attempts: List[Dict[str, Any]] = []
-            if fill_dummy and nested_controls:
+            if legacy_fill and nested_controls:
                 nested_attempts = await fill_dummy_no_save(page, nested_controls, dummy_values, input_data)
                 for a in nested_attempts:
                     a.setdefault("bizflow_tab", "Configure Routing + Add")
@@ -3402,6 +3755,9 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
                 await restore_filled_values(page, "biz_flow", reason="after Configure Routing actions rows", attempts=nested_attempts)
 
             async def _repair_routing(_repair_no: int, _judge_report: Dict[str, Any]) -> None:
+                if not legacy_fill:
+                    await _execute_state_graph_section("Configure Routing", nested_attempts, f"judge_repair_{_repair_no}")
+                    return
                 repeatable_row_audits.append(await _apply_bizflow_nested_row_adds(page, input_data or {}, "Configure Routing + Add"))
                 live_nested = _filter_bizflow_controls(await _evaluate_controls(page))
                 live_nested_stateful = await capture_stateful_controls(page, "biz_flow")
@@ -3429,6 +3785,11 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
                 raise RuntimeError(f"BizFlow deterministic state graph could not commit Configure Routing: {routing_graph_gate.get('failed_attempts', [])}")
             routing_gate = await judge_with_repairs("Configure Routing", nested_attempts, _repair_routing)
             if routing_gate.get("pass"):
+                try:
+                    # The filled Create Rule drawer's own buttons (Cancel / Save): recorded, never clicked.
+                    tab_options["Configure Routing + Add"] = await learn_bizflow_tab_options(page, "Configure Routing + Add", max_menus=0)
+                except Exception as exc:
+                    tab_options["Configure Routing + Add"] = {"error": mask_sensitive_string(str(exc))[:300]}
                 try:
                     live_nested = _filter_bizflow_controls(await _evaluate_controls(page))
                     change_form = explore_after_fill(config)
@@ -3489,7 +3850,24 @@ async def capture_and_fill_bizflow_multitab_form(page: Page, input_data: Dict[st
         # If the portal uses Next buttons instead of clickable tabs, advance after each approved non-routing tab.
         if tab != "Configure Routing":
             cont = await _click_bizflow_continue(page)
+            if cont.get("blocked"):
+                # V243R39: the portal refused Next and named what is missing: fill this
+                # tab again from input.json, then try Next once more.
+                await _execute_state_graph_section(tab, attempts, "next_blocked_repair")
+                cont = {**await _click_bizflow_continue(page), "retried_after": cont}
             tab_info["continue"] = cont
+            nav_entry["advance"] = str(cont.get("label") or "Next") if cont.get("advanced") else ""
+            if cont.get("blocked"):
+                audit["blocked_at_section"] = tab
+                raise RuntimeError(
+                    f"HIP_BIZFLOW_NEXT_BLOCKED: the wizard stayed on {tab} after Next -- "
+                    f"{'; '.join(cont.get('alerts') or []) or 'required fields are not filled'}"
+                    + (f" (missing: {', '.join(cont.get('missing_fields') or [])})" if cont.get("missing_fields") else ""))
+    if not audit.get("blocked_at_section") and nav_tabs:
+        try:
+            audit["navigation"] = await _record_bizflow_navigation(page, config, nav_tabs, tab_options)
+        except Exception as exc:
+            audit["warnings"].append(f"BizFlow navigation knowledge not recorded: {mask_sensitive_string(str(exc))[:300]}")
     repeatable_row_audits.append(await restore_filled_values(page, "biz_flow", reason="before final BizFlow screenshot/evidence", attempts=all_attempts))
     final_surface_gate = await assert_active_surface(page, "biz_flow")
     audit["final_surface_gate"] = final_surface_gate

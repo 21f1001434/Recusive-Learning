@@ -2241,6 +2241,30 @@ def deterministic_scripts(config: str = "config.yaml") -> Dict[str, Any]:
     return list_scripts(memory)
 
 
+@app.get("/api/operation-matrix")
+def operation_matrix_api(config: str = "config.yaml") -> Dict[str, Any]:
+    """V243R39: phase x operation (Create / Edit / Clone / Migrate / Deploy) -- what
+    each phase has learned, how each operation is reached and what it opens, plus
+    how each phase's form is reached and moved through (BizFlow: + Add, the
+    template link, Next per tab) and the per-operation scripts."""
+    from hip_id_agent.operation_learning import operation_matrix
+    from hip_id_agent.phase_navigation import summaries as navigation_summaries
+
+    cfg = _cfg(config)
+    memory = Path(cfg.reporting.memory_dir)
+    if not memory.is_absolute():
+        memory = (ROOT / memory).resolve()
+    matrix = operation_matrix(memory)
+    store = memory / "deterministic_scripts"
+    scripts = {}
+    for path in sorted(store.glob("*__*.md")) if store.exists() else []:
+        try:
+            scripts[path.stem] = path.read_text(encoding="utf-8")[:6000]
+        except Exception:
+            continue
+    return {**matrix, "navigation": navigation_summaries(memory), "operation_scripts": scripts}
+
+
 @app.get("/api/deterministic-recipes")
 def deterministic_recipes(config: str = "config.yaml") -> Dict[str, Any]:
     cfg = _cfg(config)

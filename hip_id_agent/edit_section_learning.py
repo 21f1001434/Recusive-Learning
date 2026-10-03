@@ -217,6 +217,19 @@ _SURFACE_GONE_JS = r"""
 """
 
 # The first data row's name, when no object was named ("learn the Edit section").
+_CLEAR_SEARCH_JS = r"""
+() => {
+  for (const box of Array.from(document.querySelectorAll('input[type=text],input[type=search],input:not([type])'))) {
+    const hint = `${box.getAttribute('placeholder') || ''} ${box.getAttribute('aria-label') || ''}`;
+    if (!/search|filter/i.test(hint) || !box.value) continue;
+    box.value = '';
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    box.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+  }
+}
+"""
+
 _FIRST_ROW_JS = r"""
 () => {
   const visible = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
@@ -226,6 +239,8 @@ _FIRST_ROW_JS = r"""
   for (const row of rows) {
     const cells = Array.from(row.querySelectorAll('td,[role=cell],[role=gridcell]'))
       .map(c => (c.innerText || '').replace(/\s+/g, ' ').trim()).filter(t => t && !/^[⌄˅▾▸›>+]$/.test(t));
+    // V243R39: an empty table's placeholder row is not an object.
+    if (cells.length && /^(no (data|records?|results?|items?)( to display| found| available)?|nothing to (display|show))\.?$/i.test(cells[0])) continue;
     if (cells.length) return cells[0];
   }
   return '';
@@ -867,6 +882,12 @@ class EditSectionLearner:
     async def first_row_name(self, phase: str) -> str:
         await self.runner._navigate(self.runner._listing_url(phase))
         page = await self._page()
+        try:
+            # V243R39: a search left from looking for another object filters the table.
+            await page.evaluate(_CLEAR_SEARCH_JS)
+            await page.wait_for_timeout(400)
+        except Exception:
+            pass
         wait = float(getattr(getattr(self.config, "portal", None), "navigation_render_wait_seconds", 20) or 20)
         deadline = time.monotonic() + min(wait, 60.0)
         while True:

@@ -905,6 +905,24 @@ class EditSectionsConfig(BaseModel):
     verify_by_reopening_edit: bool = True
 
 
+class OperationLearningConfig(BaseModel):
+    """V243R39: every mission phase learns Create, Edit, Clone, Migrate and Deploy.
+
+    At the end of a mission each phase's Edit / Clone / Migrate / Deploy is
+    learned read-only (forms read and closed with Cancel, menus read, nothing
+    saved or confirmed) unless already known and fresh; Create is the phase's
+    deterministic script.  ``GET /api/operation-matrix`` and the Control Center
+    show the phase x operation table.
+    """
+    enabled: bool = True
+    after_mission: bool = True
+    actions: List[str] = Field(default_factory=lambda: ["edit", "clone", "migrate", "deploy"])
+    # Known operations are learned again only when their knowledge is older than this.
+    refresh_days: float = 7.0
+    # The whole end-of-mission learning pass stops after this long (the rest is learned next mission).
+    max_seconds: float = 1800.0
+
+
 class RunHistoryLearningConfig(BaseModel):
     """V243R27: learn from past runs (run folders and MLflow) at mission start.
 
@@ -1328,6 +1346,7 @@ class AppConfig(BaseModel):
     mlflow: MLflowConfig = Field(default_factory=MLflowConfig)
     run_history_learning: RunHistoryLearningConfig = Field(default_factory=RunHistoryLearningConfig)
     edit_sections: EditSectionsConfig = Field(default_factory=EditSectionsConfig)
+    operation_learning: OperationLearningConfig = Field(default_factory=OperationLearningConfig)
     universal_operator: UniversalOperatorConfig = Field(default_factory=UniversalOperatorConfig)
     skill_induction: SkillInductionConfig = Field(default_factory=SkillInductionConfig)
     replay_policy: ReplayPolicyConfig = Field(default_factory=ReplayPolicyConfig)

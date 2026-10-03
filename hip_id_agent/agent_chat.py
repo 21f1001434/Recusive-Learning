@@ -227,6 +227,9 @@ def field_ready(page: Any, *, phase: str, node: Mapping[str, Any], control: Opti
             return
         if already:
             say(f"✓ {label} already shows {value}", kind="verified", phase=phase, group="already")
+            # V243R39: nothing is done to a field that already holds its value, so
+            # the next click (another helper's) must not be named after it.
+            setattr(page, "_hip_chat_field", None)
         else:
             say(f"Filling {label} with {value}", kind="field", phase=phase)
     except Exception:
@@ -287,7 +290,7 @@ def broker_action(page: Any, *, action: str, label: str, success: bool, value: A
             text = f"Typed {shown} into {lab}"
             kind = "type"
         else:
-            target = lab if lab and not low.startswith("hip portal") else field
+            target = readable_action(lab) if lab and not low.startswith("hip portal") else field
             text = f"Clicked {target}" if target == field else f"Clicked “{target}”"
             if target != field and field != "the form":
                 text += f" for {field}"
@@ -336,6 +339,24 @@ def _short_url(url: str) -> str:
         return _clean(url, 120)
 
 
+_INTERNAL_ACTION_NAMES = {
+    "click_add_bizflow": "+ Add", "click add bizflow": "+ Add", "+ add bizflow": "+ Add",
+}
+
+
+def readable_action(label: str) -> str:
+    """V243R39: an action label as a person reads it -- no internal tags.
+
+    "structural_opener structural_opener launch BizFlow template link X" becomes
+    "Opened the BizFlow template link X"; "structural_opener click_add_bizflow"
+    becomes "+ Add"; "BizFlow wizard Next ›" stays.
+    """
+    text = re.sub(r"\b(structural_opener|semantic_opener)\b\s*", "", str(label or ""), flags=re.I).strip()
+    text = _INTERNAL_ACTION_NAMES.get(text.lower(), text)
+    text = re.sub(r"^launch\s+", "", text, flags=re.I)
+    return text.strip()
+
+
 def session_action(event: Any, *, phase: str = "", label: str = "", in_broker: bool = False) -> None:
     """A BrowserSession action that the broker did not already narrate."""
     if _ACTIVE is None or in_broker:
@@ -344,7 +365,7 @@ def session_action(event: Any, *, phase: str = "", label: str = "", in_broker: b
         raw = asdict(event) if is_dataclass(event) else dict(event) if isinstance(event, Mapping) else dict(getattr(event, "__dict__", {}) or {})
         typ = str(raw.get("type") or "")
         ok = bool(raw.get("success", True))
-        target = _clean(label, 120) or _target_text(str(raw.get("target") or ""))
+        target = readable_action(_clean(label, 160)) or _target_text(str(raw.get("target") or ""))
         value = raw.get("value_redacted")
         if typ in {"screenshot", "extract"}:
             return

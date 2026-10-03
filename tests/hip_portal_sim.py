@@ -12,6 +12,14 @@ left navigation that names every module, and a listing with "+ Add".  "+ Add"
 opens that module's full create-form replica (``tests/fixtures``) on the same
 URL, as on the live portal.
 
+V243R39: every module's listing is the R30/R31 listing replica
+(``phase_listing_support`` / ``doctypes_listing_support``) at the module's real
+path -- rows with the expander, environment tabs and Edit / Clone / Deploy /
+Migrate, records kept by the server -- so a mission can learn (and an
+authorized run can perform) each operation on the same portal it creates on.
+Business Flow's "+ Add" opens the flow-template picker; the template's link
+opens the Create Biz Flow wizard (tabs ahead are locked; Next moves forward).
+
 Faults, per module and page load (``fail``):
 
 * ``loader``: the shell and navigation render, but the module never does --
@@ -35,6 +43,10 @@ from urllib.parse import urlparse
 FIXTURES = Path(__file__).parent / "fixtures"
 HOST = "developer.dell.com"
 
+# Each module's listing replica: (support module, family).
+LISTING_FAMILY = {"datamaps": "datamaps", "rules": "rules", "transportprofiles": "transport_profiles",
+                  "bizflows": "bizflows", "doctypes": "doctypes"}
+
 MODULES: Dict[str, Dict[str, Any]] = {
     "datamaps": {
         "path": "/hybrid-integrations/securelink/datamaps", "title": "Data Maps", "nav": "Data Maps",
@@ -57,9 +69,13 @@ MODULES: Dict[str, Dict[str, Any]] = {
         "rows": [["SFTP_ACME_PO_SRC_IB", "Sender", "SFTP HAFT"], ["SFTP_ACME_INV_TGT_OB", "Receiver", "SFTP HAFT"]],
     },
     "bizflows": {
-        "path": "/hybrid-integrations/bizexchange/bizflows", "title": "Business Flows", "nav": "Biz Flows",
-        "fixture": "bizflow_wizard_dds.html", "surface": "page", "columns": ["Business Flow Name", "Source", "Target"],
-        "rows": [["ACME_PC_850_PO_MAPPING_IB", "AIC - DCE", "dce-test-partner"]],
+        # V243R39 (golden BizFlow-Deployed / FD / CR): "Manage Biz Flow"; + Add opens
+        # the flow-template picker, the template's link (or its ⋮ > Create Biz Flow)
+        # opens the Create Biz Flow wizard, whose tabs advance with Next.
+        "path": "/hybrid-integrations/bizexchange/bizflows", "title": "Manage Biz Flow", "nav": "Biz Flows",
+        "fixture": "bizflow_wizard_dds.html", "surface": "page", "picker": True,
+        "columns": ["Flow Name", "Flow Type", "Primary Domains", "Source System", "Target Systems"],
+        "rows": [["ACME_PC_850_PO_MAPPING_IB", "Inbound", "Customer Experience (CX)", "AIC - DCE", "dce-test-partner"]],
     },
 }
 HOME_PATH = "/hybrid-integrations/home"
@@ -85,6 +101,8 @@ __HEAD__
                                     box-shadow: -4px 0 12px rgba(0,0,0,.25); overflow: auto; z-index: 1500; }
   .dds__drawer__header { padding: 12px 20px; border-bottom: 1px solid #ddd; }
   .dds__drawer__body { padding: 12px 20px 0 20px; }
+  .dds__action-menu:not([hidden]) { display: flex; }
+  .dds__action-menu[hidden] { display: none; }
 </style></head>
 <body>
 <header class="app-header">DELL Technologies Developer &nbsp;&middot;&nbsp; Hybrid Integrations</header>
@@ -109,6 +127,7 @@ _ADD_JS = r"""
   // URL stays; Rule and Biz Flow replace the listing with the form page.
   function drawer(title) {
     const host = document.createElement('app-generic-drawer');
+    host.setAttribute('data-sim-create', '');
     host.innerHTML = '<div class="dds__drawer dds__drawer--open" role="dialog" aria-modal="true" aria-label="' + title + '">'
       + '<div class="dds__drawer__header"><h3 class="dds__drawer__title">' + title + '</h3></div>'
       + '<div class="dds__drawer__body"></div></div>';
@@ -144,9 +163,52 @@ _ADD_JS = r"""
     }
     try { (new Function(document.getElementById('hip-sim-form-script').textContent))(); }
     finally { H.text = text; H.page = page; }
+    if (CFG.surface !== 'drawer') document.body.setAttribute('data-sim-create', '');
+  }
+  // V243R39: Biz Flow's + Add first shows the flow templates (golden: the
+  // B2B-Flow-PubSub-Template card).  The template's name is a link; its ⋮ menu
+  // also holds "Create Biz Flow".  Either opens the Create Biz Flow wizard.
+  function picker() {
+    const app = document.getElementById('app') || document.querySelector('main');
+    app.innerHTML = '<a class="dds__link" id="picker-back" href="javascript:void(0)">&#8249; Back</a>'
+      + '<h1>Create Biz Flow</h1><p>Select a flow template to create a Biz Flow.</p>'
+      + '<input type="text" placeholder="Search flow templates" aria-label="Search flow templates" style="width:360px">'
+      + '<div class="template-grid" style="display:flex;gap:16px;margin-top:14px">'
+      + card('B2B-Flow-PubSub-Template', 'Create B2B flow tailored for Inbound/Outbound integration.', 'tpl-pubsub')
+      + card('A2A-Flow-Passthrough-Template', 'Pass documents between applications without transformation.', 'tpl-a2a')
+      + '</div>';
+    app.querySelectorAll('.template-card').forEach((c) => {
+      const link = c.querySelector('a.template-link');
+      link.addEventListener('click', (e) => { e.preventDefault(); launch(c.dataset.template); });
+      const more = c.querySelector('.template-more');
+      const menu = c.querySelector('[role=menu]');
+      more.addEventListener('click', (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; more.setAttribute('aria-expanded', String(!menu.hidden)); });
+      menu.querySelector('.template-create').addEventListener('click', () => launch(c.dataset.template));
+    });
+    document.getElementById('picker-back').addEventListener('click', () => location.assign(location.pathname));
+  }
+  function card(name, text, id) {
+    return '<div class="dds__card template-card" data-template="' + name + '" style="border:1px solid #ccc;padding:12px;width:300px;position:relative">'
+      + '<div class="dds__card__header" style="display:flex;justify-content:space-between">'
+      + '<a class="dds__link template-link" href="javascript:void(0)">' + name + '</a>'
+      + '<button type="button" class="dds__action-menu__trigger template-more" aria-haspopup="true" aria-expanded="false" aria-label="More Actions">&#8942;</button>'
+      + '<div class="dds__action-menu" role="menu" hidden style="position:absolute;right:8px;top:36px;background:#fff;border:1px solid #999;flex-direction:column">'
+      + '<button type="button" role="menuitem" class="template-create">Create Biz Flow</button>'
+      + '<button type="button" role="menuitem">View Template</button></div></div>'
+      + '<p>' + text + '</p>'
+      + '<span class="dds__tag disable-tag-click">Inbound</span> <span class="dds__tag disable-tag-click">Outbound</span></div>';
+  }
+  function launch(template) {
+    window.__hipTemplateChosen = template;
+    if (template !== 'B2B-Flow-PubSub-Template') {
+      (document.getElementById('app') || document.querySelector('main')).innerHTML = '<h1>Create Biz Flow</h1><p>' + template + ' is not available for this partner.</p>';
+      return;
+    }
+    setTimeout(() => mountKit(), CFG.addDelayMs || 150);
   }
   function open() {
     if (document.querySelector('app-generic-drawer')) return;
+    if (CFG.picker) { setTimeout(picker, CFG.addDelayMs || 150); return; }
     setTimeout(() => (CFG.static ? mountStatic() : mountKit()), CFG.addDelayMs || 150);
   }
   document.addEventListener('click', (e) => {
@@ -154,8 +216,9 @@ _ADD_JS = r"""
     if (b) { e.preventDefault(); open(); return; }
     // Cancel discards the unsaved form: the drawer closes, a form page returns
     // to the listing (as the portal's Cancel does).  Submit is never simulated.
+    // (Only the create form's Cancel: a listing's Edit / Clone drawer closes itself.)
     const c = e.target.closest('#cancel');
-    if (c) {
+    if (c && c.closest('[data-sim-create]')) {
       e.preventDefault();
       const host = document.querySelector('app-generic-drawer');
       if (host) host.remove(); else location.assign(location.pathname);
@@ -203,14 +266,18 @@ def make_certificate(directory: Path) -> Dict[str, str]:
 class HipPortalSim:
     """HTTPS server for every HIP module at its real path, with injectable faults."""
 
-    def __init__(self, cert_dir: Path, *, attribute_rows: int = 5, live_plus: bool = True) -> None:
+    def __init__(self, cert_dir: Path, *, attribute_rows: int = 5, live_plus: bool = True, live_wizard: bool = True,
+                 listings: bool = True) -> None:
         self.loads: Dict[str, int] = {key: 0 for key in MODULES}
         self.served: List[Dict[str, Any]] = []
+        self.posts: List[Dict[str, Any]] = []
         self.faults: Dict[str, List[Dict[str, Any]]] = {key: [] for key in MODULES}
         self.attribute_rows = int(attribute_rows)
         self.live_plus = bool(live_plus)
+        self.live_wizard = bool(live_wizard)
         self.kit = (FIXTURES / "hip_dds_kit.js").read_text(encoding="utf-8")
         self.parts = {key: _fixture_parts(spec["fixture"]) for key, spec in MODULES.items()}
+        self.listings = self._listing_stores() if listings else {}
         self.lock = threading.Lock()
         sim = self
 
@@ -232,11 +299,11 @@ class HipPortalSim:
                     self._send(204, b"", "image/x-icon")
                     return
                 if path.startswith("/api/") or "/api/" in path:
-                    self._send(200, b"[]", "application/json")
+                    self._send(200, json.dumps(sim.api_records(path)).encode("utf-8"), "application/json")
                     return
                 module = sim.module_for(path)
                 if module:
-                    html = sim.module_page(module)
+                    html = sim.module_page(module, path)
                 elif path in {"/", "/hybrid-integrations", HOME_PATH}:
                     html = sim.home_page()
                 else:
@@ -245,7 +312,9 @@ class HipPortalSim:
                 self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
             def do_POST(self) -> None:  # noqa: N802
-                self._send(200, b"{}", "application/json")
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                code, message = sim.api_post(urlparse(self.path).path, body)
+                self._send(code, json.dumps({"message": message}).encode("utf-8"), "application/json")
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         paths = make_certificate(Path(cert_dir))
@@ -304,7 +373,73 @@ class HipPortalSim:
                'Choose a module in the menu to continue.</p>')
         return self._shell(app, {"module": "", "fault": ""})
 
-    def module_page(self, module: str) -> str:
+    # ---- listings (V243R39) ---------------------------------------------------------
+    def _listing_stores(self) -> Dict[str, Any]:
+        from doctypes_listing_support import DocTypesPortal
+        from phase_listing_support import FAMILIES, PhaseListingPortal
+
+        stores: Dict[str, Any] = {}
+        for module, family in LISTING_FAMILY.items():
+            spec = MODULES[module]
+            if family == "doctypes":
+                store = DocTypesPortal(live_path=True, expand_delay_ms=150)
+            else:
+                store = PhaseListingPortal(family)
+                store.spec = {**FAMILIES[family], "path": spec["path"], "title": spec["title"]}
+            store.server.server_close()  # the records and pages are served here
+            stores[module] = store
+        return stores
+
+    def api_records(self, path: str) -> Any:
+        for module, store in self.listings.items():
+            api = "/api/doctypes" if LISTING_FAMILY[module] == "doctypes" else store.api
+            if path.rstrip("/") == api:
+                return store.records
+        return []
+
+    def api_post(self, path: str, body: Dict[str, Any]) -> tuple:
+        with self.lock:
+            self.posts.append({"path": path, "body": body})
+        for module, store in self.listings.items():
+            if LISTING_FAMILY[module] == "doctypes":
+                if path.startswith("/api/doctypes/"):
+                    return store.apply(path, body)
+                continue
+            if path.startswith(store.api + "/"):
+                action = path.rsplit("/", 1)[-1]
+                if action in {"deploy", "migrate"}:
+                    return store.promote(body, action)
+                if action == "clone":
+                    return store.clone(body)
+                return store.save(body)
+        return 200, "ok"
+
+    def _listing_page(self, module: str, sub: str, head: str, scripts: str, state: Dict[str, Any]) -> str:
+        from doctypes_listing_support import _PAGE
+
+        store = self.listings[module]
+        if LISTING_FAMILY[module] == "doctypes":
+            html = _PAGE.replace("__KIT__", self.kit).replace("__CFG__", json.dumps(store.cfg))
+        elif sub.startswith(("/edit/", "/clone/")):
+            from urllib.parse import unquote
+
+            mode = "clone" if sub.startswith("/clone/") else "edit"
+            record = store.find(unquote(sub.split("/", 2)[2]))
+            if not record:
+                return "<!doctype html><html><body><h1>Not found</h1></body></html>"
+            return store.edit_page_html(record, mode)
+        else:
+            html = store.listing_html()
+        nav = (f'<nav class="side" aria-label="Hybrid Integrations" style="display:flex;gap:14px;padding:6px 20px;background:#f2f2f2">'
+               f'{self._nav()}</nav>')
+        state_js = f"<script>window.__HIP_SIM = {json.dumps(state)};</script>"
+        html = html.replace("</head>", head + "</head>", 1)
+        html = html.replace("</header>", "</header>" + nav, 1)
+        # The kit is on the listing page already; add the sim's state, setup and "+ Add".
+        scripts = scripts.replace(f"<script>{self.kit}</script>", "")
+        return html.replace("</body>", state_js + scripts + "</body>", 1)
+
+    def module_page(self, module: str, path: str = "") -> str:
         with self.lock:
             self.loads[module] += 1
             load = self.loads[module]
@@ -328,17 +463,21 @@ class HipPortalSim:
                '<button type="button" class="dds__button dds__button--tertiary" id="add">+ Add</button></div>'
                f'<div role="table" class="dds__table"><div role="row" class="dds__tr">{head}</div>{rows}</div>')
         state = {"module": module, "fault": "", "load": load, "static": parts["kind"] == "static",
-                 "surface": spec.get("surface", "page")}
+                 "surface": spec.get("surface", "page"), "picker": bool(spec.get("picker"))}
         # Live-faithful: every Document Type section is on the form from the start
         # (its lookups list values once Data Format Type is chosen), and rows are
         # added with the DDS "+" (R20/R25 recordings).
         setup = (f"window.__attributeRows = {self.attribute_rows}; window.__liveOptionsAfterFormat = true;"
-                 + ("window.__livePlus = true;" if self.live_plus else ""))
+                 + ("window.__livePlus = true;" if self.live_plus else "")
+                 + ("window.__liveWizard = true;" if self.live_wizard else ""))
         head = f'<script type="text/plain" id="hip-sim-form-script">{parts["script"]}</script>'
         if parts["kind"] == "static":
             style = parts["style"].replace('"', "&quot;")
             head += f'<template id="hip-sim-form" data-style="{style}">{parts["body"]}</template>'
         scripts = f"<script>{setup}</script><script>{self.kit}</script>{_ADD_JS}"
+        if self.listings:
+            sub = path[len(spec["path"]):] if path.startswith(spec["path"]) else ""
+            return self._listing_page(module, sub, head, scripts, state)
         return self._shell(app, state, scripts, head)
 
     # ---- lifecycle -----------------------------------------------------------------

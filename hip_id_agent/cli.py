@@ -1910,6 +1910,37 @@ def run_operations_cmd(
         raise typer.Exit(code=3)
 
 
+@app.command("operation-matrix")
+def operation_matrix_cmd(
+    config: str = typer.Option("config.yaml", help="Path to config YAML."),
+    as_json: bool = typer.Option(False, "--json", help="Print the matrix as JSON."),
+):
+    """V243R39: which phase knows which operation (Create / Edit / Clone / Migrate / Deploy).
+
+    Create is the phase's deterministic script; the others are learned read-only
+    at the end of every mission (or with learn-action-sections).
+    """
+    from .operation_learning import operation_matrix
+
+    cfg = load_config(config)
+    matrix = operation_matrix(Path(cfg.reporting.memory_dir))
+    if as_json:
+        console.print_json(json.dumps(matrix, ensure_ascii=False, default=str))
+        return
+    table = Table(title=f"Operations each phase knows: {matrix['known']}/{matrix['total']}")
+    table.add_column("Phase")
+    for op in matrix["operations"]:
+        table.add_column(op.title())
+    for row in matrix["rows"]:
+        cells = []
+        for op in matrix["operations"]:
+            cell = row.get(op) or {}
+            cells.append(("✓ " + str(cell.get("detail") or cell.get("status") or ""))[:60] if cell.get("known")
+                         else str(cell.get("status") or "—").replace("_", " ")[:40])
+        table.add_row(str(row.get("phase_display") or row.get("phase")), *cells)
+    console.print(table)
+
+
 @app.command("learn-action-sections")
 def learn_action_sections_cmd(
     input_json: str = typer.Argument("", help="input.json naming the objects to open (objects.<phase> names). Empty: the first row of each listing."),

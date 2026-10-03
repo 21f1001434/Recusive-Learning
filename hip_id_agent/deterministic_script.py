@@ -67,24 +67,86 @@ def _rel(input_path: str, phase: str) -> str:
     return raw[2:] if raw.startswith("$.") else raw
 
 
-def _pick_skill(data: Mapping[str, Any], operation: str = "create") -> Dict[str, Any]:
-    """The phase's current skill: the operation's certified one, else its newest candidate."""
-    skills = [s for s in (data.get("skills") or {}).values() if isinstance(s, dict)]
-    same_op = [s for s in skills if s.get("operation") == operation] or skills
-    if not same_op:
-        return {}
+def _best_of(skills: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     rank = {"certified": 0, "candidate": 1, "stale": 2}
-    best = min(rank.get(str(s.get("status")), 3) for s in same_op)
-    tier = [s for s in same_op if rank.get(str(s.get("status")), 3) == best]
+    best = min(rank.get(str(s.get("status")), 3) for s in skills)
+    tier = [s for s in skills if rank.get(str(s.get("status")), 3) == best]
     tier.sort(key=lambda s: str(s.get("certified_at") or s.get("learned_at") or ""), reverse=True)
     return dict(tier[0])
 
 
+def _pick_skill(data: Mapping[str, Any], operation: str = "create") -> Dict[str, Any]:
+    """The phase's current skill: the operation's certified one, else its newest candidate.
+
+    V243R39: a wizard phase (BizFlow) learns one skill per tab (its ``scope``);
+    the phase's skill is all of them together -- certified only when every tab's is.
+    """
+    skills = [s for s in (data.get("skills") or {}).values() if isinstance(s, dict)]
+    same_op = [s for s in skills if s.get("operation") == operation] or skills
+    if not same_op:
+        return {}
+    by_scope: Dict[str, List[Mapping[str, Any]]] = {}
+    for skill in same_op:
+        by_scope.setdefault(str(skill.get("scope") or "form"), []).append(skill)
+    picks = [_best_of(group) for group in by_scope.values()]
+    if len(picks) == 1:
+        return picks[0]
+    rank = {"certified": 0, "candidate": 1, "stale": 2}
+    weakest = max(picks, key=lambda s: rank.get(str(s.get("status")), 3))
+    merged = dict(max(picks, key=lambda s: str(s.get("certified_at") or s.get("learned_at") or "")))
+    merged["bindings"] = {k: v for pick in picks for k, v in (pick.get("bindings") or {}).items()}
+    rows: Dict[str, Any] = {}
+    for pick in picks:
+        rows.update(((pick.get("structure") or {}).get("rows") or {}) if isinstance(pick.get("structure"), dict) else {})
+    merged["structure"] = {"rows": rows}
+    merged["status"] = str(weakest.get("status") or "candidate")
+    merged["scopes"] = sorted(by_scope)
+    merged["skill_id"] = "+".join(sorted(str(p.get("skill_id") or "") for p in picks))[:120]
+    merged["learned_at"] = max(str(p.get("learned_at") or "") for p in picks) or None
+    merged["certified_at"] = (max(str(p.get("certified_at") or "") for p in picks) or None) if merged["status"] == "certified" else None
+    stats = [p.get("stats") or {} for p in picks]
+    merged["stats"] = {"replays": min(int(x.get("replays") or 0) for x in stats),
+                       "replay_failures": sum(int(x.get("replay_failures") or 0) for x in stats),
+                       "learn_seconds": round(sum(float(x.get("learn_seconds") or 0) for x in stats), 2) or None,
+                       "last_replay_seconds": round(sum(float(x.get("last_replay_seconds") or 0) for x in stats), 2) or None}
+    return merged
+
+
+def _norm_section(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def _options_text(tab: str, options: Mapping[str, Any]) -> str:
+    parts: List[str] = []
+    menus = options.get("menus") if isinstance(options.get("menus"), Mapping) else {}
+    for name, menu in menus.items():
+        items = [str(i) for i in (menu or {}).get("items") or []] if isinstance(menu, Mapping) else []
+        if items:
+            parts.append(f"{name} → {', '.join(items)}")
+    labels = []
+    for b in options.get("buttons") or []:
+        if isinstance(b, Mapping) and b.get("label") and not b.get("pager") and str(b.get("label")) not in labels:
+            labels.append(str(b.get("label")))
+    commits = [str(c) for c in options.get("commit_buttons") or []]
+    text = f"Learned what “{tab}” offers (read-only): buttons {', '.join(labels[:14]) or '—'}"
+    if parts:
+        text += "; menus " + "; ".join(parts[:8])
+    if commits:
+        text += f"; never clicked: {', '.join(commits)}"
+    return text
+
+
 def build_script(
     *, phase: str, skill_data: Mapping[str, Any], graph: Optional[Mapping[str, Any]] = None, url: str = "",
-    run_id: str = "", save_after_fill: bool = False,
+    run_id: str = "", save_after_fill: bool = False, navigation: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """The phase's deterministic script from its learned skill (and the phase state graph for names)."""
+    """The phase's deterministic script from its learned skill (and the phase state graph for names).
+
+    V243R39: with the phase's navigation knowledge (``phase_navigation``) the
+    script also says how the form is reached (BizFlow: + Add, then the
+    template's link) and moved through (fill a tab, then Next), and what each
+    tab offers.
+    """
     skill = _pick_skill(skill_data)
     status = str(skill.get("status") or "none") if skill else "none"
     display = PHASE_DISPLAY.get(phase, _humanize(phase))
@@ -95,11 +157,15 @@ def build_script(
     if not order:
         order = list(by_path)
 
+    nav = dict(navigation or {})
+    entry = [str(x) for x in nav.get("entry") or [] if str(x).strip()]
     steps: List[Dict[str, Any]] = [
         {"do": "open", "text": f"Open {url or 'the ' + display + ' listing'}", "target": url},
-        {"do": "click", "text": f"Click “+ Add” to open the Create {display.replace('Source ', '').replace('Target ', '')} form",
-         "target": "+ Add"},
+        {"do": "click", "text": (f"Click “+ Add” to open the Create {display.replace('Source ', '').replace('Target ', '')} form"
+                                 if len(entry) <= 1 else "Click “+ Add”"), "target": "+ Add"},
     ]
+    for item in entry[1:]:
+        steps.append({"do": "click", "text": f"Click the {item} to open the form", "target": item})
     rows = ((skill.get("structure") or {}).get("rows") or {}) if isinstance(skill.get("structure"), dict) else {}
     row_counts: Dict[str, int] = {}
     for path in order:
@@ -114,8 +180,41 @@ def build_script(
         steps.append({"do": "add_rows", "text": f"Add rows in “{section}” until there is one per input.json item "
                                                 f"({count} in this run) with “{add_label}”",
                       "section": section, "rows_from": f"input.json → {list_path}", "add_label": add_label})
+    tabs = [t for t in nav.get("tabs") or [] if isinstance(t, Mapping) and t.get("tab")]
+    if tabs:
+        # Fields grouped by the tab they are on, in the portal's tab order.
+        def tab_of(path: str) -> int:
+            section = _norm_section((by_path.get(path) or {}).get("section"))
+            for i, t in enumerate(tabs):
+                if section and (section == _norm_section(t.get("tab")) or section == _norm_section(t.get("portal_tab"))):
+                    return i
+            return len(tabs)
+        order = sorted(order, key=lambda p: (tab_of(p), order.index(p)))
+    current_tab = -1
+    options = nav.get("options") if isinstance(nav.get("options"), Mapping) else {}
+
+    def close_tab(index: int) -> None:
+        if index < 0 or index >= len(tabs):
+            return
+        tab = tabs[index]
+        name = str(tab.get("tab"))
+        for key in (name, f"{name} + Add"):
+            if isinstance(options.get(key), Mapping) and not options[key].get("error"):
+                steps.append({"do": "learn_options", "text": _options_text(key, options[key]), "tab": key, "read_only": True})
+        if tab.get("advance"):
+            nxt = str(tabs[index + 1].get("tab")) if index + 1 < len(tabs) else "the next tab"
+            steps.append({"do": "next", "text": f"Click “{tab.get('advance')}” at the bottom — the wizard moves to “{nxt}” "
+                                                f"(it refuses until this tab's required fields are filled)", "target": tab.get("advance")})
+
     for path in order:
         node = by_path.get(path) or {}
+        if tabs:
+            index = tab_of(path)
+            if index != current_tab:
+                close_tab(current_tab)
+                current_tab = index
+                if index < len(tabs):
+                    steps.append({"do": "tab", "text": f"On the “{tabs[index].get('tab')}” tab:", "tab": tabs[index].get("tab")})
         binding = bindings.get(path) if isinstance(bindings.get(path), dict) else {}
         action = str(binding.get("action") or node.get("action") or "fill_text")
         field = _humanize(str(node.get("field_key") or path.split(".")[-1]).replace("[*]", ""))
@@ -130,6 +229,10 @@ def build_script(
                 else f"{verb} input.json → {path} in “{field}”{where}")
         steps.append({"do": action, "text": text, "field": field, "section": section, "row": row,
                       "value_from": f"input.json → objects.{phase}.{path}", "learned_binding": bool(binding)})
+    if tabs:
+        close_tab(current_tab)
+        for index in range(max(current_tab + 1, 0), len(tabs)):
+            close_tab(index)
     steps.append({"do": "verify_all", "text": "Read every field back; each must equal its input.json value exactly"})
     steps.append({"do": "save" if save_after_fill else "stop",
                   "text": ("Click Save once (governed save after the exact proof), then check the listing"
@@ -146,6 +249,7 @@ def build_script(
         "replay_failures": int(stats.get("replay_failures") or 0),
         "learn_seconds": stats.get("learn_seconds"), "last_replay_seconds": stats.get("last_replay_seconds"),
         "field_steps": len(order), "step_count": len(steps), "steps": steps,
+        "navigation": {"entry": entry, "tabs": [t.get("tab") for t in tabs], "wizard": bool(nav.get("wizard"))} if nav else {},
         "values_stored": False, "selectors_stored": False, "coordinates_stored": False,
     }
 
@@ -183,8 +287,14 @@ def write_phase_script(
     run_id: str = "", save_after_fill: bool = False,
 ) -> Dict[str, Any]:
     """Render and store the phase's script; returns a summary for the chat and the report."""
+    try:
+        from .phase_navigation import load as _load_navigation
+
+        navigation = _load_navigation(memory_dir, phase)
+    except Exception:
+        navigation = {}
     script = build_script(phase=phase, skill_data=_skill_data(memory_dir, phase), graph=graph, url=url,
-                          run_id=run_id, save_after_fill=save_after_fill)
+                          run_id=run_id, save_after_fill=save_after_fill, navigation=navigation)
     markdown = render_markdown(script)
     phase_dir = Path(phase_dir)
     safe_write_json(phase_dir / "deterministic_script.json", script, mask=False)

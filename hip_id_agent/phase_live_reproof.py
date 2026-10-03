@@ -209,16 +209,78 @@ async def live_input_field_map(
     """
     rows: List[Dict[str, Any]] = []
     proof = await _prove_surface(page=page, phase=phase, phase_input=phase_input, judge=judge, field_rows_out=rows)
+    hidden_tab_exact = await _remember_wizard_tabs(page, phase, rows)
     counts = {k: sum(1 for r in rows if r.get("status") == k) for k in ("exact", "different", "not_on_screen", "invalid", "not_checked")}
     checked = len(rows) - counts["not_checked"]
     from .security import mask_sensitive_data
 
     return {
         "schema_version": "hip.live-input-json-map.v1", "phase": phase, "total": checked, **counts,
-        "complete": checked > 0 and counts["exact"] == checked and bool(proof.get("pass")),
+        "exact_on_other_tabs": hidden_tab_exact,
+        # Values remembered from another wizard tab count in the map, but "complete"
+        # still needs the shown tab exact; the phase's final proof walks every tab.
+        "complete": checked > 0 and counts["exact"] == checked and bool(proof.get("pass") or hidden_tab_exact),
         "proof_status": proof.get("status"), "invalid_fields": proof.get("invalid_fields") or [],
         "rows": mask_sensitive_data(rows), "read_only": True,
     }
+
+
+_EPOCH_JS = r"""() => {
+  const tabs = Array.from(document.querySelectorAll('[role=tablist] [role=tab]')).filter((t) => {
+    const r = t.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+  if (tabs.length < 2) return {epoch: '', current: ''};
+  const current = tabs.find((t) => t.getAttribute('aria-selected') === 'true');
+  return {epoch: window.__hipLiveMapEpoch || (window.__hipLiveMapEpoch = Math.random().toString(36).slice(2)),
+          current: current ? String(current.innerText || current.textContent || '').replace(/\s+/g, ' ').trim() : ''};
+}"""
+
+
+async def _remember_wizard_tabs(page: Any, phase: str, rows: List[Dict[str, Any]]) -> int:
+    """V243R39: a wizard shows one tab at a time -- keep what was exact on the others.
+
+    A value read exact while its tab was shown stays counted when the wizard has
+    moved on (its field is ``not_on_screen`` now), as long as it is the same open
+    form (same document; a reload or a reopened form starts empty).  The rows are
+    marked ``on_other_tab``; returns how many.  Read-only.
+    """
+    try:
+        state = await page.evaluate(_EPOCH_JS) or {}
+    except Exception:
+        state = {}
+    epoch, current = str(state.get("epoch") or ""), str(state.get("current") or "")
+    if not epoch or not current:
+        return 0
+    shown = {"text": current, "index": 0}
+
+    def on_shown_tab(row: Dict[str, Any]) -> bool:
+        # A row belongs to the tab on screen when its section names that tab.
+        return _tab_for_section(str(row.get("section") or ""), [shown]) is not None
+    store = getattr(page, "_hip_live_map_seen", None)
+    if not isinstance(store, dict) or store.get("epoch") != epoch or store.get("phase") != phase:
+        store = {"epoch": epoch, "phase": phase, "values": {}}
+        try:
+            setattr(page, "_hip_live_map_seen", store)
+        except Exception:
+            return 0
+    seen: Dict[str, Any] = store["values"]
+    remembered = 0
+    for row in rows:
+        key = f"{row.get('input_path')}|{row.get('field')}|{row.get('row')}"
+        own_tab = on_shown_tab(row)
+        if row.get("status") == "exact" and own_tab:
+            # Remembered only when read on its own tab (a value equal by chance on
+            # another tab -- the routing Target and the Target Transport Profile --
+            # must never stand in for it).
+            seen[key] = row.get("expected")
+        elif (row.get("status") == "not_on_screen" and not own_tab and key in seen
+              and seen[key] == row.get("expected")):
+            row["status"] = "exact"
+            row["live"] = row.get("expected")
+            row["on_other_tab"] = True
+            remembered += 1
+        elif row.get("status") == "different" or (own_tab and row.get("status") == "not_on_screen"):
+            seen.pop(key, None)
+    return remembered
 
 
 def _chip_values(controls: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:

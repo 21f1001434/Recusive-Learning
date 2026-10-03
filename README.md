@@ -1,3 +1,46 @@
+## V243R39 — BizFlow end to end, and every phase learns every operation (2026-10-03)
+
+- **BizFlow now runs the way the portal does:**
+  1. click + Add;
+  2. the flow-template card appears;
+  3. click its link, B2B-Flow-PubSub-Template;
+  4. the Create Biz Flow wizard opens;
+  5. fill each tab, then click Next at the bottom;
+  6. on Configure Routing, fill the routing "+ Add" drawer.
+
+  Proven by a real mission against a local copy of the portal: every input.json value is exact, the phase completes and its deterministic script is certified.
+- **Why BizFlow failed before:**
+  - The card's link (`javascript:void(0)`) was skipped.
+  - A tab ahead in the wizard is locked, and the agent only tried its header ("could not prove active BizFlow tab 'Source Details'").
+  - "Next" was looked up as the first button with that text, which can be the table pager's.
+  - The row "+" finder took the Flow Details tab header for the Attributes "+", so the wizard jumped back a tab.
+  - A legacy pre-fill typed guessed values (a rule name into the routing drawer, which has no rule field) and opened every dropdown first.
+- **What changed:**
+  - The wizard is moved with its own Next and Previous.
+  - When the portal refuses Next, the agent reads which required fields it names, fills them from input.json, then tries again.
+  - Tab headers, the wizard bar and pagers are never taken for a row "+".
+  - The goal engine fills each tab on its own.
+  - The live counter keeps values already verified on earlier tabs, so it no longer drops to 0/54 after Next.
+- **It learns everything the last tab offers, read-only:**
+  - the routing table's column menus and the row Action menu are opened, read and closed;
+  - + Add, Previous and Submit are recorded;
+  - commit buttons (Submit, Save, Delete) are never clicked.
+
+  How the form is reached and moved through is saved per phase (`data/hip_memory/phase_navigation/`). The deterministic script now says "Click the template link", "Click Next" and what each tab offers.
+- **Every phase learns Create, Edit, Clone, Migrate and Deploy.** At the end of every mission each phase learns, read-only, where Edit, Clone, Migrate and Deploy are and what they open:
+  - Edit / Clone forms are read in full and closed with Cancel;
+  - Migrate / Deploy menus, confirmations and dialogs are read and never confirmed;
+  - if input.json's object is new, an object already on the listing is used;
+  - Deploy buttons that may act at once are opened only with the mutation gate (`--allow-portal-mutation` + `HIP_ALLOW_PORTAL_MUTATION=YES` + the phrase), and still never confirmed;
+  - Create is the phase's deterministic script.
+
+  Each learned operation gets its own script (`deterministic_scripts/<phase>__<operation>.md`). The Mission tab's new **Operations each phase knows** panel (and `GET /api/operation-matrix`) shows the phase × operation table.
+- **The local portal copy** (`tests/hip_portal_sim.py`):
+  - now serves every module's listing with expandable rows and Edit / Clone / Migrate / Deploy;
+  - BizFlow has the template picker and the locked-tab wizard (Next checks required fields; Reset and Submit are traps).
+
+See `V243R39_BIZFLOW_WIZARD_AND_EVERY_OPERATION_20261003.md`. Apply with `APPLY_V243R39_IN_PLACE.ps1`; it includes R13–R38.
+
 ## V243R38 — Whole missions keep going, and say what they learned (2026-10-03)
 
 - **Target Document Type no longer loops on the listing.** Three causes, found by running the real mission against a local copy of the portal:

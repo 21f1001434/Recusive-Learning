@@ -13,19 +13,35 @@
   const ATTRS = ['Receiver', 'Sender', 'Transaction Type', 'Business Identifier'];
   const OPS = ['Equals', 'Not Equals', 'Contains'];
 
+  // V243R39 (window.__liveWizard): the live Create Biz Flow is a wizard.  A tab
+  // ahead of the furthest one reached is locked -- its header ignores the click --
+  // and only Next (after the tab's required fields are filled) moves forward;
+  // Previous goes back; a tab already reached opens from its header.
+  const WIZ = !!window.__liveWizard;
+  const wiz = { current: 0, reached: 0, onSelect: null };
   function tabs(names) {
     const list = H.el('<div role="tablist"></div>');
+    const tabEls = [];
     const panels = names.map((name, i) => {
       const tabId = `tab-${i}`; const panelId = `panel-${i}`;
-      const tab = H.el(`<button type="button" role="tab" id="${tabId}" aria-controls="${panelId}" aria-selected="${i === 0}">${name}</button>`);
+      const tab = H.el(`<button type="button" role="tab" id="${tabId}" aria-controls="${panelId}" aria-selected="${i === 0}"${WIZ && i > 0 ? ' aria-disabled="true"' : ''}>${name}</button>`);
       list.appendChild(tab);
+      tabEls.push(tab);
       const panel = H.el(`<div role="tabpanel" id="${panelId}" aria-labelledby="${tabId}"${i === 0 ? '' : ' hidden'}></div>`);
-      tab.addEventListener('click', () => {
-        list.querySelectorAll('[role=tab]').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
-        panels.forEach((p) => { p.hidden = p !== panel; });
-      });
+      tab.addEventListener('click', () => { if (!WIZ || i <= wiz.reached) wiz.select(i); });
       return panel;
     });
+    wiz.select = (i) => {
+      wiz.current = i;
+      wiz.reached = Math.max(wiz.reached, i);
+      tabEls.forEach((t, k) => {
+        t.setAttribute('aria-selected', String(k === i));
+        if (WIZ) { if (k <= wiz.reached) t.removeAttribute('aria-disabled'); else t.setAttribute('aria-disabled', 'true'); }
+        t.classList.toggle('wizard-tab--visited', WIZ && k < wiz.reached && k !== i);
+      });
+      panels.forEach((p, k) => { p.hidden = k !== i; });
+      if (wiz.onSelect) wiz.onSelect(i);
+    };
     return { list, panels };
   }
 
@@ -173,11 +189,46 @@
   const drawerHost = document.createElement('div');
   const addButton = H.el('<button type="button" id="routing-add">+ Add</button>');
   addButton.addEventListener('click', () => H.when(drawerHost, routingDrawer));
+  const COLS = ['Rule Name', 'Description', 'Rule Type', 'Version', 'Status'];
+  // Live (golden CR): every column header has its own column menu (⋮), each rule
+  // row has Action up / down arrows and a ⋮ menu, and the table is paginated.
+  const routingTable = WIZ
+    ? H.el(`<table class="dds__table routing-table"><thead><tr>${COLS.map((c, i) => `<th>${c} <button type="button" class="dds__table__column-menu" aria-haspopup="true" aria-expanded="false" aria-label="${c} column menu" aria-controls="col-menu-${i}">&#8942;</button><div class="dds__action-menu" role="menu" id="col-menu-${i}" hidden><button type="button" role="menuitem">Sort Ascending</button><button type="button" role="menuitem">Sort Descending</button><button type="button" role="menuitem">Hide Column</button></div></th>`).join('')}<th>Action</th></tr></thead><tbody><tr class="routing-empty"><td colspan="6">No data to display</td></tr></tbody></table>`)
+    : H.el('<table class="dds__table"><thead><tr><th>Rule Name</th><th>Description</th><th>Rule Type</th><th>Version</th><th>Status</th></tr></thead><tbody></tbody></table>');
+  const pager = WIZ ? H.el('<div class="dds__pagination routing-pager"><span>Items per page</span> <select aria-label="Items per page"><option>10</option><option>25</option></select> <span class="routing-count">0 - 0 of 0 items</span> <button type="button" class="dds__pagination__prev-page" disabled>Previous</button> <span>Page 1 of 1</span> <button type="button" class="dds__pagination__next-page" disabled>Next</button></div>') : null;
+  if (WIZ) {
+    routingTable.querySelectorAll('.dds__table__column-menu').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = routingTable.querySelector('#' + b.getAttribute('aria-controls'));
+      routingTable.querySelectorAll('.dds__action-menu').forEach((m) => { if (m !== menu) m.hidden = true; });
+      menu.hidden = !menu.hidden; b.setAttribute('aria-expanded', String(!menu.hidden));
+    }));
+    const closeMenus = () => {
+      document.querySelectorAll('.dds__action-menu').forEach((m) => { m.hidden = true; });
+      document.querySelectorAll('[aria-haspopup][aria-expanded=true]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+    };
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.dds__action-menu,[aria-haspopup]')) closeMenus(); });
+  }
   panels[3].append(
     H.row(H.text({ label: 'Table search', name: 'tableSearch', placeholder: 'Table search' }), addButton),
-    H.el('<table class="dds__table"><thead><tr><th>Rule Name</th><th>Description</th><th>Rule Type</th><th>Version</th><th>Status</th></tr></thead><tbody></tbody></table>'),
+    routingTable,
+    ...(pager ? [pager] : []),
     drawerHost,
   );
+  // A saved routing rule becomes a table row (Save is the portal's rule commit:
+  // the replica records it, a dummy fill never clicks it).
+  function addRoutingRow(values) {
+    const body = routingTable.querySelector('tbody');
+    const empty = body.querySelector('.routing-empty');
+    if (empty) empty.remove();
+    const n = body.querySelectorAll('tr').length;
+    const tr = H.el(`<tr class="routing-row"><td>${values.ruleName || ''}</td><td></td><td>${values.ruleType || ''}</td><td>${values.version || '1'}</td><td>Enabled</td><td class="routing-actions"><button type="button" aria-label="Move up">&#9650;</button><button type="button" aria-label="Move down">&#9660;</button><button type="button" class="routing-row-menu" aria-haspopup="true" aria-expanded="false" aria-label="More actions" aria-controls="row-menu-${n}">&#8942;</button><div class="dds__action-menu" role="menu" id="row-menu-${n}" hidden><button type="button" role="menuitem">Edit</button><button type="button" role="menuitem">View</button><button type="button" role="menuitem">Delete</button></div></td></tr>`);
+    const b = tr.querySelector('.routing-row-menu');
+    b.addEventListener('click', (e) => { e.stopPropagation(); const m = tr.querySelector('.dds__action-menu'); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); });
+    body.appendChild(tr);
+    if (pager) pager.querySelector('.routing-count').textContent = `1 - ${n + 1} of ${n + 1} items`;
+  }
   function routingDrawer() {
     const targetHost = document.createElement('div');
     const conditions = document.createElement('div');
@@ -218,15 +269,89 @@
           onChange: () => setTimeout(() => H.when(targetHost, () => H.dropdown({ label: 'Target *', name: 'target', options: ['SFTP_U-HAUL_ASN_PC_TGT_OB', 'SFTP_U-HAUL_ASN_PC_SRC_IB'] })), 150) }),
         targetHost,
       )),
-      H.el('<div class="actions"><button type="button">Cancel</button> <button type="button">Save</button></div>'),
+      H.el('<div class="actions"><button type="button" class="routing-cancel">Cancel</button> <button type="button" class="routing-save">Save</button></div>'),
     );
+    if (WIZ) {
+      drawer.querySelector('.routing-cancel').addEventListener('click', () => { drawerHost.innerHTML = ''; });
+      drawer.querySelector('.routing-save').addEventListener('click', () => {
+        window.__hipRoutingSaved = (window.__hipRoutingSaved || 0) + 1;
+        const v = (n) => { const i = drawer.querySelector(`[formcontrolname="${n}"] input, input[formcontrolname="${n}"]`); return i ? i.value : ''; };
+        addRoutingRow({ ruleName: v('ruleName'), ruleType: v('ruleType'), version: v('version') });
+        drawerHost.innerHTML = '';
+      });
+    }
     return drawer;
   }
 
   const wizard = document.createElement('form');
   wizard.setAttribute('autocomplete', 'off');
-  wizard.append(list, ...panels, H.el('<div class="actions"><button type="button">Previous</button> <button type="button">Reset</button> <button type="button">Next</button></div>'));
+  if (!WIZ) {
+    wizard.append(list, ...panels, H.el('<div class="actions"><button type="button">Previous</button> <button type="button">Reset</button> <button type="button">Next</button></div>'));
+  } else {
+    // Golden FD / CS / CR: Flow Details has Reset + Next; the middle tabs
+    // Previous + Reset + Next; Configure Routing Previous + Submit.
+    const bar = H.el('<div class="actions wizard-actions"></div>');
+    const message = H.el('<div class="wizard-message" aria-live="polite"></div>');
+    function requiredMissing(panel) {
+      const missing = [];
+      panel.querySelectorAll('label').forEach((label) => {
+        const text = label.textContent.trim();
+        if (!/\*\s*$/.test(text) || !label.offsetParent) return;
+        const control = label.htmlFor ? document.getElementById(label.htmlFor) : null;
+        if (!control || control.disabled || !control.offsetParent) return;
+        const dd = control.closest('dds-dropdown');
+        let filled;
+        if (dd && dd.getAttribute('selection') === 'multiple') filled = dd.querySelectorAll('.dds__tags .dds__tag').length > 0;
+        else filled = String(control.value || '').trim().length > 0;
+        control.setAttribute('aria-invalid', filled ? 'false' : 'true');
+        if (!filled) missing.push(text.replace(/\s*\*\s*$/, ''));
+      });
+      return missing;
+    }
+    function render(i) {
+      message.innerHTML = '';
+      const last = i === panels.length - 1;
+      bar.innerHTML = (i > 0 ? '<button type="button" class="dds__button dds__button--secondary" id="wizard-previous">&#8249; Previous</button> ' : '')
+        + (last ? '' : '<button type="button" class="dds__button dds__button--secondary" id="wizard-reset">Reset</button> ')
+        + (last ? '<button type="button" class="dds__button" id="wizard-submit">Submit</button>' : '<button type="button" class="dds__button" id="wizard-next">Next &#8250;</button>');
+      const prev = bar.querySelector('#wizard-previous');
+      if (prev) prev.addEventListener('click', () => wiz.select(i - 1));
+      const reset = bar.querySelector('#wizard-reset');
+      if (reset) reset.addEventListener('click', () => {
+        window.__hipWizardReset = (window.__hipWizardReset || 0) + 1;
+        panels[i].querySelectorAll('input[type=text],textarea').forEach((x) => { if (!x.disabled) { x.value = ''; x.dispatchEvent(new Event('input', { bubbles: true })); } });
+      });
+      const next = bar.querySelector('#wizard-next');
+      if (next) next.addEventListener('click', () => {
+        const missing = requiredMissing(panels[i]);
+        if (missing.length) {
+          window.__hipWizardBlocked = (window.__hipWizardBlocked || 0) + 1;
+          message.innerHTML = `<div class="dds__notification dds__notification--error" role="alert">Please fill the required fields: ${missing.join(', ')}</div>`;
+          return;
+        }
+        setTimeout(() => wiz.select(i + 1), 120);
+      });
+      const submit = bar.querySelector('#wizard-submit');
+      if (submit) submit.addEventListener('click', () => {
+        window.__hipSubmitted = (window.__hipSubmitted || 0) + 1;
+        message.innerHTML = '<div class="dds__notification" role="status">Biz Flow submitted</div>';
+      });
+    }
+    wiz.onSelect = render;
+    render(0);
+    // Test hook only: jump to a tab (as if every earlier tab had been completed).
+    if (window.__liveWizardTestHooks) window.__hipWizardJump = (i) => wiz.select(i);
+    wizard.append(list, ...panels, message, bar);
+  }
   H.page('Create Biz Flow', wizard);
+  if (WIZ) {
+    const back = H.el('<a class="dds__link wizard-back" href="javascript:void(0)">&#8249; Back</a>');
+    back.addEventListener('click', () => location.assign(location.pathname));
+    document.querySelector('main').insertBefore(back, document.querySelector('main').firstChild);
+    const style = document.createElement('style');
+    style.textContent = '[role=tab][aria-disabled=true] { color: #888; cursor: default; } .wizard-tab--visited { background: #eee; } .dds__notification--error { color: #b00; padding: 6px 0; } .routing-actions button { background: none; border: 0; cursor: pointer; } .dds__action-menu { position: absolute; background: #fff; border: 1px solid #999; z-index: 960; display: flex; flex-direction: column; } .dds__action-menu[hidden] { display: none; } th { position: relative; }';
+    document.head.appendChild(style);
+  }
   document.querySelector('main').insertBefore(H.el('<p>Create B2B flow using B2B-Flow-PubSub-Template template tailored for Inbound/Outbound integration.</p>'), wizard);
 })();
 </script>

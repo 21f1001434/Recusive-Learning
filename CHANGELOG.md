@@ -1,3 +1,67 @@
+# V243R39 — BizFlow end to end; every phase learns every operation (2026-10-03)
+
+- `bizflow_kb.py`:
+  - `_click_bizflow_template_link_after_add`:
+    - an in-page link (`javascript:void(0)`, `#`, no href) or a link below the module is followed;
+    - Back / View Template are skipped;
+    - the entry is remembered on the page (`_hip_bizflow_template_entry`).
+  - `_WIZARD_STATE_JS`, `_WIZARD_BUTTON_JS`, `_bizflow_wizard_state`, `_bizflow_tab_index`, `_click_bizflow_wizard_button`: the wizard's own Next / Previous (never a pager, a drawer, a table or a tab), with the tab before and after, the portal's alerts and the invalid fields.
+  - `_ensure_bizflow_tab_open`:
+    - a locked tab is reached with Next, one tab at a time;
+    - a header that does not open its tab moves the wizard instead;
+    - a refused Next raises `HIP_BIZFLOW_NEXT_BLOCKED` naming the missing fields.
+  - `_click_bizflow_continue`: the wizard Next first; legacy Continue / Proceed only without one.
+  - `_click_bizflow_section_add`: `notRowAdder` excludes tab lists, tabs, the wizard bar, pagers, Back / Previous / Next / Reset / Submit.
+  - `learn_bizflow_tab_options`, `_TAB_OPTIONS_JS`, `_OPEN_MENU_ITEMS_JS`, `_wizard_bar_buttons`: every button and menu of a tab, read-only. Each menu is opened, read and closed; a menu is reopened only if it is still visible.
+  - `_record_bizflow_navigation`.
+  - `capture_and_fill_bizflow_multitab_form`:
+    - per-tab navigation entries; the routing options are learned before + Add, and the drawer's buttons after the fill;
+    - a refused Next is repaired once from input.json, then raises;
+    - `legacy_fill`: with the goal engine on, the legacy dummy pass, the row helpers and dropdown opening are skipped, and repairs go to the goal engine;
+    - stateful controls are filtered too ("Items per page").
+- `phase_navigation.py` (new): `record`, `load`, `summaries`, `script_steps`, `is_commit` → `<memory>/phase_navigation/<phase>.json`.
+- `deterministic_script.py`: `build_script(navigation=...)` adds:
+  - the entry clicks;
+  - "On the “tab” tab:" groups;
+  - "Click “Next ›”" steps;
+  - "Learned what … offers" steps.
+
+  `write_phase_script` loads the navigation.
+- `operation_learning.py` (new):
+  - `learn_mission_operations`:
+    - per phase × Edit / Clone / Migrate / Deploy, skipped when known and fresh;
+    - falls back to the listing's first row when input.json's object is not there;
+    - chat narration and per-operation scripts;
+    - `last_report.json` / `matrix.json`.
+  - `operation_matrix`, `read_last_report`.
+- `edit_section_learning.py`: `first_row_name` clears a leftover table search (`_CLEAR_SEARCH_JS`).
+- `dummy_fill_e2e.py`:
+  - `_learn_operations_after_mission` after the phase loop (skipped without a live page);
+  - `FullDummyFillOptions.learn_operations`;
+  - the exact-state lock is written at completion when a later read-only proof made the phase exact (the terminal gate needs it).
+- `phase_live_reproof.py`: `_remember_wizard_tabs` — a value read exact on its own wizard tab stays counted while another tab is shown (same open form only); a value matched on another tab is never remembered; `exact_on_other_tabs`.
+- `agent_chat.py`:
+  - a field that already shows its value clears the field context;
+  - `readable_action` drops internal tags from click narration ("structural_opener …", "click_add_bizflow" → "+ Add").
+- `cli.py`: `hip-agent operation-matrix [--json]`.
+- `config.py` / `config.yaml`: `operation_learning` (enabled, after_mission, actions, refresh_days, max_seconds).
+- `backend/app.py`: `GET /api/operation-matrix` (matrix, navigation summaries, per-operation scripts).
+- `webui` (both copies):
+  - the **Operations each phase knows** panel (`loadOperationMatrix`);
+  - the 🧭 chat icon.
+- Tests and replicas:
+  - `tests/fixtures/bizflow_wizard_dds.html` gains `window.__liveWizard`:
+    - locked tabs; Next validates required fields;
+    - Previous / Reset / Submit;
+    - routing table column menus, row Action menu and pager;
+    - drawer Cancel / Save;
+    - `__liveWizardTestHooks`.
+  - `tests/hip_portal_sim.py`:
+    - BizFlow template picker;
+    - live wizard;
+    - every module's listing from `phase_listing_support` / `doctypes_listing_support`, with records, edit / clone pages and the deploy / migrate / save APIs.
+  - `tests/test_v243r39_bizflow_wizard_and_operations.py` (14).
+
 # V243R38 — Whole missions keep going, and say what they learned (2026-10-03)
 
 - `tests/hip_portal_sim.py` (new):

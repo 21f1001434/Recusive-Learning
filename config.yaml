@@ -892,6 +892,17 @@ production_e2e:
   write_final_summary: true
   final_summary_filename: "production_final_summary.json"
 
+operation_learning:
+  # V243R39: at the end of every mission each phase learns -- read-only -- its
+  # Edit, Clone, Migrate and Deploy (forms read and closed with Cancel, menus
+  # read, nothing saved or confirmed); Create is the phase's deterministic
+  # script.  Known, fresh operations are not learned again.
+  enabled: true
+  after_mission: true
+  actions: [edit, clone, migrate, deploy]
+  refresh_days: 7
+  max_seconds: 1800
+
 edit_sections:
   # V243R30: every phase's Edit section (listing -> search -> expand -> Edit) is
   # read completely (every tab, collapsed section and row), closed unsaved and

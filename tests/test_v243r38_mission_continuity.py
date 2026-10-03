@@ -384,7 +384,8 @@ def test_a_data_map_mission_completes_and_reports_its_deterministic_script(tmp_p
             options = FullDummyFillOptions(
                 phases=["data_map"], vision_verify=False, section_judge=False, require_text_judge=False,
                 require_vision_judge=False, upload_assets_dir=str(tmp_path / "uploads"), portal_brain_enabled=False,
-                runtime_self_heal_max_phase_attempts=2, continue_after_phase_block=True, qualify_models_on_first_page=False)
+                runtime_self_heal_max_phase_attempts=2, continue_after_phase_block=True, qualify_models_on_first_page=False,
+                learn_operations=False)  # V243R39: covered by its own mission test
             await asyncio.wait_for(FullDummyFillE2EFlow(cfg, options).run(ctx, input_json=str(mission_input(tmp_path))), timeout=600)
             return run_dir
 

@@ -2546,6 +2546,9 @@ class FullDummyFillOptions:
     # V243R24: when no model was qualified yet (Live certification never ran),
     # the first live mission page qualifies them once (read-only).
     qualify_models_on_first_page: bool = False
+    # V243R39: learn every mission phase's Edit / Clone / Migrate / Deploy at the
+    # end (read-only).  None: config.operation_learning decides.
+    learn_operations: Optional[bool] = None
 
 
 class FullDummyFillE2EFlow:
@@ -2559,6 +2562,42 @@ class FullDummyFillE2EFlow:
     def __init__(self, config: AppConfig, options: Optional[FullDummyFillOptions] = None):
         self.config = config
         self.options = options or FullDummyFillOptions()
+
+    async def _learn_operations_after_mission(self, *, ctx: RunContext, root_dir: Path, phases: Sequence[str],
+                                              browser: Any, input_data: Any, chat: Any) -> Dict[str, Any]:
+        """V243R39: learn each mission phase's Edit / Clone / Migrate / Deploy (read-only, never saved)."""
+        cfg = getattr(self.config, "operation_learning", None)
+        wanted = self.options.learn_operations
+        enabled = bool(getattr(cfg, "enabled", True) and getattr(cfg, "after_mission", True)) if wanted is None else bool(wanted)
+        if not enabled or not phases:
+            return {"status": "disabled"}
+        page = getattr(browser, "page", None)
+        try:
+            live = page is not None and str(getattr(page, "url", "") or "").startswith("http") and not page.is_closed()
+        except Exception:
+            live = False
+        if not live:
+            return {"status": "skipped_no_live_page"}
+        try:
+            from .operation_learning import learn_mission_operations
+            from .portal_operations import operation_gate
+
+            gate = operation_gate(bool(self.options.allow_portal_mutation), str(self.options.mutation_confirmation or ""))
+            report = await learn_mission_operations(
+                self.config, browser, input_data if isinstance(input_data, dict) else {}, run_dir=root_dir, phases=list(phases),
+                actions=list(getattr(cfg, "actions", None) or ["edit", "clone", "migrate", "deploy"]),
+                refresh_days=float(getattr(cfg, "refresh_days", 7.0) or 7.0), gate=gate, chat=chat, run_id=ctx.run_id,
+                deadline_seconds=float(getattr(cfg, "max_seconds", 1800.0) or 1800.0),
+            )
+        except Exception as exc:
+            report = {"status": "error", "error": mask_sensitive_string(str(exc))[:500]}
+            try:
+                chat.post(f"🧭 Learning Edit / Clone / Migrate / Deploy stopped: {report['error'][:200]}", kind="warn")
+            except Exception:
+                pass
+        safe_write_json(root_dir / "operation_learning_summary.json",
+                        {k: v for k, v in report.items() if k != "matrix"} if isinstance(report, dict) else report)
+        return report
 
     async def run(self, ctx: RunContext, *, input_json: str) -> Dict[str, Any]:
         root_dir = ctx.run_dir
@@ -5050,6 +5089,20 @@ class FullDummyFillE2EFlow:
                             phase_save_block_reason = f"HIP_PHASE_SAVE_NOT_CONFIRMED: {phase_save.get('status')}"
                             blocked_phase = phase
                             break
+                    if not (phase_dir / "phase_exact_state_lock.json").is_file():
+                        # V243R39: a phase proven exact by the read-only proof (BizFlow: every
+                        # wizard tab walked) after the fill coroutine returned has no lock yet;
+                        # the mission's terminal gate needs it.
+                        late_checkpoint = phase_exact_completion_checkpoint(phase, phase_dir)
+                        if late_checkpoint.get("pass") is True:
+                            safe_write_json(phase_dir / "phase_exact_state_lock.json", {
+                                "schema_version": "hip.all-phase-exact-state-lock.v1",
+                                "phase": phase, "attempt": attempt_no, "family": contract.get("family"),
+                                "exact_completion_checkpoint": late_checkpoint, "form_frozen": True,
+                                "phase_replay_allowed": False, "judge_may_review_but_not_mutate": True,
+                                "transaction_policy": contract.get("transaction_policy") or {},
+                                "written_at_completion": True,
+                            })
                     mission.mark_phase_complete(phase, attempt=attempt_no, judge_pass=bool(judge_result.get("pass", True)))
                     try:
                         # A committed phase must not leave an old review visible in
@@ -5229,6 +5282,13 @@ class FullDummyFillE2EFlow:
                 phase_verifications.append(verification)
                 if judge_result:
                     phase_judge_results.append(judge_result)
+
+            # V243R39: every phase of the mission also learns -- read-only -- its
+            # Edit, Clone, Migrate and Deploy (Create is the phase's script above).
+            operation_learning_report = await self._learn_operations_after_mission(
+                ctx=ctx, root_dir=root_dir, phases=phases, browser=shared_browser, input_data=base_input,
+                chat=mission_trace.chat,
+            )
 
         finally:
             if live_frame_task is not None:
